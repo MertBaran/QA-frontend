@@ -1,0 +1,9 @@
+node_modules/
+build/
+dist/
+coverage/
+*.config.js
+*.config.ts
+*.test.js
+*.test.ts
+*.test.tsx 
