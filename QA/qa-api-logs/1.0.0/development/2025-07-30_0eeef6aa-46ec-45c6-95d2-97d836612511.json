@@ -1,0 +1,27 @@
+[
+  {
+    "id": "0eeef6aa-46ec-45c6-95d2-97d836612511_2025-07-30T16-08-26-080Z",
+    "applicationId": "0eeef6aa-46ec-45c6-95d2-97d836612511",
+    "timestamp": "2025-07-30T16:08:26.080Z",
+    "environment": "development",
+    "version": "1.0.0",
+    "error": {
+      "message": "Test system error",
+      "name": "ApplicationError",
+      "stack": "ApplicationError: Test system error\n    at ApplicationError.systemError (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/dist/helpers/error/ApplicationError.js:69:16)\n    at /Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/dist/controllers/authController.js:56:59\n    at asyncUtilWrap (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express-async-handler/index.js:3:20)\n    at Layer.handle [as handle_request] (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/layer.js:95:5)\n    at next (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/route.js:149:13)\n    at Route.dispatch (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/route.js:119:3)\n    at Layer.handle [as handle_request] (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/layer.js:95:5)\n    at /Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/index.js:284:15\n    at router.process_params (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/index.js:346:12)\n    at next (/Users/mertbaran/Desktop/Bu/Projects/Mine/QA/QA-API/node_modules/express/lib/router/index.js:280:10)"
+    },
+    "metadata": {
+      "category": "SYSTEM_ERROR",
+      "severity": "CRITICAL",
+      "shouldLog": true,
+      "shouldAlert": true
+    },
+    "context": {
+      "endpoint": "/api/auth/test-error?errorType=system-error",
+      "method": "GET",
+      "userAgent": "PostmanRuntime/7.44.1",
+      "ip": "::1",
+      "timestamp": "2025-07-30T16:08:26.079Z"
+    }
+  }
+]

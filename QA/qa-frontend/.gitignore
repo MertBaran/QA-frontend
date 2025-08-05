@@ -124,3 +124,6 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Project specific
+TODO.md
