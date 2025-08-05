@@ -1,11 +1,10 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
-import { authService, RegisterData } from '../../../services/authService';
-import { ApiResponse } from '../../../types/api';
-import { User } from '../../../models/User';
+import { authService } from '../../../services/authService';
+import { RegisterData, LoginResponse } from '../../../types/user';
 import { handleReduxError, handleApiError } from '../../../utils/errorHandling';
 
 export const registerUser = createAsyncThunk<
-  ApiResponse<User>,
+  LoginResponse,
   RegisterData,
   { rejectValue: string }
 >(
@@ -13,7 +12,7 @@ export const registerUser = createAsyncThunk<
   async (userData, { rejectWithValue, getState }) => {
     try {
       const response = await authService.register(userData);
-      localStorage.setItem('token', (response as any).token);
+      localStorage.setItem('token', response.token);
       return response;
     } catch (error: any) {
       handleApiError(error, {

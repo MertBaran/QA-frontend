@@ -24,6 +24,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { registerUser } from '../../store/auth/register/registerThunks';
 import { clearError } from '../../store/auth/authSlice';
+import { t } from '../../utils/translations';
 import { useFormValidation, registerSchema } from '../../utils/validation';
 
 const Register = () => {
@@ -32,6 +33,7 @@ const Register = () => {
 
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector(state => state.auth);
+  const { currentLanguage } = useAppSelector(state => state.language);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -107,7 +109,7 @@ const Register = () => {
           }}
         >
           <Typography component="h1" variant="h4" gutterBottom>
-            Hesap Oluştur
+            {t('register_title', currentLanguage)}
           </Typography>
 
           {error && (
@@ -128,7 +130,7 @@ const Register = () => {
                   required
                   fullWidth
                   id="firstName"
-                  label="Ad"
+                  label={t('first_name', currentLanguage)}
                   name="firstName"
                   autoComplete="given-name"
                   value={formData.firstName}
@@ -143,6 +145,13 @@ const Register = () => {
                       </InputAdornment>
                     ),
                   }}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  inputProps={{
+                    'data-secure': 'true',
+                    'data-no-inspect': 'true',
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -151,7 +160,7 @@ const Register = () => {
                   required
                   fullWidth
                   id="lastName"
-                  label="Soyad"
+                  label={t('last_name', currentLanguage)}
                   name="lastName"
                   autoComplete="family-name"
                   value={formData.lastName}
@@ -166,6 +175,13 @@ const Register = () => {
                       </InputAdornment>
                     ),
                   }}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                  inputProps={{
+                    'data-secure': 'true',
+                    'data-no-inspect': 'true',
+                  }}
                 />
               </Grid>
             </Grid>
@@ -175,7 +191,7 @@ const Register = () => {
               required
               fullWidth
               id="email"
-              label="Email Adresi"
+              label={t('email_address', currentLanguage)}
               name="email"
               autoComplete="email"
               value={formData.email}
@@ -191,6 +207,9 @@ const Register = () => {
                   </InputAdornment>
                 ),
               }}
+              InputLabelProps={{
+                shrink: true,
+              }}
             />
 
             <TextField
@@ -198,7 +217,7 @@ const Register = () => {
               required
               fullWidth
               name="password"
-              label="Şifre"
+              label={t('password', currentLanguage)}
               type={showPassword ? 'text' : 'password'}
               id="password"
               autoComplete="new-password"
@@ -225,6 +244,15 @@ const Register = () => {
                   </InputAdornment>
                 ),
               }}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              inputProps={{
+                'data-secure': 'true',
+                'data-no-inspect': 'true',
+                'data-protected': 'true',
+                'data-mask': 'true',
+              }}
             />
 
             <TextField
@@ -232,7 +260,7 @@ const Register = () => {
               required
               fullWidth
               name="confirmPassword"
-              label="Şifre Tekrarı"
+              label={t('confirm_password', currentLanguage)}
               type={showConfirmPassword ? 'text' : 'password'}
               id="confirmPassword"
               autoComplete="new-password"
@@ -259,6 +287,15 @@ const Register = () => {
                   </InputAdornment>
                 ),
               }}
+              // InputLabelProps={{
+              //   shrink: true,
+              // }}
+              inputProps={{
+                'data-secure': 'true',
+                'data-no-inspect': 'true',
+                'data-protected': 'true',
+                'data-mask': 'true',
+              }}
             />
 
             <Button
@@ -271,13 +308,13 @@ const Register = () => {
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                'Kayıt Ol'
+                t('register_button', currentLanguage)
               )}
             </Button>
 
             <Box sx={{ textAlign: 'center' }}>
               <Link component={RouterLink} to="/login" variant="body2">
-                {'Zaten hesabınız var mı? Giriş yapın'}
+                {t('have_account', currentLanguage)}
               </Link>
             </Box>
           </Box>

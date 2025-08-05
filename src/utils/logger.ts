@@ -15,12 +15,7 @@ type Logger = {
   error: (message: string, error?: any, context?: LogContext) => void;
   api: {
     request: (method: string, url: string, data?: LogData) => void;
-    response: (
-      method: string,
-      url: string,
-      status: number,
-      data?: LogData
-    ) => void;
+    response: (method: string, url: string, status: number, data?: LogData) => void;
     error: (method: string, url: string, error: any) => void;
   };
   auth: {
@@ -28,6 +23,8 @@ type Logger = {
     success: (user: { email?: string } | any) => void;
     failure: (email: string, error: any) => void;
     logout: () => void;
+    action: (action: string, data?: LogData) => void;
+    error: (action: string, error: any) => void;
   };
   redux: {
     action: (actionType: string, payload?: LogData) => void;
@@ -97,10 +94,7 @@ const logger: Logger = {
     },
     response: (method, url, status, data = null) => {
       if (isDevelopment) {
-        console.log(
-          `[API RESPONSE] ${method.toUpperCase()} ${url} (${status})`,
-          data
-        );
+        console.log(`[API RESPONSE] ${method.toUpperCase()} ${url} (${status})`, data);
       }
     },
     error: (method, url, error) => {
@@ -121,16 +115,14 @@ const logger: Logger = {
 
   // Auth logs - only in development
   auth: {
-    login: email => {
+    login: (email) => {
       if (isDevelopment) {
         console.log(`[AUTH] Login attempt for: ${email}`);
       }
     },
-    success: user => {
+    success: (user) => {
       if (isDevelopment) {
-        console.log(
-          `[AUTH] Login successful for: ${user?.email || JSON.stringify(user)}`
-        );
+        console.log(`[AUTH] Login successful for: ${user?.email || JSON.stringify(user)}`);
       }
     },
     failure: (email, error) => {
@@ -152,6 +144,24 @@ const logger: Logger = {
     logout: () => {
       if (isDevelopment) {
         console.log('[AUTH] User logged out');
+      }
+    },
+    action: (action, data = null) => {
+      if (isDevelopment) {
+        console.log(`[AUTH ACTION] ${action}`, data);
+      }
+    },
+    error: (action, error) => {
+      if (isDevelopment) {
+        console.error(`[AUTH ERROR] ${action}`, error);
+      }
+      if (isProduction) {
+        Sentry.captureException(error, {
+          tags: {
+            type: 'auth_error',
+            action,
+          },
+        });
       }
     },
   },

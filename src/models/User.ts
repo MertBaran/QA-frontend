@@ -1,7 +1,20 @@
 export interface User {
   _id: string;
+  name: string;
   email: string;
-  name?: string;
-  profileImage?: string;
-  // Diğer user alanları eklenebilir
+  roles: string[]; // Role ID'leri
+  title?: string;
+  about?: string;
+  place?: string;
+  website?: string;
+  profile_image: string;
+  blocked: boolean;
+  createdAt?: Date;
+  language?: string;
+  notificationPreferences?: {
+    email: boolean;
+    push: boolean;
+    sms: boolean;
+    webhook: boolean;
+  };
 }

@@ -7,13 +7,14 @@ import formReducer from './form/formSlice';
 import loginReducer from './auth/login/loginSlice';
 import registerReducer from './auth/register/registerSlice';
 import questionReducer from './questions/questionSlice';
+import languageReducer from './language/languageSlice';
 
 // Persist configuration for auth slice
 const authPersistConfig = {
   key: 'auth',
   storage,
-  whitelist: ['user', 'isAuthenticated'], // Sadece bu alanları persist et
-  blacklist: ['loading', 'error'], // Bu alanları persist etme
+  whitelist: ['user', 'isAuthenticated', 'hasAdminPermission', 'roles'], // Admin permission'ları da persist et
+  blacklist: ['loading', 'error', 'adminPermissionLoading'], // Bu alanları persist etme
 };
 
 // Persist configuration for theme slice
@@ -49,8 +50,9 @@ const store = configureStore({
     theme: persistedThemeReducer,
     form: persistedFormReducer,
     questions: questionReducer,
+    language: languageReducer,
   },
-  middleware: getDefaultMiddleware =>
+  middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],

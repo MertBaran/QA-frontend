@@ -6,15 +6,17 @@ import Loading from '../components/ui/Loading';
 // Route components
 import ProtectedRoute from './ProtectedRoute';
 import PublicRoute from './PublicRoute';
+import AdminLayout from '../components/layout/AdminLayout';
 
 // Route configuration
-import { publicRoutes, protectedRoutes, catchAllRoute } from './config';
+import { publicRoutes, protectedRoutes, adminProtectedRoutes, catchAllRoute } from './config';
 
 // Lazy load page components
 const Login = lazy(() => import('../pages/auth/Login'));
 const Register = lazy(() => import('../pages/auth/Register'));
 const Home = lazy(() => import('../pages/Home'));
 const Questions = lazy(() => import('../pages/question/Questions'));
+const QuestionDetail = lazy(() => import('../pages/question/QuestionDetail'));
 const AskQuestion = lazy(() => import('../pages/question/AskQuestion'));
 const Profile = lazy(() => import('../pages/user/Profile'));
 const TestError = lazy(() => import('../pages/TestError'));
@@ -22,18 +24,36 @@ const NotFound = lazy(() => import('../pages/NotFound'));
 const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 
+// Admin page components
+const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
+const AdminUsers = lazy(() => import('../pages/admin/AdminUsers'));
+const AdminQuestions = lazy(() => import('../pages/admin/AdminQuestions'));
+const AdminAnswers = lazy(() => import('../pages/admin/AdminAnswers'));
+const AdminPermissions = lazy(() => import('../pages/admin/AdminPermissions'));
+const AdminRoles = lazy(() => import('../pages/admin/AdminRoles'));
+const AdminSettings = lazy(() => import('../pages/admin/AdminSettings'));
+
 // Page component mapping
 const Pages = {
   Login,
   Register,
   Home,
   Questions,
+  QuestionDetail,
   AskQuestion,
   Profile,
   TestError,
   NotFound,
   ResetPassword,
   ForgotPassword,
+  // Admin pages
+  AdminDashboard,
+  AdminUsers,
+  AdminQuestions,
+  AdminAnswers,
+  AdminPermissions,
+  AdminRoles,
+  AdminSettings,
 };
 
 const AppRoutes = () => {
@@ -76,6 +96,21 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute>
               {renderPageComponent(ComponentName as keyof typeof Pages)}
+            </ProtectedRoute>
+          }
+        />
+      ))}
+
+      {/* Admin Routes */}
+      {adminProtectedRoutes.map(({ path, component: ComponentName }) => (
+        <Route
+          key={path}
+          path={path}
+          element={
+            <ProtectedRoute requireAdmin>
+              <AdminLayout>
+                {renderPageComponent(ComponentName as keyof typeof Pages)}
+              </AdminLayout>
             </ProtectedRoute>
           }
         />

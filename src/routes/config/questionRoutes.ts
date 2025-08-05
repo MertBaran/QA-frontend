@@ -6,6 +6,11 @@ export const questionRoutes = [
     exact: true,
   },
   {
+    path: '/questions/:id',
+    component: 'QuestionDetail',
+    exact: true,
+  },
+  {
     path: '/ask',
     component: 'AskQuestion',
     exact: true,

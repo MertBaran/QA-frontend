@@ -9,13 +9,17 @@ import {
   getCurrentUserRejected,
 } from './reducers/authReducers';
 import logger from '../../utils/logger';
-import { AuthState } from '../../models/Auth';
+import { AuthState } from './authState';
 
 const initialState: AuthState = {
   user: null,
   isAuthenticated: false,
   loading: false,
   error: null,
+  // Admin permission state'leri
+  hasAdminPermission: false,
+  roles: [],
+  adminPermissionLoading: false,
 };
 
 const authSlice = createSlice({
@@ -24,11 +28,25 @@ const authSlice = createSlice({
   reducers: {
     logout: logoutReducer,
     clearError: clearErrorReducer,
+    // Admin permission actions
+    setAdminPermissions: (state, action) => {
+      state.hasAdminPermission = action.payload.hasAdminPermission;
+      state.roles = action.payload.roles;
+      state.adminPermissionLoading = false;
+    },
+    setAdminPermissionLoading: (state, action) => {
+      state.adminPermissionLoading = action.payload;
+    },
+    clearAdminPermissions: (state) => {
+      state.hasAdminPermission = false;
+      state.roles = [];
+      state.adminPermissionLoading = false;
+    },
   },
-  extraReducers: builder => {
+  extraReducers: (builder) => {
     builder
       // Login cases
-      .addCase(loginUser.pending, state => {
+      .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
         logger.redux.state('auth', { loading: true, error: null });
@@ -38,6 +56,9 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.isAuthenticated = true;
         state.error = null;
+        // Login sonrası admin permission'ları temizle (yeniden check edilecek)
+        state.hasAdminPermission = false;
+        state.roles = [];
         logger.redux.state('auth', {
           user: action.payload.user,
           isAuthenticated: true,
@@ -48,6 +69,9 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         state.user = null;
         state.isAuthenticated = false;
+        // Login başarısız olduğunda admin permission'ları temizle
+        state.hasAdminPermission = false;
+        state.roles = [];
         logger.redux.state('auth', {
           error: action.payload,
           isAuthenticated: false,
@@ -60,5 +84,11 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const {
+  logout,
+  clearError,
+  setAdminPermissions,
+  setAdminPermissionLoading,
+  clearAdminPermissions,
+} = authSlice.actions;
 export default authSlice.reducer;

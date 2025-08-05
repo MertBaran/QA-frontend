@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { Box, Container, Paper, TextField, Button, Typography, Link } from '@mui/material';
+import { Box, Container, Paper, TextField, Button, Typography, Link, FormControlLabel, Checkbox } from '@mui/material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginUser } from '../../store/auth/login/loginThunks';
+import { checkAdminPermissions } from '../../store/auth/authThunks';
 import { clearError } from '../../store/auth/authSlice';
+import { t } from '../../utils/translations';
 import { useFormValidation, loginSchema } from '../../utils/validation';
+import SecurePasswordField from '../../components/auth/SecurePasswordField';
 import { ButtonLoading } from '../../components/ui/Loading';
 import { ErrorAlert } from '../../components/error/ErrorDisplay';
 import {
@@ -13,21 +16,24 @@ import {
   isServerError,
 } from '../../utils/errorHandling/enhancedErrorHandler';
 import logger from '../../utils/logger';
-import { GoogleLogin } from '@react-oauth/google';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 import axios from 'axios';
 import { getCurrentUser } from '../../store/auth/authThunks';
 
 const Login = () => {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.auth);
+  const { currentLanguage } = useAppSelector(state => state.language);
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+  const [rememberMe, setRememberMe] = useState(false);
 
   const [retryCount, setRetryCount] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError } =
     useFormValidation(loginSchema);
@@ -56,8 +62,32 @@ const Login = () => {
 
     if (isValid) {
       try {
-        await dispatch(loginUser(formData)).unwrap();
+        // Remember me bilgisini ekle
+        const loginData = {
+          ...formData,
+          rememberMe
+        };
+        await dispatch(loginUser(loginData)).unwrap();
         logger.user.action('login_successful');
+        
+        // Login başarılı olduktan sonra admin permission check
+        try {
+          const adminResult = await dispatch(checkAdminPermissions()).unwrap();
+          
+          if (adminResult.hasAdminPermission) {
+            // Admin ise admin dashboard'a yönlendir
+            navigate('/admin/dashboard');
+            logger.user.action('admin_login_successful');
+          } else {
+            // Normal user ise normal dashboard'a yönlendir
+            navigate('/dashboard');
+            logger.user.action('user_login_successful');
+          }
+        } catch (adminError) {
+          // Admin check başarısız olursa normal dashboard'a yönlendir
+          logger.user.action('admin_check_failed', { error: adminError });
+          navigate('/dashboard');
+        }
       } catch (error) {
         // Enhanced error handling
         const errorInfo = await handleError(error, {
@@ -146,7 +176,7 @@ const Login = () => {
     if (isServerError({ message: error })) {
       return (
         <ErrorAlert
-          error="Sunucu hatası oluştu. Lütfen daha sonra tekrar deneyin."
+          error={t('server_error', currentLanguage)}
           onRetry={handleRetry}
           onDismiss={handleDismissError}
         />
@@ -178,44 +208,37 @@ const Login = () => {
           }}
         >
           <Typography component="h1" variant="h4" gutterBottom>
-            Giriş Yap
+            {t('login_title', currentLanguage)}
           </Typography>
 
           {/* Enhanced Error Display */}
           {getErrorComponent()}
 
           {/* Google ile Giriş */}
-          <Box sx={{ width: '100%', my: 2 }}>
-            <GoogleLogin
-              onSuccess={async credentialResponse => {
-                if (credentialResponse.credential) {
-                  await handleGoogleLogin(credentialResponse.credential);
-                }
-              }}
-              onError={() => {
-                alert('Google ile giriş başarısız oldu.');
-              }}
-              width="100%"
-            />
-          </Box>
-          <Typography align="center" sx={{ my: 2 }}>veya</Typography>
+          <GoogleLoginButton
+            onSuccess={handleGoogleLogin}
+            onError={() => {
+              alert(t('google_login_failed', currentLanguage));
+            }}
+          />
+          <Typography align="center" sx={{ my: 2 }}>{t('or', currentLanguage)}</Typography>
 
           {/* Retry Count Display */}
           {retryCount > 0 && (
             <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
-              Deneme sayısı: {retryCount}
+              {t('retry_count', currentLanguage)}: {retryCount}
             </Typography>
           )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+          <Box component="form" onSubmit={handleSubmit} autoComplete="on" sx={{ mt: 1, width: '100%' }}>
             <TextField
               margin="normal"
               required
               fullWidth
               id="email"
-              label="Email Adresi"
+              label={t('email_address', currentLanguage)}
               name="email"
-              autoComplete="email"
+              autoComplete="username"
               value={formData.email}
               onChange={handleInputChange}
               onBlur={handleInputBlur}
@@ -223,28 +246,45 @@ const Login = () => {
               error={!!getFieldError('email')}
               helperText={getFieldError('email')}
               disabled={loading}
+              InputLabelProps={{ //giriş bilgileri tarayıcı tarafından hatırlanıyor ise küçük yapıyor
+                shrink: true,
+              }}
+              inputProps={{
+                'data-secure': 'true',
+                'data-no-inspect': 'true',
+              }}
             />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
+            <SecurePasswordField
               name="password"
-              label="Şifre"
-              type="password"
-              id="password"
-              autoComplete="current-password"
+              label={t('password', currentLanguage)}
               value={formData.password}
               onChange={handleInputChange}
               onBlur={handleInputBlur}
               error={!!getFieldError('password')}
               helperText={getFieldError('password')}
+              showPassword={showPassword}
+              onTogglePassword={() => setShowPassword(!showPassword)}
               disabled={loading}
             />
-            <Box sx={{ textAlign: 'right', mb: 1 }}>
+            
+            {/* Beni Hatırla Checkbox */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    color="primary"
+                  />
+                }
+                label={t('remember_me', currentLanguage)}
+              />
               <Link component={RouterLink} to="/forgot-password" variant="body2">
-                Şifremi Unuttum?
+                {t('forgot_password', currentLanguage)}
               </Link>
             </Box>
+            
+
             <Button
               type="submit"
               fullWidth
@@ -252,11 +292,11 @@ const Login = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading || !isFormValid}
             >
-              {loading ? <ButtonLoading size={24} /> : 'Giriş Yap'}
+              {loading ? <ButtonLoading size={24} /> : t('login_button', currentLanguage)}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link component={RouterLink} to="/register" variant="body2">
-                {'Hesabınız yok mu? Kayıt olun'}
+                {t('no_account', currentLanguage)}
               </Link>
             </Box>
           </Box>

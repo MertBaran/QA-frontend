@@ -1,16 +1,16 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { QuestionState } from '../../models/QuestionState';
+import { QuestionState } from './questionState.js';
 import {
   getAllQuestions,
   getQuestion,
-  askQuestion,
-  editQuestion,
+  createQuestion,
+  updateQuestion,
   deleteQuestion,
   likeQuestion,
-  undoLikeQuestion,
+  unlikeQuestion,
 } from './questionThunks';
-import { ApiResponse } from '../../types/api';
-import { Question } from '../../models/Question';
+
+import { Question } from '../../types/question';
 
 const initialState: QuestionState = {
   questions: [],
@@ -27,7 +27,7 @@ const questionSlice = createSlice({
   initialState,
   reducers: {
     // Clear errors
-    clearError: state => {
+    clearError: (state) => {
       state.error = null;
     },
 
@@ -42,14 +42,14 @@ const questionSlice = createSlice({
     },
 
     // Clear current question
-    clearCurrentQuestion: state => {
+    clearCurrentQuestion: (state) => {
       state.currentQuestion = null;
     },
 
     // Update question in list
     updateQuestionInList: (state, action) => {
       const { questionId, updates } = action.payload;
-      const index = state.questions.findIndex(q => q._id === questionId);
+      const index = state.questions.findIndex((q) => q.id === questionId);
       if (index !== -1) {
         state.questions[index] = { ...state.questions[index], ...updates };
       }
@@ -58,7 +58,7 @@ const questionSlice = createSlice({
     // Remove question from list
     removeQuestionFromList: (state, action) => {
       const questionId = action.payload;
-      state.questions = state.questions.filter(q => q._id !== questionId);
+      state.questions = state.questions.filter((q) => q.id !== questionId);
       state.totalQuestions -= 1;
     },
 
@@ -70,97 +70,94 @@ const questionSlice = createSlice({
 
     // Update like status
     updateLikeStatus: (state, action) => {
-      const { questionId, userId, isLiked } = action.payload;
-      const question = state.questions.find(q => q._id === questionId);
+      const { questionId, isLiked } = action.payload;
+      const question = state.questions.find((q) => q.id === questionId);
       if (question) {
         if (isLiked) {
-          if (!question.likes.includes(userId)) {
-            question.likes.push(userId);
-          }
+          question.likes += 1;
         } else {
-          question.likes = question.likes.filter(id => id !== userId);
+          question.likes = Math.max(0, question.likes - 1);
         }
       }
     },
   },
-  extraReducers: builder => {
+  extraReducers: (builder) => {
     // Get all questions
     builder
-      .addCase(getAllQuestions.pending, state => {
+      .addCase(getAllQuestions.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getAllQuestions.fulfilled, (state, action: PayloadAction<ApiResponse<Question[]>>) => {
+      .addCase(getAllQuestions.fulfilled, (state, action: PayloadAction<Question[]>) => {
         state.loading = false;
-        state.questions = action.payload.data;
-        state.totalQuestions = action.payload.data.length;
+        state.questions = action.payload;
+        state.totalQuestions = action.payload.length;
       })
       .addCase(getAllQuestions.rejected, (state, action) => {
         state.loading = false;
-        state.error = typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
+        state.error =
+          typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
       // Get single question
-      .addCase('questions/getQuestion/pending', state => {
+      .addCase(getQuestion.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getQuestion.fulfilled, (state, action: PayloadAction<ApiResponse<Question>>) => {
+      .addCase(getQuestion.fulfilled, (state, action: PayloadAction<Question>) => {
         state.loading = false;
-        state.currentQuestion = action.payload.data;
+        state.currentQuestion = action.payload;
       })
       .addCase(getQuestion.rejected, (state, action) => {
         state.loading = false;
-        state.error = typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
+        state.error =
+          typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
-      // Ask question
-      .addCase('questions/askQuestion/pending', state => {
+      // Create question
+      .addCase(createQuestion.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(askQuestion.fulfilled, (state, action: PayloadAction<ApiResponse<Question>>) => {
+      .addCase(createQuestion.fulfilled, (state, action: PayloadAction<Question>) => {
         state.loading = false;
-        state.questions.unshift(action.payload.data);
+        state.questions.unshift(action.payload);
         state.totalQuestions += 1;
       })
-      .addCase(askQuestion.rejected, (state, action) => {
+      .addCase(createQuestion.rejected, (state, action) => {
         state.loading = false;
-        state.error = typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
+        state.error =
+          typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
-      // Edit question
-      .addCase('questions/editQuestion/pending', state => {
+      // Update question
+      .addCase(updateQuestion.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(editQuestion.fulfilled, (state, action: PayloadAction<ApiResponse<Question>>) => {
+      .addCase(updateQuestion.fulfilled, (state, action: PayloadAction<Question>) => {
         state.loading = false;
-        const updatedQuestion = action.payload.data;
+        const updatedQuestion = action.payload;
 
         // Update in questions list
-        const index = state.questions.findIndex(
-          q => q._id === updatedQuestion._id
-        );
+        const index = state.questions.findIndex((q) => q.id === updatedQuestion.id);
         if (index !== -1) {
           state.questions[index] = updatedQuestion;
         }
 
         // Update current question if it's the same
-        if (
-          state.currentQuestion &&
-          state.currentQuestion._id === updatedQuestion._id
-        ) {
+        if (state.currentQuestion && state.currentQuestion.id === updatedQuestion.id) {
           state.currentQuestion = updatedQuestion;
         }
       })
-      .addCase(editQuestion.rejected, (state, action) => {
+      .addCase(updateQuestion.rejected, (state, action) => {
         state.loading = false;
-        state.error = typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
+        state.error =
+          typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
       // Delete question
-      .addCase('questions/deleteQuestion/pending', state => {
+      .addCase(deleteQuestion.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
@@ -168,38 +165,41 @@ const questionSlice = createSlice({
         state.loading = false;
         // The question ID is in action.meta.arg
         const questionId = (action as any).meta.arg as string;
-        state.questions = state.questions.filter(q => q._id !== questionId);
+        state.questions = state.questions.filter((q) => q.id !== questionId);
         state.totalQuestions -= 1;
 
         // Clear current question if it's the deleted one
-        if (state.currentQuestion && state.currentQuestion._id === questionId) {
+        if (state.currentQuestion && state.currentQuestion.id === questionId) {
           state.currentQuestion = null;
         }
       })
       .addCase(deleteQuestion.rejected, (state, action) => {
         state.loading = false;
-        state.error = typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
+        state.error =
+          typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
       // Like question
-      .addCase(likeQuestion.fulfilled, (state, action: PayloadAction<ApiResponse<Question>>) => {
-        const updatedQuestion = action.payload.data;
-        const index = state.questions.findIndex(q => q._id === updatedQuestion._id);
-        if (index !== -1) {
-          state.questions[index] = updatedQuestion;
+      .addCase(likeQuestion.fulfilled, (state, action) => {
+        // Like action returns boolean, so we need to update the question manually
+        const questionId = (action as any).meta.arg as string;
+        const question = state.questions.find((q) => q.id === questionId);
+        if (question) {
+          question.likes += 1;
         }
-        if (state.currentQuestion && state.currentQuestion._id === updatedQuestion._id) {
-          state.currentQuestion = updatedQuestion;
+        if (state.currentQuestion && state.currentQuestion.id === questionId) {
+          state.currentQuestion.likes += 1;
         }
       })
-      .addCase(undoLikeQuestion.fulfilled, (state, action: PayloadAction<ApiResponse<Question>>) => {
-        const updatedQuestion = action.payload.data;
-        const index = state.questions.findIndex(q => q._id === updatedQuestion._id);
-        if (index !== -1) {
-          state.questions[index] = updatedQuestion;
+      .addCase(unlikeQuestion.fulfilled, (state, action) => {
+        // Unlike action returns boolean, so we need to update the question manually
+        const questionId = (action as any).meta.arg as string;
+        const question = state.questions.find((q) => q.id === questionId);
+        if (question) {
+          question.likes = Math.max(0, question.likes - 1);
         }
-        if (state.currentQuestion && state.currentQuestion._id === updatedQuestion._id) {
-          state.currentQuestion = updatedQuestion;
+        if (state.currentQuestion && state.currentQuestion.id === questionId) {
+          state.currentQuestion.likes = Math.max(0, state.currentQuestion.likes - 1);
         }
       });
   },

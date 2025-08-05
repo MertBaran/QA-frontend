@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react';
 import { BrowserTracing } from '@sentry/tracing';
-import { User } from '../models/User';
+import { User } from '../types/user';
 import type { SeverityLevel } from '@sentry/types';
 
 export const initSentry = (): void => {
@@ -47,7 +47,7 @@ export const initSentry = (): void => {
 export const setUserContext = (user: User | null): void => {
   if (user) {
     Sentry.setUser({
-      id: user._id,
+      id: user.id,
       email: user.email,
       username: user.name,
     });
@@ -71,10 +71,14 @@ export const captureError = (error: unknown, context: Record<string, unknown> = 
   });
 };
 
-export const captureMessage = (message: string, level: string = 'info', context: Record<string, unknown> = {}): void => {
+export const captureMessage = (
+  message: string,
+  level: string = 'info',
+  context: Record<string, unknown> = {},
+): void => {
   console.log('Sentry Message (development):', message, level, context);
   Sentry.captureMessage(message, {
     level: level as SeverityLevel,
     extra: context,
   });
-}; 
+};
