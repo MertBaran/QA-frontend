@@ -334,7 +334,10 @@ const Questions = () => {
                       {/* Like Button */}
                       {user && (
                         <IconButton
-                          onClick={() => handleLikeQuestion(question.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleLikeQuestion(question.id);
+                          }}
                           color={isLiked ? 'primary' : 'default'}
                           size="small"
                         >
