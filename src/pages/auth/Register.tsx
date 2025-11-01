@@ -43,21 +43,28 @@ const Register = () => {
     confirmPassword: '',
   });
 
-  const { validateForm, handleBlur, handleChange, isFormValid, getFieldError } =
+  const { validateForm, handleBlur, handleChange, isFormValid, getFieldError, validateField, touched } =
     useFormValidation(registerSchema);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-    handleChange(name, value);
+    setFormData(prev => {
+      const updated = { ...prev, [name]: value };
+      handleChange(name, value, updated);
+      
+      // If password changed and confirmPassword is touched, re-validate confirmPassword
+      if (name === 'password' && touched['confirmPassword']) {
+        validateField('confirmPassword', updated.confirmPassword, updated);
+      }
+      // If confirmPassword changed and password is touched, we already validated it above
+      
+      return updated;
+    });
   };
 
   const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    handleBlur(name, value);
+    handleBlur(name, value, formData);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

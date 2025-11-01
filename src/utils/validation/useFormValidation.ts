@@ -6,17 +6,24 @@ export const useFormValidation = (schema: yup.ObjectSchema<any>) => {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Validate a single field
-  const validateField = async (name: string, value: any): Promise<boolean> => {
+  const validateField = async (
+    name: string,
+    value: any,
+    allFormData?: Record<string, any>,
+  ): Promise<boolean> => {
     try {
       // Create a partial schema for the specific field
       const fieldSchema = yup.object({
         [name]: schema.fields[name],
       });
 
-      await fieldSchema.validate({ [name]: value }, { abortEarly: false });
+      // Use allFormData if provided (for yup.ref() support), otherwise just the field value
+      const dataToValidate = allFormData ? { ...allFormData, [name]: value } : { [name]: value };
+
+      await fieldSchema.validate(dataToValidate, { abortEarly: false });
 
       // If validation passes, remove error for this field
-      setErrors(prev => {
+      setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[name];
         return newErrors;
@@ -26,7 +33,7 @@ export const useFormValidation = (schema: yup.ObjectSchema<any>) => {
     } catch (validationError) {
       if (validationError instanceof yup.ValidationError) {
         const fieldError = validationError.errors[0];
-        setErrors(prev => ({
+        setErrors((prev) => ({
           ...prev,
           [name]: fieldError,
         }));
@@ -37,9 +44,7 @@ export const useFormValidation = (schema: yup.ObjectSchema<any>) => {
   };
 
   // Validate entire form
-  const validateForm = async (
-    formData: Record<string, any>
-  ): Promise<boolean> => {
+  const validateForm = async (formData: Record<string, any>): Promise<boolean> => {
     try {
       await schema.validate(formData, { abortEarly: false });
       setErrors({});
@@ -47,7 +52,7 @@ export const useFormValidation = (schema: yup.ObjectSchema<any>) => {
     } catch (validationError) {
       if (validationError instanceof yup.ValidationError) {
         const newErrors: Record<string, string> = {};
-        validationError.inner.forEach(error => {
+        validationError.inner.forEach((error) => {
           if (error.path) newErrors[error.path] = error.message;
         });
         setErrors(newErrors);
@@ -58,15 +63,15 @@ export const useFormValidation = (schema: yup.ObjectSchema<any>) => {
   };
 
   // Handle field blur
-  const handleBlur = async (name: string, value: any) => {
-    setTouched(prev => ({ ...prev, [name]: true }));
-    await validateField(name, value);
+  const handleBlur = async (name: string, value: any, allFormData?: Record<string, any>) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    await validateField(name, value, allFormData);
   };
 
   // Handle field change
-  const handleChange = async (name: string, value: any) => {
+  const handleChange = async (name: string, value: any, allFormData?: Record<string, any>) => {
     if (touched[name]) {
-      await validateField(name, value);
+      await validateField(name, value, allFormData);
     }
   };
 
