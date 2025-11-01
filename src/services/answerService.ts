@@ -28,24 +28,33 @@ const transformAnswerData = (answerData: AnswerData): Answer => {
     timeAgo = `${days} gün önce`;
   }
 
+  const userInfo =
+    answerData.userInfo || (typeof answerData.user === 'object' ? answerData.user : null);
+
+  if (!userInfo) {
+    throw new Error('User information not available');
+  }
+
   return {
     id: answerData._id,
     content: answerData.content,
     author: {
-      id: answerData.user._id,
-      name: answerData.user.name,
-      avatar: answerData.user.profile_image,
-      title: answerData.user.title,
+      id: userInfo._id,
+      name: userInfo.name,
+      avatar: userInfo.profile_image || '',
+      title: userInfo.title,
     },
     userInfo: answerData.userInfo || {
-      _id: answerData.user._id,
-      name: answerData.user.name,
-      email: answerData.user.email,
-      profile_image: answerData.user.profile_image,
+      _id: userInfo._id,
+      name: userInfo.name,
+      email: userInfo.email,
+      profile_image: userInfo.profile_image,
     },
     likes: answerData.likes.length,
     createdAt: answerData.createdAt,
     timeAgo,
+    questionId: answerData.questionInfo?._id ?? answerData.question,
+    questionTitle: answerData.questionInfo?.title,
   };
 };
 
@@ -112,7 +121,7 @@ class AnswerService {
   // Cevap sil
   async deleteAnswer(answerId: string, questionId: string): Promise<boolean> {
     try {
-      const response = await api.delete(`/questions/${questionId}/answers/${answerId}`);
+      const response = await api.delete(`/questions/${questionId}/answers/${answerId}/delete`);
       return response.data.success || false;
     } catch (error) {
       console.error('Cevap silinirken hata:', error);
@@ -139,6 +148,20 @@ class AnswerService {
     } catch (error) {
       console.error('Cevap beğenisi geri alınırken hata:', error);
       throw error;
+    }
+  }
+
+  // Kullanıcıya ait cevapları getir
+  async getAnswersByUser(userId: string): Promise<Answer[]> {
+    try {
+      const response = await api.get<AnswersResponse>(`/answers/user/${userId}`);
+      if (response.data.success && response.data.data) {
+        return response.data.data.map(transformAnswerData);
+      }
+      return [];
+    } catch (error) {
+      console.error('Kullanıcı cevapları getirilirken hata:', error);
+      return [];
     }
   }
 }

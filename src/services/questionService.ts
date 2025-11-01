@@ -106,22 +106,29 @@ const transformQuestionData = (questionData: QuestionData): Question => {
   // Trending hesaplama (basit)
   const isTrending = questionData.likes.length > 5 || questionData.answers.length > 3;
 
+  const userInfo =
+    questionData.userInfo || (typeof questionData.user === 'object' ? questionData.user : null);
+
+  if (!userInfo) {
+    throw new Error('User information not available');
+  }
+
   return {
     id: questionData._id,
     title: questionData.title,
     content: questionData.content,
     slug: questionData.slug,
     author: {
-      id: questionData.user._id,
-      name: questionData.user.name,
-      avatar: questionData.user.profile_image,
-      title: questionData.user.title,
+      id: userInfo._id,
+      name: userInfo.name,
+      avatar: userInfo.profile_image || '',
+      title: userInfo.title,
     },
     userInfo: questionData.userInfo || {
-      _id: questionData.user._id,
-      name: questionData.user.name,
-      email: questionData.user.email,
-      profile_image: questionData.user.profile_image,
+      _id: userInfo._id,
+      name: userInfo.name,
+      email: userInfo.email,
+      profile_image: userInfo.profile_image,
     },
     tags,
     likes: questionData.likes.length,
@@ -281,6 +288,20 @@ class QuestionService {
     } catch (error) {
       console.error('Soru beğenisi geri alınırken hata:', error);
       throw error;
+    }
+  }
+
+  // Kullanıcıya ait soruları getir
+  async getQuestionsByUser(userId: string): Promise<Question[]> {
+    try {
+      const response = await api.get<QuestionsResponse>(`/questions/user/${userId}`);
+      if (response.data.success && response.data.data) {
+        return response.data.data.map(transformQuestionData);
+      }
+      return [];
+    } catch (error) {
+      console.error('Kullanıcı soruları getirilirken hata:', error);
+      return [];
     }
   }
 

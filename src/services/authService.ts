@@ -2,6 +2,7 @@ import { User, UserData, RegisterData, LoginCredentials, LoginResponse } from '.
 import { ApiResponse } from '../types/api';
 import api from './api';
 import logger from '../utils/logger';
+import { setStoredToken, removeStoredToken } from '../utils/tokenUtils';
 
 export const authService = {
   register: async (registerData: RegisterData): Promise<LoginResponse> => {
@@ -16,6 +17,9 @@ export const authService = {
     }
 
     const { access_token: token, data: backendUserData } = response.data;
+
+    // Token'ı localStorage'a kaydet
+    setStoredToken(token);
 
     const user: User = {
       id: backendUserData._id,
@@ -37,9 +41,10 @@ export const authService = {
   },
 
   login: async (
-    credentials: LoginCredentials & { rememberMe?: boolean },
+    credentials: LoginCredentials & { rememberMe?: boolean; captchaToken?: string },
   ): Promise<LoginResponse> => {
     logger.auth.login(credentials.email);
+
     const response = await api.post<{
       success: boolean;
       access_token: string;
@@ -51,6 +56,9 @@ export const authService = {
     }
 
     const { access_token: token, data: userData } = response.data;
+
+    // Token'ı localStorage'a kaydet
+    setStoredToken(token);
 
     // User verisini dönüştür
     const user: User = {
@@ -76,6 +84,10 @@ export const authService = {
   logout: async (): Promise<ApiResponse<null>> => {
     logger.auth.logout();
     const response = await api.get<ApiResponse<null>>('/auth/logout');
+
+    // Token'ı localStorage'dan sil
+    removeStoredToken();
+
     return response.data;
   },
 
