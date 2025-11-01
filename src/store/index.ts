@@ -8,6 +8,8 @@ import loginReducer from './auth/login/loginSlice';
 import registerReducer from './auth/register/registerSlice';
 import questionReducer from './questions/questionSlice';
 import languageReducer from './language/languageSlice';
+import bookmarkReducer from './bookmarks/bookmarkSlice';
+import confirmReducer from './confirm/confirmSlice';
 
 // Persist configuration for auth slice
 const authPersistConfig = {
@@ -51,6 +53,8 @@ const store = configureStore({
     form: persistedFormReducer,
     questions: questionReducer,
     language: languageReducer,
+    bookmarks: bookmarkReducer,
+    confirm: confirmReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
