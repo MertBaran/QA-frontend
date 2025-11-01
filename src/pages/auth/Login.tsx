@@ -17,6 +17,7 @@ import {
 } from '../../utils/errorHandling/enhancedErrorHandler';
 import logger from '../../utils/logger';
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
+import ReCaptchaComponent from '../../components/auth/ReCaptcha';
 import axios from 'axios';
 import { getCurrentUser } from '../../store/auth/authThunks';
 
@@ -31,6 +32,8 @@ const Login = () => {
     password: '',
   });
   const [rememberMe, setRememberMe] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaError, setCaptchaError] = useState(false);
 
   const [retryCount, setRetryCount] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
@@ -52,21 +55,35 @@ const Login = () => {
     handleBlur(name, value);
   };
 
+  const handleCaptchaVerify = (token: string | null) => {
+    setCaptchaToken(token);
+    setCaptchaError(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     // Clear any previous errors
     dispatch(clearError());
+    setCaptchaError(false);
 
     const isValid = await validateForm(formData);
 
+    // reCAPTCHA kontrolü
+    if (!captchaToken) {
+      setCaptchaError(true);
+      return;
+    }
+
     if (isValid) {
       try {
-        // Remember me bilgisini ekle
+        // Remember me ve captcha bilgisini ekle
         const loginData = {
           ...formData,
-          rememberMe
+          rememberMe,
+          captchaToken
         };
+        
         await dispatch(loginUser(loginData)).unwrap();
         logger.user.action('login_successful');
         
@@ -284,13 +301,19 @@ const Login = () => {
               </Link>
             </Box>
             
+            {/* reCAPTCHA */}
+            <ReCaptchaComponent
+              onVerify={handleCaptchaVerify}
+              error={captchaError}
+              disabled={loading}
+            />
 
             <Button
               type="submit"
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
-              disabled={loading || !isFormValid}
+              disabled={loading || !isFormValid || !captchaToken}
             >
               {loading ? <ButtonLoading size={24} /> : t('login_button', currentLanguage)}
             </Button>

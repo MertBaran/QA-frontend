@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
 import Loading from '../components/ui/Loading';
+import { isTokenValidAndNotExpired } from '../utils/tokenUtils';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,8 +18,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAdmin 
     return <Loading message="Checking authentication..." />;
   }
 
-  // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
-  if (!isAuthenticated) {
+  // Token geçerliliğini kontrol et
+  const isTokenValid = isTokenValidAndNotExpired();
+  
+  if (!isAuthenticated || !isTokenValid) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

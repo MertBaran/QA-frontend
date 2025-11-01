@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAppSelector } from '../store/hooks';
 import Loading from '../components/ui/Loading';
 import { ReactNode } from 'react';
+import { isTokenValidAndNotExpired } from '../utils/tokenUtils';
 
 interface PublicRouteProps {
   children: ReactNode;
@@ -14,7 +15,10 @@ const PublicRoute = ({ children }: PublicRouteProps) => {
     return <Loading message="Checking authentication..." />;
   }
 
-  return isAuthenticated ? <Navigate to="/" replace /> : <>{children}</>;
+  // Token geçerliliğini kontrol et
+  const isTokenValid = isTokenValidAndNotExpired();
+  
+  return (isAuthenticated && isTokenValid) ? <Navigate to="/" replace /> : <>{children}</>;
 };
 
 export default PublicRoute;
