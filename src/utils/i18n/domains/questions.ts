@@ -1,0 +1,142 @@
+export const questions = {
+  questions: {
+    tr: 'Sorular',
+    en: 'Questions',
+    de: 'Fragen',
+  },
+  create_question: {
+    tr: 'Soru Oluştur',
+    en: 'Create Question',
+    de: 'Frage erstellen',
+  },
+  no_questions: {
+    tr: 'Henüz soru yok.',
+    en: 'No questions yet.',
+    de: 'Noch keine Fragen.',
+  },
+  be_first: {
+    tr: 'İlk soruyu siz sorun!',
+    en: 'Be the first to ask!',
+    de: 'Seien Sie der Erste, der fragt!',
+  },
+  home_total_questions: {
+    tr: 'Toplam soru',
+    en: 'Total questions',
+    de: 'Gesamte Fragen',
+  },
+  no_questions_found: {
+    tr: 'Bu filtrelerle soru bulunamadı',
+    en: 'No questions found with these filters',
+    de: 'Keine Fragen mit diesen Filtern gefunden',
+  },
+  be_first_to_ask: {
+    tr: 'İlk soruyu sor',
+    en: 'Ask the first question',
+    de: 'Erste Frage stellen',
+  },
+  new_question: {
+    tr: 'Yeni Soru Oluştur',
+    en: 'Create New Question',
+    de: 'Neue Frage erstellen',
+  },
+  question_title: {
+    tr: 'Soru Başlığı',
+    en: 'Question Title',
+    de: 'Fragentitel',
+  },
+  question_content: {
+    tr: 'Soru İçeriği',
+    en: 'Question Content',
+    de: 'Frageninhalt',
+  },
+  category: {
+    tr: 'Kategori',
+    en: 'Category',
+    de: 'Kategorie',
+  },
+  tags: {
+    tr: 'Etiketler (virgülle ayırın)',
+    en: 'Tags (separate with commas)',
+    de: 'Tags (mit Kommas trennen)',
+  },
+  tags_placeholder: {
+    tr: 'örnek: javascript, react, frontend',
+    en: 'example: javascript, react, frontend',
+    de: 'Beispiel: javascript, react, frontend',
+  },
+  back_to_home: {
+    tr: 'Ana sayfaya dön',
+    en: 'Back to home',
+    de: 'Zurück zur Startseite',
+  },
+  question_not_found: {
+    tr: 'Soru bulunamadı',
+    en: 'Question not found',
+    de: 'Frage nicht gefunden',
+  },
+  frontend: {
+    tr: 'Frontend',
+    en: 'Frontend',
+    de: 'Frontend',
+  },
+  backend: {
+    tr: 'Backend',
+    en: 'Backend',
+    de: 'Backend',
+  },
+  mobile: {
+    tr: 'Mobile',
+    en: 'Mobile',
+    de: 'Mobile',
+  },
+  devops: {
+    tr: 'DevOps',
+    en: 'DevOps',
+    de: 'DevOps',
+  },
+  database: {
+    tr: 'Database',
+    en: 'Database',
+    de: 'Datenbank',
+  },
+  ai_ml: {
+    tr: 'AI/ML',
+    en: 'AI/ML',
+    de: 'KI/ML',
+  },
+  newest: {
+    tr: 'En Yeni',
+    en: 'Newest',
+    de: 'Neueste',
+  },
+  most_popular: {
+    tr: 'En Popüler',
+    en: 'Most Popular',
+    de: 'Beliebteste',
+  },
+  most_viewed: {
+    tr: 'En Çok Görüntülenen',
+    en: 'Most Viewed',
+    de: 'Am meisten angesehen',
+  },
+  most_answered: {
+    tr: 'En Çok Cevaplanan',
+    en: 'Most Answered',
+    de: 'Am meisten beantwortet',
+  },
+  validation_title_min: {
+    tr: 'Başlık en az 10 karakter olmalıdır',
+    en: 'Title must be at least 10 characters',
+    de: 'Titel muss mindestens 10 Zeichen lang sein',
+  },
+  validation_content_min: {
+    tr: 'İçerik en az 20 karakter olmalıdır',
+    en: 'Content must be at least 20 characters',
+    de: 'Inhalt muss mindestens 20 Zeichen lang sein',
+  },
+  validation_required: {
+    tr: 'Bu alan gereklidir',
+    en: 'This field is required',
+    de: 'Dieses Feld ist erforderlich',
+  },
+} as const;
