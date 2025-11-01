@@ -104,8 +104,10 @@ const ThemeToggleContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-const BulbContainer = styled(Box)<{ 
-  isPulling: boolean; 
+const BulbContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isPulling' && prop !== 'isDragging',
+})<{
+  isPulling: boolean;
   isDragging: boolean;
 }>(({ theme, isPulling, isDragging }) => ({
   position: 'relative',
@@ -164,7 +166,9 @@ const BulbIcon = styled('div')(({ theme }) => ({
   },
 }));
 
-const Rope = styled(Box)<{ 
+const Rope = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isDragging',
+})<{
   isDragging: boolean;
 }>(({ theme, isDragging }) => ({
   position: 'absolute',
@@ -192,9 +196,19 @@ const Rope = styled(Box)<{
   },
 }));
 
-const PullString = styled(Box)<{ 
-  isPulling: boolean; 
-  isHovered: boolean; 
+const PullString = styled(Box, {
+  shouldForwardProp: (prop) =>
+    ![
+      'isPulling',
+      'isHovered',
+      'isReleased',
+      'isDragging',
+      'mouseX',
+      'mouseY',
+    ].includes(String(prop)),
+})<{
+  isPulling: boolean;
+  isHovered: boolean;
   isReleased: boolean;
   isDragging: boolean;
   mouseX: number;
@@ -206,17 +220,7 @@ const PullString = styled(Box)<{
   const currentAngle = Math.atan2(mouseY, mouseX) * (180 / Math.PI);
   const angle = currentAngle - baseAngle;
   
-  // Debug için
-  if (isDragging && distance > 20) {
-    console.log('Mouse Debug:', { 
-      mouseX, 
-      mouseY, 
-      distance, 
-      angle, 
-      direction: mouseX > 0 ? 'right' : 'left',
-      rotation: `${angle * 0.8}deg`
-    });
-  }
+  // debug logs removed
   
   return {
     position: 'absolute',
@@ -265,7 +269,9 @@ const PullString = styled(Box)<{
   };
 });
 
-const LightBeam = styled(Box)<{ isOn: boolean }>(({ theme, isOn }) => ({
+const LightBeam = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isOn',
+})<{ isOn: boolean }>(({ theme, isOn }) => ({
   position: 'absolute',
   top: '100%',
   left: '50%',
@@ -363,7 +369,6 @@ const ThemeToggle = () => {
   };
 
   const handlePull = () => {
-    console.log('🎯 İp çekildi!');
     setIsPulling(true);
     setIsOn(!isOn);
     

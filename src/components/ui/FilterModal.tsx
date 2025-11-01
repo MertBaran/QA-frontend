@@ -16,6 +16,8 @@ import {
   Divider,
   Fade,
   Slide,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import {
   FilterList,
@@ -25,6 +27,8 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { categories, sortOptions } from '../../types/question';
+import { t } from '../../utils/translations';
+import { useAppSelector } from '../../store/hooks';
 
 const FilterModalContainer = styled(Modal)(({ theme }) => ({
   display: 'flex',
@@ -75,9 +79,10 @@ interface FilterModalProps {
     category: string;
     tags: string;
     sortBy: string;
+    savedOnly?: string;
   };
   onFilterChange: (field: string, value: string) => void;
-  onApplyFilters: () => void;
+  onApplyFilters: (applied: { search: string; category: string; tags: string; sortBy: string; savedOnly?: string }) => void;
   onClearFilters: () => void;
   activeFilters: string[];
   onRemoveFilter: (filter: string) => void;
@@ -94,6 +99,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onRemoveFilter,
 }) => {
   const [localFilters, setLocalFilters] = useState(filters);
+  const { currentLanguage } = useAppSelector(state => state.language);
 
   const handleLocalFilterChange = (field: string, value: string) => {
     setLocalFilters(prev => ({ ...prev, [field]: value }));
@@ -104,7 +110,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
     Object.entries(localFilters).forEach(([key, value]) => {
       onFilterChange(key, value);
     });
-    onApplyFilters();
+    onApplyFilters(localFilters as any);
     onClose();
   };
 
@@ -114,7 +120,8 @@ const FilterModal: React.FC<FilterModalProps> = ({
       category: '',
       tags: '',
       sortBy: 'En Yeni',
-    });
+      savedOnly: 'false',
+    } as any);
     onClearFilters();
   };
 
@@ -137,7 +144,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
               <FilterList sx={{ mr: 1, color: '#FFB800' }} />
-              Gelişmiş Filtreleme
+              {t('advanced_filters', currentLanguage)}
             </Typography>
             <IconButton 
               onClick={handleClose}
@@ -154,11 +161,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
           <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 3 }} />
 
-          {/* Aktif Filtreler */}
+          {/* Active Filters */}
           {activeFilters.length > 0 && (
             <FilterSection>
               <Typography variant="h6" sx={{ mb: 2, color: 'rgba(255,255,255,0.9)' }}>
-                Aktif Filtreler
+                {t('active_filters', currentLanguage)}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
                 {activeFilters.map((filter, index) => (
@@ -173,22 +180,22 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </FilterSection>
           )}
 
-          {/* Filtre Seçenekleri */}
+          {/* Filter Options */}
           <FilterSection>
             <Typography variant="h6" sx={{ mb: 3, color: 'rgba(255,255,255,0.9)' }}>
-              Filtre Seçenekleri
+              {t('filter_options', currentLanguage)}
             </Typography>
             
             <FilterRow container spacing={3}>
-              {/* Arama */}
+              {/* Search */}
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Arama"
+                  label={t('search', currentLanguage)}
                   variant="outlined"
                   fullWidth
                   value={localFilters.search}
                   onChange={(e) => handleLocalFilterChange('search', e.target.value)}
-                  placeholder="Soru başlığında ara..."
+                  placeholder={t('search_placeholder', currentLanguage)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       color: 'white',
@@ -202,14 +209,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 />
               </Grid>
 
-              {/* Kategori */}
+              {/* Category */}
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Kategori</InputLabel>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>{t('category', currentLanguage)}</InputLabel>
                   <Select
                     value={localFilters.category}
                     onChange={(e) => handleLocalFilterChange('category', e.target.value)}
-                    label="Kategori"
+                    label={t('category', currentLanguage)}
                     sx={{
                       color: 'white',
                       '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
@@ -218,7 +225,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                       '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
                     }}
                   >
-                    <MenuItem value="">Tüm Kategoriler</MenuItem>
+                    <MenuItem value="">{t('all_categories', currentLanguage)}</MenuItem>
                     {categories.map((category) => (
                       <MenuItem key={category} value={category}>{category}</MenuItem>
                     ))}
@@ -228,14 +235,14 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
 
 
-              {/* Sıralama */}
+              {/* Sorting */}
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sıralama</InputLabel>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>{t('sorting', currentLanguage)}</InputLabel>
                   <Select
                     value={localFilters.sortBy}
                     onChange={(e) => handleLocalFilterChange('sortBy', e.target.value)}
-                    label="Sıralama"
+                    label={t('sorting', currentLanguage)}
                     sx={{
                       color: 'white',
                       '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
@@ -251,15 +258,15 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 </FormControl>
               </Grid>
 
-              {/* Etiketler */}
+              {/* Tags */}
               <Grid item xs={12}>
                 <TextField
-                  label="Etiketler"
+                  label={t('tags_label', currentLanguage)}
                   variant="outlined"
                   fullWidth
                   value={localFilters.tags}
                   onChange={(e) => handleLocalFilterChange('tags', e.target.value)}
-                  placeholder="React, TypeScript, JavaScript... (virgülle ayırın)"
+                  placeholder={t('tags_placeholder', currentLanguage)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       color: 'white',
@@ -270,6 +277,22 @@ const FilterModal: React.FC<FilterModalProps> = ({
                     '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
                     '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,184,0,0.8)' },
                   }}
+                />
+              </Grid>
+
+              {/* Saved Only */}
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={localFilters as any && (localFilters as any).savedOnly === 'true'}
+                      onChange={(e) =>
+                        handleLocalFilterChange('savedOnly', e.target.checked ? 'true' : 'false')
+                      }
+                      color="primary"
+                    />
+                  }
+                  label={t('saved_only', currentLanguage)}
                 />
               </Grid>
             </FilterRow>
@@ -292,7 +315,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 },
               }}
             >
-              Temizle
+              {t('reset_filters', currentLanguage)}
             </Button>
             <Button
               variant="contained"
@@ -308,7 +331,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                 },
               }}
             >
-              Filtrele
+              {t('filter', currentLanguage)}
             </Button>
           </Box>
         </FilterModalContent>

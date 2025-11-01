@@ -37,7 +37,7 @@ import {
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { logout } from '../../store/auth/authSlice';
+import { logoutUser } from '../../store/auth/authThunks';
 import { setLanguage } from '../../store/language/languageSlice';
 import ThemeToggle from '../ui/ThemeToggle';
 import { t } from '../../utils/translations';
@@ -124,10 +124,17 @@ const Header = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleLogout = () => {
-    dispatch(logout());
-    handleMenuClose();
-    navigate('/login');
+  const handleLogout = async () => {
+    try {
+      await dispatch(logoutUser()).unwrap();
+      handleMenuClose();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Hata olsa bile login sayfasına yönlendir
+      handleMenuClose();
+      navigate('/login');
+    }
   };
 
   const handleNavigation = (path: string) => {
