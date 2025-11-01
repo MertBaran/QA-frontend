@@ -35,8 +35,9 @@ import {
   Add,
   KeyboardArrowLeft,
   KeyboardArrowRight,
+  Delete,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { styled } from '@mui/material/styles';
 import Layout from '../components/layout/Layout';
 import { HomePageSkeleton } from '../components/ui/Skeleton';
@@ -49,8 +50,10 @@ import {
   type QuestionFilters
 } from '../types/question';
 import { questionService } from '../services/questionService';
+import { bookmarkService } from '../services/bookmarkService';
 import { t } from '../utils/translations';
 import { useAppSelector } from '../store/hooks';
+import BookmarkButton from '../components/ui/BookmarkButton';
 
 const QuestionCard = styled(Paper)(({ theme }) => ({
   background: 'linear-gradient(135deg, rgba(30, 58, 71, 0.95) 0%, rgba(21, 42, 53, 0.98) 100%)',
@@ -140,7 +143,9 @@ const ItemsPerPageContainer = styled(Box)(({ theme }) => ({
 }));
 
 const Home = () => {
+  const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { user } = useAppSelector(state => state.auth);
   const [loading, setLoading] = useState(true);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filters, setFilters] = useState({
@@ -148,6 +153,7 @@ const Home = () => {
     category: '',
     tags: '',
     sortBy: 'En Yeni',
+    savedOnly: 'false',
   });
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
@@ -190,7 +196,21 @@ const Home = () => {
           tags: filters.tags || undefined,
         });
         
-        setQuestions(result.data);
+        let data = result.data;
+        // Saved only filtresi: kullanıcı bookmarklarından question-id eşleştirerek filtrele
+        if (filters.savedOnly === 'true') {
+          try {
+            const bookmarks = await bookmarkService.getUserBookmarks();
+            const savedQuestionIds = new Set(
+              bookmarks.filter(b => b.target_type === 'question').map(b => b.target_id)
+            );
+            data = data.filter(q => savedQuestionIds.has(q.id));
+          } catch {
+            // sessiz geç
+          }
+        }
+
+        setQuestions(data);
         setTotalQuestions(result.pagination.totalItems);
         setTotalPages(result.pagination.totalPages);
         logger.user.action('home_page_loaded');
@@ -210,13 +230,20 @@ const Home = () => {
     setFilters(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = (applied: { search: string; category: string; tags: string; sortBy: string; savedOnly?: string }) => {
+    const f = {
+      ...filters,
+      ...applied,
+      savedOnly: applied.savedOnly ?? filters.savedOnly,
+    };
+    setFilters(f);
     const newActiveFilters: string[] = [];
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value && key !== 'sortBy') {
+    Object.entries(f).forEach(([key, value]) => {
+      if (value && key !== 'sortBy' && key !== 'savedOnly') {
         newActiveFilters.push(`${key}: ${value}`);
       }
     });
+    if (f.savedOnly === 'true') newActiveFilters.push(t('saved_only', currentLanguage));
     setActiveFilters(newActiveFilters);
     setCurrentPage(1); // Filtre uygulandığında ilk sayfaya dön
   };
@@ -227,6 +254,7 @@ const Home = () => {
       category: '',
       tags: '',
       sortBy: 'En Yeni',
+      savedOnly: 'false',
     });
     setActiveFilters([]);
     setCurrentPage(1);
@@ -359,6 +387,29 @@ const Home = () => {
       }
     } catch (error) {
       console.error('Soru beğenisi kaldırılırken hata:', error);
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    const { confirmService } = await import('../services/confirmService');
+    const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    // Optimistic update: UI'dan hemen sil
+    const previousQuestions = [...questions];
+    setQuestions(prev => prev.filter(q => q.id !== questionId));
+    
+    try {
+      await questionService.deleteQuestion(questionId);
+      // Success - state already updated
+    } catch (error) {
+      // Rollback on error
+      console.error('Soru silinirken hata:', error);
+      setQuestions(previousQuestions);
+      alert(t('delete_failed', currentLanguage));
     }
   };
 
@@ -495,46 +546,69 @@ const Home = () => {
               {questions.map((question, index) => (
                 <Fade in timeout={800 + index * 200} key={question.id}>
                   <QuestionCard>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-                          <Avatar 
-                            src={question.userInfo?.profile_image || question.author.avatar} 
-                            sx={{ width: 32, height: 32 }}
-                          />
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                            {question.userInfo?.name || question.author.name}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                            •
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                            {question.timeAgo}
-                          </Typography>
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                            •
-                          </Typography>
-                          <Chip 
-                            label={question.category} 
-                            size="small" 
-                            sx={{ 
-                              bgcolor: 'rgba(255,184,0,0.2)', 
-                              color: 'rgba(255,184,0,0.9)',
-                              fontSize: '0.75rem',
-                            }} 
-                          />
-                        </Box>
-                        
-                        {/* Tıklanabilir başlık ve içerik alanı */}
-                        <Box 
-                          sx={{ 
-                            cursor: 'pointer',
-                            '&:hover': {
-                              opacity: 0.9
-                            }
-                          }}
-                          onClick={() => window.location.href = `/questions/${question.id}`}
-                        >
+                    {/* Tıklanabilir alan - kartın çeperlerinden 2px içeride */}
+                    <Box 
+                      sx={{ 
+                        cursor: 'pointer',
+                        padding: '2px',
+                        margin: '-2px',
+                        borderRadius: '14px', // 16 - 2 = 14 (kartın border radius'ından 2px az)
+                        '&:hover': {
+                          opacity: 0.9
+                        }
+                      }}
+                      onClick={() => window.location.href = `/questions/${question.id}`}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                            <Avatar 
+                              src={question.userInfo?.profile_image || question.author.avatar} 
+                              sx={{ 
+                                width: 32, 
+                                height: 32,
+                                cursor: 'pointer',
+                                '&:hover': { opacity: 0.8 }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/profile/${question.author.id}`);
+                              }}
+                            />
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                color: 'rgba(255,255,255,0.8)',
+                                cursor: 'pointer',
+                                '&:hover': { color: 'rgba(255,184,0,0.8)' }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/profile/${question.author.id}`);
+                              }}
+                            >
+                              {question.userInfo?.name || question.author.name}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                              •
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+                              {question.timeAgo}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                              •
+                            </Typography>
+                            <Chip 
+                              label={question.category} 
+                              size="small" 
+                              sx={{ 
+                                bgcolor: 'rgba(255,184,0,0.2)', 
+                                color: 'rgba(255,184,0,0.9)',
+                                fontSize: '0.75rem',
+                              }} 
+                            />
+                          </Box>
+                          
                           <Typography 
                             variant="h5" 
                             sx={{ 
@@ -550,109 +624,132 @@ const Home = () => {
                             sx={{ mb: 3, lineHeight: 1.6, color: 'rgba(255,255,255,0.9)' }}
                           >
                             {question.content.length > 200 
-                              ? `${question.content.substring(0, 200)}...` 
+                              ? `${question.content.substring(0,200)}...` 
                               : question.content
                             }
                           </Typography>
-                        </Box>
-                        
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                          {question.tags.map((tag) => (
-                            <Chip
-                              key={tag}
-                              label={tag}
-                              size="small"
-                              variant="outlined"
+                          
+                          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+                            {question.tags.map((tag) => (
+                              <Chip
+                                key={tag}
+                                label={tag}
+                                size="small"
+                                variant="outlined"
+                                sx={{ 
+                                  borderRadius: 2,
+                                  borderColor: 'primary.main',
+                                  color: 'primary.main',
+                                  bgcolor: 'rgba(255,255,255,0.08)',
+                                  '&:hover': {
+                                    background: 'rgba(255, 184, 0, 0.1)',
+                                  }
+                                }}
+                              />
+                            ))}
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <Box 
                               sx={{ 
-                                borderRadius: 2,
-                                borderColor: 'primary.main',
-                                color: 'primary.main',
-                                bgcolor: 'rgba(255,255,255,0.08)',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 1,
+                                cursor: 'pointer',
                                 '&:hover': {
-                                  background: 'rgba(255, 184, 0, 0.1)',
+                                  opacity: 0.8,
                                 }
                               }}
-                            />
-                          ))}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                question.likes > 0 ? handleUnlikeQuestion(question.id) : handleLikeQuestion(question.id);
+                              }}
+                            >
+                              {question.likes > 0 ? (
+                                <ThumbUp sx={{ fontSize: 18, color: '#FFB800' }} />
+                              ) : (
+                                <ThumbUp sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
+                              )}
+                              <span style={{ 
+                                color: question.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.8)', 
+                                fontSize: 14,
+                                fontWeight: question.likes > 0 ? 600 : 400
+                              }}>
+                                {question.likes}
+                              </span>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Comment sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
+                              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>{question.answers}</span>
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Visibility sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
+                              <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>{question.views}</span>
+                            </Box>
+                          </Box>
                         </Box>
                         
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <Box 
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <BookmarkButton 
+                            targetType={'question'} 
+                            targetId={question.id} 
+                            targetData={{
+                              title: question.title,
+                              content: question.content,
+                              author: question.author?.name,
+                              authorId: question.author?.id,
+                              created_at: question.createdAt,
+                              url: window.location.origin + '/questions/' + question.id,
+                            }}
+                          />
+                          {user && (
+                            question.author.id === user.id || 
+                            question.userInfo?._id === user.id ||
+                            question.author.id === user.id?.toString()
+                          ) && (
+                            <IconButton 
+                              size="small" 
+                              sx={{ 
+                                color: 'rgba(255,80,80,0.8)',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  color: 'rgba(255,80,80,1)',
+                                }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteQuestion(question.id);
+                              }}
+                              title={t('delete', currentLanguage)}
+                            >
+                              <Delete />
+                            </IconButton>
+                          )}
+                          <IconButton 
+                            size="small" 
                             sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              gap: 1,
-                              cursor: 'pointer',
-                              '&:hover': {
-                                opacity: 0.8,
-                              }
+                              color: 'rgba(255,255,255,0.7)',
+                              cursor: 'pointer'
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              question.likes > 0 ? handleUnlikeQuestion(question.id) : handleLikeQuestion(question.id);
                             }}
                           >
-                            {question.likes > 0 ? (
-                              <ThumbUp sx={{ fontSize: 18, color: '#FFB800' }} />
-                            ) : (
-                              <ThumbUp sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                            )}
-                            <span style={{ 
-                              color: question.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.8)', 
-                              fontSize: 14,
-                              fontWeight: question.likes > 0 ? 600 : 400
-                            }}>
-                              {question.likes}
-                            </span>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Comment sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>{question.answers}</span>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Visibility sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                            <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>{question.views}</span>
-                          </Box>
+                            <Share />
+                          </IconButton>
+                          <IconButton 
+                            size="small" 
+                            sx={{ 
+                              color: 'rgba(255,255,255,0.7)',
+                              cursor: 'pointer'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                            }}
+                          >
+                            <MoreVert />
+                          </IconButton>
                         </Box>
-                      </Box>
-                      
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <IconButton 
-                          size="small" 
-                          sx={{ 
-                            color: 'rgba(255,255,255,0.7)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        >
-                          <Bookmark />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          sx={{ 
-                            color: 'rgba(255,255,255,0.7)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        >
-                          <Share />
-                        </IconButton>
-                        <IconButton 
-                          size="small" 
-                          sx={{ 
-                            color: 'rgba(255,255,255,0.7)',
-                            cursor: 'pointer'
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
-                        >
-                          <MoreVert />
-                        </IconButton>
                       </Box>
                     </Box>
                   </QuestionCard>

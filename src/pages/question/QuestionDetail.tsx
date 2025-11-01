@@ -8,7 +8,7 @@ import {
   Avatar,
   Button,
   TextField,
-  Divider,
+  // Divider,
   Chip,
   IconButton,
   Card,
@@ -34,6 +34,7 @@ import { answerService } from '../../services/answerService';
 import { useAppSelector } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
+import BookmarkButton from '../../components/ui/BookmarkButton';
 
 const QuestionCard = styled(Paper)(({ theme }) => ({
   background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
@@ -79,6 +80,7 @@ const QuestionDetail: React.FC = () => {
   const [newAnswer, setNewAnswer] = useState('');
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [answerValidationError, setAnswerValidationError] = useState<string>('');
+  const [highlightedAnswerId, setHighlightedAnswerId] = useState<string | null>(null);
 
   // Soru ve cevapları yükle
   useEffect(() => {
@@ -115,6 +117,29 @@ const QuestionDetail: React.FC = () => {
     loadQuestionData();
   }, [id]);
 
+  // Hash'ten cevap ID'sini al ve highlight et
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#answer-')) {
+      const answerId = hash.substring('#answer-'.length);
+      setHighlightedAnswerId(answerId);
+      
+      // Scroll to answer
+      setTimeout(() => {
+        const element = document.getElementById(`answer-${answerId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Remove highlight after animation
+          setTimeout(() => {
+            setHighlightedAnswerId(null);
+            window.history.replaceState(null, '', window.location.pathname);
+          }, 3000);
+        }
+      }, 100);
+    }
+  }, [answers, id]);
+
   // Cevap gönder
   const handleSubmitAnswer = async () => {
     if (!id || !newAnswer.trim() || !user) return;
@@ -142,7 +167,7 @@ const QuestionDetail: React.FC = () => {
         if (contentError) {
           let message = contentError.message;
           if (message.includes('Too small')) {
-            message = 'Cevap en az 20 karakter olmalıdır';
+            message = 'Cevap en az 5 karakter olmalıdır';
           } else if (message.includes('Required')) {
             message = 'Cevap gereklidir';
           }
@@ -224,6 +249,52 @@ const QuestionDetail: React.FC = () => {
     }
   };
 
+  // Soru sil
+  const handleDeleteQuestion = async () => {
+    if (!id) return;
+    
+    const { confirmService } = await import('../../services/confirmService');
+    const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    try {
+      await questionService.deleteQuestion(id);
+      navigate('/');
+    } catch (error) {
+      console.error('Soru silinirken hata:', error);
+      alert(t('delete_failed', currentLanguage));
+    }
+  };
+
+  // Cevap sil
+  const handleDeleteAnswer = async (answerId: string) => {
+    if (!id) return;
+    
+    const { confirmService } = await import('../../services/confirmService');
+    const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
+    
+    if (!confirmed) {
+      return;
+    }
+    
+    // Optimistic update: UI'dan hemen sil
+    const previousAnswers = [...answers];
+    setAnswers(prev => prev.filter(answer => answer.id !== answerId));
+    
+    try {
+      await answerService.deleteAnswer(answerId, id!);
+      // Success - state already updated
+    } catch (error) {
+      // Rollback on error
+      console.error('Cevap silinirken hata:', error);
+      setAnswers(previousAnswers);
+      alert(t('delete_failed', currentLanguage));
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -287,10 +358,25 @@ const QuestionDetail: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Avatar 
                   src={question.userInfo?.profile_image || question.author.avatar} 
-                  sx={{ width: 40, height: 40 }}
+                  sx={{ 
+                    width: 40, 
+                    height: 40,
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                  onClick={() => navigate(`/profile/${question.author.id}`)}
                 />
                 <Box>
-                  <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>
+                  <Typography 
+                    variant="subtitle1" 
+                    sx={{ 
+                      color: 'white', 
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      '&:hover': { color: 'rgba(255,184,0,0.8)' }
+                    }}
+                    onClick={() => navigate(`/profile/${question.author.id}`)}
+                  >
                     {question.userInfo?.name || question.author.name}
                   </Typography>
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -381,7 +467,19 @@ const QuestionDetail: React.FC = () => {
             </Box>
 
             {/* Aksiyon Butonları */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              <BookmarkButton 
+                targetType={"question"}
+                targetId={question.id}
+                targetData={{
+                  title: question.title,
+                  content: question.content,
+                  author: question.author?.name,
+                  authorId: question.author?.id,
+                  created_at: question.createdAt,
+                  url: window.location.origin + '/questions/' + question.id,
+                }}
+              />
               <IconButton 
                 onClick={question.likes > 0 ? handleUnlikeQuestion : handleLikeQuestion}
                 sx={{ 
@@ -393,15 +491,23 @@ const QuestionDetail: React.FC = () => {
               >
                 {question.likes > 0 ? <ThumbUp /> : <ThumbUpOutlined />}
               </IconButton>
-              {user && question.author.id === user.id && (
-                <>
-                  <IconButton sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    <Edit />
-                  </IconButton>
-                  <IconButton sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    <Delete />
-                  </IconButton>
-                </>
+              {user && (
+                question.author.id === user.id || 
+                question.userInfo?._id === user.id ||
+                question.author.id === user.id?.toString()
+              ) && (
+                <IconButton 
+                  sx={{ 
+                    color: 'rgba(255,80,80,0.8)',
+                    '&:hover': {
+                      color: 'rgba(255,80,80,1)',
+                    }
+                  }}
+                  onClick={handleDeleteQuestion}
+                  title={t('delete', currentLanguage)}
+                >
+                  <Delete />
+                </IconButton>
               )}
             </Box>
           </Box>
@@ -414,7 +520,7 @@ const QuestionDetail: React.FC = () => {
               {t('write_answer', currentLanguage)}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
-              * {t('validation_answer_min', currentLanguage)}
+              * {t('validation_answer_min', currentLanguage)} (Enter ile gönder, Shift+Enter yeni satır)
             </Typography>
             <TextField
               multiline
@@ -422,6 +528,12 @@ const QuestionDetail: React.FC = () => {
               fullWidth
               value={newAnswer}
               onChange={(e) => setNewAnswer(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !submittingAnswer && newAnswer.trim()) {
+                  e.preventDefault();
+                  handleSubmitAnswer();
+                }
+              }}
               placeholder={t('answer_placeholder', currentLanguage)}
               variant="outlined"
               disabled={submittingAnswer}
@@ -469,18 +581,47 @@ const QuestionDetail: React.FC = () => {
                 {t('no_answers', currentLanguage)}
               </Typography>
             </QuestionCard>
-          ) : (
+            ) : (
             answers.map((answer) => (
-              <AnswerCard key={answer.id}>
+              <AnswerCard 
+                key={answer.id}
+                id={`answer-${answer.id}`}
+                sx={{
+                  border: highlightedAnswerId === answer.id ? '2px solid #FFB800' : '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: highlightedAnswerId === answer.id ? '0 0 20px rgba(255, 184, 0, 0.5)' : 'none',
+                  transition: 'all 0.3s ease-in-out',
+                  animation: highlightedAnswerId === answer.id ? 'pulse 0.5s ease-in-out' : 'none',
+                  '@keyframes pulse': {
+                    '0%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.02)' },
+                    '100%': { transform: 'scale(1)' },
+                  },
+                }}
+              >
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Avatar 
                         src={answer.userInfo?.profile_image || answer.author.avatar} 
-                        sx={{ width: 32, height: 32 }}
+                        sx={{ 
+                          width: 32, 
+                          height: 32,
+                          cursor: 'pointer',
+                          '&:hover': { opacity: 0.8 }
+                        }}
+                        onClick={() => navigate(`/profile/${answer.author.id}`)}
                       />
                       <Box>
-                        <Typography variant="subtitle2" sx={{ color: 'white', fontWeight: 600 }}>
+                        <Typography 
+                          variant="subtitle2" 
+                          sx={{ 
+                            color: 'white', 
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            '&:hover': { color: 'rgba(255,184,0,0.8)' }
+                          }}
+                          onClick={() => navigate(`/profile/${answer.author.id}`)}
+                        >
                           {answer.userInfo?.name || answer.author.name}
                         </Typography>
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
@@ -488,18 +629,62 @@ const QuestionDetail: React.FC = () => {
                         </Typography>
                       </Box>
                     </Box>
-                    
-                    <IconButton 
-                      onClick={() => answer.likes > 0 ? handleUnlikeAnswer(answer.id) : handleLikeAnswer(answer.id)}
-                      sx={{ 
-                        color: answer.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.7)',
-                        '&:hover': {
-                          color: answer.likes > 0 ? '#FF8F00' : '#FFB800',
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {/* Bookmark for Answer (sağ üst, like ile yan yana) */}
+                      <BookmarkButton
+                        targetType={"answer"}
+                        targetId={answer.id}
+                        targetData={{
+                          title: question.title,
+                          content: answer.content,
+                          author: answer.author?.name,
+                          authorId: answer.author?.id,
+                          created_at: answer.createdAt,
+                          url:
+                            window.location.origin +
+                            '/questions/' +
+                            question.id +
+                            '#answer-' +
+                            answer.id,
+                        }}
+                      />
+                      {user && (
+                        answer.author.id === user.id || 
+                        answer.userInfo?._id === user.id ||
+                        answer.author.id === user.id?.toString()
+                      ) && (
+                        <IconButton
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAnswer(answer.id);
+                          }}
+                          sx={{
+                            color: 'rgba(255,80,80,0.8)',
+                            '&:hover': {
+                              color: 'rgba(255,80,80,1)',
+                            },
+                          }}
+                          title={t('delete', currentLanguage)}
+                        >
+                          <Delete />
+                        </IconButton>
+                      )}
+                      <IconButton
+                        onClick={() =>
+                          answer.likes > 0
+                            ? handleUnlikeAnswer(answer.id)
+                            : handleLikeAnswer(answer.id)
                         }
-                      }}
-                    >
-                      {answer.likes > 0 ? <ThumbUp /> : <ThumbUpOutlined />}
-                    </IconButton>
+                        sx={{
+                          color: answer.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.7)',
+                          '&:hover': {
+                            color: answer.likes > 0 ? '#FF8F00' : '#FFB800',
+                          },
+                        }}
+                      >
+                        {answer.likes > 0 ? <ThumbUp /> : <ThumbUpOutlined />}
+                      </IconButton>
+                    </Box>
                   </Box>
                   
                   <Typography 
