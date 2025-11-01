@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -23,6 +24,9 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
+  Tabs,
+  Tab,
+  Pagination,
 } from '@mui/material';
 import {
   Edit,
@@ -45,8 +49,12 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { useTheme } from '@mui/material/styles';
 import { authService } from '../../services/authService';
 import { userService } from '../../services/userService';
+import { questionService } from '../../services/questionService';
+import { answerService } from '../../services/answerService';
 import { t } from '../../utils/translations';
 import { User } from '../../types/user';
+import { Question } from '../../types/question';
+import { Answer } from '../../types/answer';
 
 interface ProfileStats {
   totalQuestions: number;
@@ -64,13 +72,26 @@ interface UserActivity {
   likes: number;
 }
 
+interface ActivityItem {
+  id: string;
+  type: 'question' | 'answer';
+  title: string;
+  content: string;
+  createdAt: Date;
+  likes: number;
+  questionId?: string;
+}
+
 const Profile = () => {
+  const { userId } = useParams<{ userId?: string }>();
+  const navigate = useNavigate();
   const theme = useTheme();
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const dispatch = useAppDispatch();
 
   // State
+  const [profileUser, setProfileUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,57 +103,124 @@ const Profile = () => {
     profileViews: 0,
   });
   const [recentActivity, setRecentActivity] = useState<UserActivity[]>([]);
+  const [userQuestions, setUserQuestions] = useState<Question[]>([]);
+  const [userAnswers, setUserAnswers] = useState<Answer[]>([]);
+  const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
   const [showPassword, setShowPassword] = useState(false);
+  const [questionsPage, setQuestionsPage] = useState(1);
+  const [answersPage, setAnswersPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Form state
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    title: user?.title || '',
-    about: user?.about || '',
-    place: user?.place || '',
-    website: user?.website || '',
+    name: '',
+    email: '',
+    title: '',
+    about: '',
+    place: '',
+    website: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
+  // Determine if viewing own profile
+  const isOwnProfile = !userId || userId === user?.id;
+
   // Load user data
   useEffect(() => {
-    if (isAuthenticated && user) {
-      loadUserData();
-    }
-  }, [isAuthenticated, user]);
+    const loadProfileUser = async () => {
+      if (!isAuthenticated) return;
+      
+      setLoading(true);
+      try {
+        let targetUser: User | null = null;
+        
+        if (userId) {
+          // Fetch specific user profile
+          targetUser = await userService.getUserById(userId);
+        } else {
+          // Use current user
+          targetUser = user;
+        }
+        
+        if (targetUser) {
+          setProfileUser(targetUser);
+          setFormData({
+            name: targetUser.name || '',
+            email: targetUser.email || '',
+            title: targetUser.title || '',
+            about: targetUser.about || '',
+            place: targetUser.place || '',
+            website: targetUser.website || '',
+            currentPassword: '',
+            newPassword: '',
+            confirmPassword: '',
+          });
+          await loadUserData(targetUser.id);
+        } else {
+          setError('Kullanıcı bulunamadı');
+        }
+      } catch (error) {
+        console.error('Profil yüklenirken hata:', error);
+        setError(t('error_loading_profile', currentLanguage));
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const loadUserData = async () => {
+    loadProfileUser();
+  }, [userId, isAuthenticated, user]);
+
+  const loadUserData = async (targetUserId: string) => {
     try {
       setLoading(true);
-      // TODO: Backend'de bu endpoint'ler yok, şimdilik mock data
-      setStats({
-        totalQuestions: 12,
-        totalAnswers: 45,
-        totalLikes: 234,
-        profileViews: 1234,
-      });
-      setRecentActivity([
-        {
-          id: '1',
-          type: 'question',
-          title: 'React Hooks kullanımı',
-          content: 'useEffect ve useState arasındaki farklar nelerdir?',
-          createdAt: '2024-01-15T10:30:00Z',
-          likes: 15,
-        },
-        {
-          id: '2',
-          type: 'answer',
-          title: 'TypeScript interface vs type',
-          content: 'Interface ve type arasındaki temel farklar...',
-          createdAt: '2024-01-14T14:20:00Z',
-          likes: 8,
-        },
+      
+      // Load questions and answers
+      const [questions, answers] = await Promise.all([
+        questionService.getQuestionsByUser(targetUserId),
+        answerService.getAnswersByUser(targetUserId),
       ]);
+      
+      setUserQuestions(questions);
+      setUserAnswers(answers);
+      
+      // Calculate stats
+      const totalQuestions = questions.length;
+      const totalAnswers = answers.length;
+      const totalLikes = questions.reduce((sum, q) => sum + q.likes, 0) + answers.reduce((sum, a) => sum + a.likes, 0);
+      
+      setStats({
+        totalQuestions,
+        totalAnswers,
+        totalLikes,
+        profileViews: 0, // TODO: Backend'de profil görüntüleme sayacı yok
+      });
+      
+      // Create recent activity list
+      const activities: UserActivity[] = [
+        ...questions.slice(0, 5).map(q => ({
+          id: q.id,
+          type: 'question' as const,
+          title: q.title,
+          content: q.content,
+          createdAt: q.createdAt?.toString() || new Date().toISOString(),
+          likes: q.likes,
+        })),
+        ...answers.slice(0, 5).map(a => ({
+          id: a.id,
+          type: 'answer' as const,
+          title: '', // Answers don't have titles
+          content: a.content,
+          createdAt: a.createdAt?.toString() || new Date().toISOString(),
+          likes: a.likes,
+        })),
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+       .slice(0, 10);
+      
+      setRecentActivity(activities);
     } catch (error) {
+      console.error('Kullanıcı verileri yüklenirken hata:', error);
       setError(t('error_loading_profile', currentLanguage));
     } finally {
       setLoading(false);
@@ -228,6 +316,22 @@ const Profile = () => {
     );
   }
 
+  if (!profileUser) {
+    return (
+      <Layout>
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+              <CircularProgress />
+            </Box>
+          ) : error ? (
+            <Alert severity="error">{error}</Alert>
+          ) : null}
+        </Container>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
@@ -264,31 +368,35 @@ const Profile = () => {
                 {/* Profil Fotoğrafı */}
                 <Box sx={{ position: 'relative', mb: 3 }}>
                   <Avatar
-                    src={user.profile_image}
+                    src={profileUser.profile_image}
                     sx={{ width: 120, height: 120, mx: 'auto', mb: 2 }}
                   />
-                  <input
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    id="profile-image-upload"
-                    type="file"
-                    onChange={handleImageUpload}
-                  />
-                  <label htmlFor="profile-image-upload">
-                    <IconButton
-                      component="span"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 0,
-                        right: '50%',
-                        transform: 'translateX(50%)',
-                        bgcolor: 'primary.main',
-                        '&:hover': { bgcolor: 'primary.dark' },
-                      }}
-                    >
-                      <PhotoCamera />
-                    </IconButton>
-                  </label>
+                  {isOwnProfile && (
+                    <>
+                      <input
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        id="profile-image-upload"
+                        type="file"
+                        onChange={handleImageUpload}
+                      />
+                      <label htmlFor="profile-image-upload">
+                        <IconButton
+                          component="span"
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: '50%',
+                            transform: 'translateX(50%)',
+                            bgcolor: 'primary.main',
+                            '&:hover': { bgcolor: 'primary.dark' },
+                          }}
+                        >
+                          <PhotoCamera />
+                        </IconButton>
+                      </label>
+                    </>
+                  )}
                 </Box>
 
                 {/* Kullanıcı Bilgileri */}
@@ -296,14 +404,14 @@ const Profile = () => {
                   color: theme.palette.mode === 'dark' ? 'white' : '#1A202C', 
                   mb: 1 
                 }}>
-                  {user.name}
+                  {profileUser.name}
                 </Typography>
-                {user.title && (
+                {profileUser.title && (
                   <Typography variant="body2" sx={{ 
                     color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568', 
                     mb: 2 
                   }}>
-                    {user.title}
+                    {profileUser.title}
                   </Typography>
                 )}
 
@@ -361,23 +469,25 @@ const Profile = () => {
                   </Grid>
                 </Box>
 
-                {/* Düzenle Butonu */}
-                <Button
-                  variant="outlined"
-                  startIcon={<Edit />}
-                  onClick={() => setIsEditing(true)}
-                  sx={{ 
-                    mt: 3, 
-                    color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                    borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                    '&:hover': {
+                {/* Düzenle Butonu - Sadece kendi profili için */}
+                {isOwnProfile && (
+                  <Button
+                    variant="outlined"
+                    startIcon={<Edit />}
+                    onClick={() => setIsEditing(true)}
+                    sx={{ 
+                      mt: 3, 
+                      color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
                       borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                      backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                    }
-                  }}
-                >
-                  {t('edit_profile', currentLanguage)}
-                </Button>
+                      '&:hover': {
+                        borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                      }
+                    }}
+                  >
+                    {t('edit_profile', currentLanguage)}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </Grid>
@@ -414,7 +524,7 @@ const Profile = () => {
                           <Typography variant="body2" sx={{ 
                             color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                           }}>
-                            {t('name', currentLanguage)}: {user.name}
+                            {t('name', currentLanguage)}: {profileUser.name}
                           </Typography>
                         </Box>
                       </Grid>
@@ -427,11 +537,11 @@ const Profile = () => {
                           <Typography variant="body2" sx={{ 
                             color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                           }}>
-                            {t('email', currentLanguage)}: {user.email}
+                            {t('email', currentLanguage)}: {profileUser.email}
                           </Typography>
                         </Box>
                       </Grid>
-                                             {user.place && (
+                                             {profileUser.place && (
                          <Grid item xs={12} sm={6}>
                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                              <LocationOn sx={{ 
@@ -441,12 +551,12 @@ const Profile = () => {
                              <Typography variant="body2" sx={{ 
                                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                              }}>
-                               {t('location', currentLanguage)}: {user.place}
+                               {t('location', currentLanguage)}: {profileUser.place}
                              </Typography>
                            </Box>
                          </Grid>
                        )}
-                       {user.website && (
+                       {profileUser.website && (
                          <Grid item xs={12} sm={6}>
                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                              <Link sx={{ 
@@ -456,12 +566,12 @@ const Profile = () => {
                              <Typography variant="body2" sx={{ 
                                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                              }}>
-                               {t('website', currentLanguage)}: {user.website}
+                               {t('website', currentLanguage)}: {profileUser.website}
                              </Typography>
                            </Box>
                          </Grid>
                        )}
-                       {user.about && (
+                       {profileUser.about && (
                          <Grid item xs={12}>
                            <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
                              <Description sx={{ 
@@ -472,7 +582,7 @@ const Profile = () => {
                              <Typography variant="body2" sx={{ 
                                color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                              }}>
-                               {t('about', currentLanguage)}: {user.about}
+                               {t('about', currentLanguage)}: {profileUser.about}
                              </Typography>
                            </Box>
                          </Grid>
@@ -486,7 +596,7 @@ const Profile = () => {
                            <Typography variant="body2" sx={{ 
                              color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                            }}>
-                             {t('member_since', currentLanguage)}: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                             {t('member_since', currentLanguage)}: {profileUser.createdAt ? new Date(profileUser.createdAt).toLocaleDateString() : 'N/A'}
                            </Typography>
                          </Box>
                        </Grid>
@@ -495,7 +605,7 @@ const Profile = () => {
                 </Card>
               </Grid>
 
-              {/* Son Aktiviteler */}
+              {/* Sorular ve Cevaplar */}
               <Grid item xs={12}>
                 <Card sx={{ 
                   bgcolor: theme.palette.mode === 'dark' 
@@ -507,61 +617,199 @@ const Profile = () => {
                     : '1px solid rgba(0,0,0,0.05)',
                 }}>
                   <CardContent>
-                    <Typography variant="h6" sx={{ 
-                      color: theme.palette.mode === 'dark' ? 'white' : '#1A202C', 
-                      mb: 2 
-                    }}>
-                      {t('recent_activity', currentLanguage)}
-                    </Typography>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                      <Tabs 
+                        value={activeTab} 
+                        onChange={(_, newValue) => {
+                          setActiveTab(newValue);
+                          setQuestionsPage(1);
+                          setAnswersPage(1);
+                        }}
+                        textColor="primary"
+                        indicatorColor="primary"
+                      >
+                        <Tab 
+                          label={`${t('questions', currentLanguage)} (${userQuestions.length})`} 
+                          value="questions" 
+                          sx={{ color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' }}
+                        />
+                        <Tab 
+                          label={`${t('answers', currentLanguage)} (${userAnswers.length})`} 
+                          value="answers" 
+                          sx={{ color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' }}
+                        />
+                      </Tabs>
+                    </Box>
                     
-                    {recentActivity.length > 0 ? (
-                      <List>
-                        {recentActivity.map((activity) => (
-                          <ListItem key={activity.id} sx={{ px: 0 }}>
-                            <ListItemAvatar>
-                              <Avatar sx={{ bgcolor: activity.type === 'question' ? 'primary.main' : 'secondary.main' }}>
-                                {activity.type === 'question' ? 'Q' : 'A'}
-                              </Avatar>
-                            </ListItemAvatar>
-                                                         <ListItemText
-                               primary={
-                                 <Typography variant="body1" sx={{ 
-                                   color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' 
-                                 }}>
-                                   {activity.title}
-                                 </Typography>
-                               }
-                               secondary={
-                                 <Typography variant="body2" sx={{ 
-                                   color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
-                                 }}>
-                                   {activity.content.substring(0, 100)}...
-                                 </Typography>
-                               }
-                             />
-                             <Box sx={{ textAlign: 'right' }}>
-                               <Typography variant="caption" sx={{ 
-                                 color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
-                               }}>
-                                 {new Date(activity.createdAt).toLocaleDateString()}
-                               </Typography>
-                               <Typography variant="caption" sx={{ 
-                                 display: 'block', 
-                                 color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
-                               }}>
-                                 {activity.likes} {t('likes', currentLanguage)}
-                               </Typography>
-                             </Box>
-                          </ListItem>
-                        ))}
-                      </List>
-                    ) : (
-                      <Typography sx={{ 
-                        color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568', 
-                        textAlign: 'center' 
-                      }}>
-                        {t('no_activity_yet', currentLanguage)}
-                      </Typography>
+                    {activeTab === 'questions' && (
+                      <>
+                        {userQuestions.length > 0 ? (
+                          <>
+                            <List>
+                              {userQuestions.slice((questionsPage - 1) * itemsPerPage, questionsPage * itemsPerPage).map((question) => (
+                              <ListItem 
+                                key={question.id} 
+                                sx={{ 
+                                  px: 0, 
+                                  py: 2,
+                                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                  cursor: 'pointer',
+                                  '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
+                                }}
+                                onClick={() => window.location.href = `/questions/${question.id}`}
+                              >
+                                <ListItemAvatar>
+                                  <Avatar sx={{ bgcolor: 'primary.main' }}>
+                                    Q
+                                  </Avatar>
+                                </ListItemAvatar>
+                                <ListItemText
+                                  primary={
+                                    <Typography variant="body1" sx={{ 
+                                      color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                                      fontWeight: 500,
+                                    }}>
+                                      {question.title}
+                                    </Typography>
+                                  }
+                                  secondary={
+                                    <Typography variant="body2" sx={{ 
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568',
+                                      mt: 0.5,
+                                    }}>
+                                      {question.content.length > 150 
+                                        ? `${question.content.substring(0, 150)}...` 
+                                        : question.content}
+                                    </Typography>
+                                  }
+                                />
+                                <Box sx={{ textAlign: 'right', ml: 2 }}>
+                                  <Typography variant="caption" sx={{ 
+                                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
+                                    display: 'block',
+                                  }}>
+                                    {new Date(question.createdAt || '').toLocaleDateString()}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', gap: 1, mt: 0.5, justifyContent: 'flex-end' }}>
+                                    <Typography variant="caption" sx={{ 
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
+                                    }}>
+                                      {question.likes} {t('likes', currentLanguage)}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ 
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
+                                    }}>
+                                      • {question.answers} {t('answers', currentLanguage)}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </ListItem>
+                              ))}
+                            </List>
+                            {userQuestions.length > itemsPerPage && (
+                              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                                <Pagination
+                                  count={Math.ceil(userQuestions.length / itemsPerPage)}
+                                  page={questionsPage}
+                                  onChange={(_, page) => setQuestionsPage(page)}
+                                  color="primary"
+                                />
+                              </Box>
+                            )}
+                          </>
+                        ) : (
+                          <Typography sx={{ 
+                            color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568', 
+                            textAlign: 'center',
+                            py: 4,
+                          }}>
+                            {t('no_questions', currentLanguage)}
+                          </Typography>
+                        )}
+                      </>
+                    )}
+                    
+                    {activeTab === 'answers' && (
+                      <>
+                        {userAnswers.length > 0 ? (
+                          <>
+                            <List>
+                              {userAnswers.slice((answersPage - 1) * itemsPerPage, answersPage * itemsPerPage).map((answer) => (
+                              <ListItem 
+                                key={answer.id} 
+                                sx={{ 
+                                  px: 0, 
+                                  py: 2,
+                                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                  cursor: 'pointer',
+                                  '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
+                                }}
+                                onClick={() => navigate(`/questions/${answer.questionId || ''}#answer-${answer.id}`)}
+                              >
+                                <ListItemAvatar>
+                                  <Avatar sx={{ bgcolor: 'secondary.main' }}>
+                                    A
+                                  </Avatar>
+                                </ListItemAvatar>
+                                <ListItemText
+                                  primary={
+                                    answer.questionTitle ? (
+                                      <Typography variant="body2" sx={{ 
+                                        color: theme.palette.mode === 'dark' ? 'rgba(255,184,0,0.8)' : '#FFB800',
+                                        fontWeight: 600,
+                                        mb: 0.5,
+                                      }}>
+                                        {t('answer_to', currentLanguage)}: {answer.questionTitle}
+                                      </Typography>
+                                    ) : null
+                                  }
+                                  secondary={
+                                    <Typography variant="body2" sx={{ 
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568',
+                                    }}>
+                                      {answer.content.length > 150 
+                                        ? `${answer.content.substring(0, 150)}...` 
+                                        : answer.content}
+                                    </Typography>
+                                  }
+                                />
+                                <Box sx={{ textAlign: 'right', ml: 2 }}>
+                                  <Typography variant="caption" sx={{ 
+                                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
+                                    display: 'block',
+                                  }}>
+                                    {new Date(answer.createdAt || '').toLocaleDateString()}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ 
+                                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
+                                  }}>
+                                    {answer.likes} {t('likes', currentLanguage)}
+                                  </Typography>
+                                </Box>
+                              </ListItem>
+                              ))}
+                            </List>
+                            {userAnswers.length > itemsPerPage && (
+                              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                                <Pagination
+                                  count={Math.ceil(userAnswers.length / itemsPerPage)}
+                                  page={answersPage}
+                                  onChange={(_, page) => setAnswersPage(page)}
+                                  color="primary"
+                                />
+                              </Box>
+                            )}
+                          </>
+                        ) : (
+                          <Typography sx={{ 
+                            color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568', 
+                            textAlign: 'center',
+                            py: 4,
+                          }}>
+                            {t('no_answers', currentLanguage)}
+                          </Typography>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
