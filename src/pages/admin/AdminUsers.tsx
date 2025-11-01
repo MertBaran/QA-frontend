@@ -471,7 +471,7 @@ const AdminUsers: React.FC = () => {
                       label={t('role', currentLanguage)}
                     >
                       <MenuItem value="all">{t('all', currentLanguage)}</MenuItem>
-                      <MenuItem value="admin">{t('admin', currentLanguage)}</MenuItem>
+                      <MenuItem value="admin">{t('admin_role', currentLanguage)}</MenuItem>
                       <MenuItem value="moderator">{t('moderator', currentLanguage)}</MenuItem>
                       <MenuItem value="user">{t('user', currentLanguage)}</MenuItem>
                     </Select>
