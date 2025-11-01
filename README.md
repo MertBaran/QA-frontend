@@ -1,36 +1,20 @@
 # QA Platform Frontend
 
-A modern Question & Answer platform built with React, Redux, and comprehensive error handling. Features user authentication, question management, and real-time interactions.
-
-## 🚀 Features
-
-- **User Authentication** - Secure login/register with JWT tokens
-- **Question Management** - Ask, view, like/unlike questions
-- **Answer System** - Provide and manage answers
-- **Advanced Error Handling** - Sentry integration with retry mechanisms
-- **Form Validation** - Real-time validation with Yup schemas
-- **Responsive Design** - Mobile-first approach with modern UI
-- **Loading States** - Skeleton screens and loading indicators
-- **Lazy Loading** - Code splitting for better performance
-
-## 🛠️ Quick Start
-
 ### Prerequisites
 
-- Node.js (v16+)
+- Node.js 16+
 - Backend API running
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/MertBaran/QA-frontend.git
-cd QA-frontend
+# Clone repository
+git clone https://github.com/MertBaran/QA-frontend.git && cd QA-frontend
 
 # Install dependencies
 npm install
 
-# Setup environment
+# Environment setup
 cp env.example .env
 # Edit .env with your configuration
 
@@ -38,15 +22,28 @@ cp env.example .env
 npm start
 ```
 
-## 🔧 Available Scripts
+### Docker Setup
 
-- `npm start` - Start development server
-- `npm run build` - Build for production
-- `npm test` - Run tests
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues
+```bash
+# Build and run with Docker Compose
+docker-compose up -d
 
-## 🌍 Environment Variables
+# Or build manually
+docker build -t qa-frontend .
+docker run -p 3000:3000 --env-file .env qa-frontend
+```
+
+## Available Scripts
+
+```bash
+npm start          # Start development server
+npm run build      # Build for production
+npm test           # Run tests
+npm run lint       # Run ESLint
+npm run lint:fix   # Fix ESLint issues
+```
+
+## Environment Variables
 
 ```env
 # API Configuration
@@ -60,61 +57,66 @@ REACT_APP_NAME=QA Platform
 REACT_APP_VERSION=1.0.0
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 src/
 ├── components/          # Reusable UI components
+│   ├── auth/           # Authentication components
+│   ├── error/          # Error handling components
+│   ├── layout/         # Layout components
+│   └── ui/             # UI components
 ├── config/             # Configuration files
-├── pages/              # Page components (auth, questions, user)
+├── pages/              # Page components
+│   ├── admin/          # Admin pages
+│   ├── auth/           # Auth pages
+│   ├── question/       # Question pages
+│   └── user/           # User pages
 ├── routes/             # Routing configuration
 ├── services/           # API services
-├── store/              # Redux store (auth, questions, theme)
-├── utils/              # Utilities (error handling, validation)
-└── App.js              # Main application component
+├── store/              # Redux store
+│   ├── auth/           # Auth state
+│   ├── bookmarks/      # Bookmarks state
+│   ├── confirm/        # Confirm dialog state
+│   ├── language/       # Language state
+│   ├── questions/      # Questions state
+│   └── theme/          # Theme state
+├── types/              # TypeScript types
+├── utils/              # Utilities
+│   ├── i18n/           # Internationalization
+│   ├── validation/     # Form validation
+│   └── errorHandling/  # Error handling
+└── App.tsx             # Main application component
 ```
 
-## 🔒 Error Handling
+## Tech Stack
 
-- **Error Boundaries** - Graceful error handling with fallback UI
-- **Retry Mechanisms** - Automatic retry for failed API calls
-- **User-Friendly Messages** - Clear error messages with recovery options
-- **Sentry Integration** - Real-time error tracking and monitoring
+- React 18
+- Redux Toolkit
+- Material-UI
+- TypeScript
+- Axios
+- Yup
+- React Router DOM
+- Sentry
 
-## 🎨 UI/UX
+<div align="center">
 
-- **Modern Design** - Clean, intuitive interface
-- **Responsive** - Works on all devices
-- **Loading States** - Skeleton screens and loading indicators
-- **Interactive Elements** - Like/unlike, real-time updates
+![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![Redux](https://img.shields.io/badge/redux-%23593d88.svg?style=for-the-badge&logo=redux&logoColor=white)
+![Material-UI](https://img.shields.io/badge/material--ui-%230081CB.svg?style=for-the-badge&logo=material-ui&logoColor=white)
+![Webpack](https://img.shields.io/badge/webpack-%238DD6F9.svg?style=for-the-badge&logo=webpack&logoColor=black)
+![Sentry](https://img.shields.io/badge/sentry-0dccd4?style=for-the-badge&logo=sentry&logoColor=white)
 
-## 🚀 Deployment
+</div>
 
-### Docker
+## Contributing
 
-```bash
-docker-compose up --build
-```
-
-### Production
-
-```bash
-npm run build
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and linting
-5. Submit a Pull Request
-
-## 📄 License
+## License
 
 MIT License
 
-## 🔗 Related
+## Related
 
-- **Backend**: [QA API](https://github.com/MertBaran/qa-api)
-- **Monitoring**: Sentry for error tracking
+- Backend: [QA API](https://github.com/MertBaran/QA-API)
