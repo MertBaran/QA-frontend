@@ -56,6 +56,7 @@ export interface RegisterData {
 export interface LoginCredentials {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 // Kullanıcı giriş response tipi

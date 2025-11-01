@@ -7,12 +7,13 @@ export interface QuestionData {
   content: string;
   slug: string;
   createdAt: string;
-  user: UserData;
+  user: UserData | string;
   userInfo?: {
     _id: string;
     name: string;
     email: string;
     profile_image?: string;
+    title?: string;
   };
   likes: string[];
   answers: string[];
@@ -24,7 +25,7 @@ export interface UserData {
   _id: string;
   name: string;
   email: string;
-  profile_image: string;
+  profile_image?: string;
   title?: string;
   about?: string;
   place?: string;

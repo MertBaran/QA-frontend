@@ -5,14 +5,20 @@ import { UserData } from './question';
 export interface AnswerData {
   _id: string;
   content: string;
-  user: UserData;
+  user: UserData | string;
   userInfo?: {
     _id: string;
     name: string;
     email: string;
     profile_image?: string;
+    title?: string;
   };
   question: string;
+  questionInfo?: {
+    _id: string;
+    title?: string;
+    slug?: string;
+  };
   likes: string[];
   createdAt: string;
   __v?: number;
@@ -37,6 +43,8 @@ export interface Answer {
   likes: number;
   createdAt: string;
   timeAgo: string;
+  questionId?: string;
+  questionTitle?: string;
 }
 
 // Cevap oluşturma için tip
