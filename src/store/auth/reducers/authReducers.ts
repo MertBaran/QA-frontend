@@ -7,7 +7,8 @@ export const logoutReducer = (state: AuthState) => {
   state.error = null;
   state.hasAdminPermission = false;
   state.roles = [];
-  localStorage.removeItem('token');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('token'); // Eski token'ı da temizle
   setUserContext(null);
 };
 

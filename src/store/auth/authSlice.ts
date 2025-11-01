@@ -1,5 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
-import { getCurrentUser } from './authThunks';
+import { getCurrentUser, logoutUser } from './authThunks';
 import { loginUser } from './login/loginThunks';
 import {
   logoutReducer,
@@ -80,7 +80,37 @@ const authSlice = createSlice({
       // Get current user cases
       .addCase(getCurrentUser.pending, getCurrentUserPending)
       .addCase(getCurrentUser.fulfilled, getCurrentUserFulfilled)
-      .addCase(getCurrentUser.rejected, getCurrentUserRejected);
+      .addCase(getCurrentUser.rejected, getCurrentUserRejected)
+      // Logout cases
+      .addCase(logoutUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        logger.redux.state('auth', { loading: true, error: null });
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.error = null;
+        state.hasAdminPermission = false;
+        state.roles = [];
+        logger.redux.state('auth', {
+          user: null,
+          isAuthenticated: false,
+        });
+      })
+      .addCase(logoutUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.hasAdminPermission = false;
+        state.roles = [];
+        logger.redux.state('auth', {
+          error: action.payload,
+          isAuthenticated: false,
+        });
+      });
   },
 });
 

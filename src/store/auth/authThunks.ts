@@ -4,6 +4,7 @@ import { handleReduxError, handleApiError } from '../../utils/errorHandling';
 import type { AxiosError } from 'axios';
 import { setAdminPermissions, setAdminPermissionLoading } from './authSlice';
 import logger from '../../utils/logger';
+import { removeStoredToken } from '../../utils/tokenUtils';
 
 export const getCurrentUser = createAsyncThunk(
   'auth/getCurrentUser',
@@ -30,7 +31,7 @@ export const getCurrentUser = createAsyncThunk(
 
       return response;
     } catch (error: unknown) {
-      localStorage.removeItem('token');
+      removeStoredToken();
       handleApiError(error as AxiosError, {
         action: 'getCurrentUser',
       });
@@ -86,3 +87,19 @@ export const checkAdminPermissions = createAsyncThunk(
     }
   },
 );
+
+// Logout thunk
+export const logoutUser = createAsyncThunk('auth/logoutUser', async (_, { rejectWithValue }) => {
+  try {
+    logger.auth.action('logout_user');
+    const response = await authService.logout();
+
+    logger.auth.success('User logged out successfully');
+    return response;
+  } catch (error) {
+    logger.auth.error('logout_failed', error);
+    // Hata olsa bile token'ı temizle
+    removeStoredToken();
+    return rejectWithValue('Logout failed');
+  }
+});

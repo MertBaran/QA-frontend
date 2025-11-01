@@ -8,6 +8,7 @@ import logger from '../../../utils/logger';
 // Genişletilmiş login credentials interface
 interface ExtendedLoginCredentials extends LoginCredentials {
   rememberMe?: boolean;
+  captchaToken?: string;
 }
 
 export const loginUser = createAsyncThunk<
