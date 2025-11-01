@@ -19,9 +19,8 @@ export const useLanguageDetection = () => {
 
       if (supportedLanguages.includes(shortLang)) {
         dispatch(setLanguage(shortLang));
-        console.log(`Tarayıcı dili algılandı: ${shortLang}`);
       } else {
-        console.log(`Desteklenmeyen tarayıcı dili: ${shortLang}, varsayılan dil kullanılıyor: tr`);
+        // unsupported language; keep default 'tr'
       }
     }
   }, [dispatch]);
