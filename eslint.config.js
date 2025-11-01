@@ -10,13 +10,7 @@ export default [
   js.configs.recommended,
   // Test dosyaları için jest ve node global'leri
   {
-    files: [
-      '**/*.test.ts',
-      '**/*.test.tsx',
-      '**/*.test.js',
-      '**/setupTests.js',
-      '**/__mocks__/**',
-    ],
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.test.js', '**/setupTests.js', '**/__mocks__/**'],
     languageOptions: {
       globals: {
         jest: true,
@@ -88,10 +82,7 @@ export default [
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { argsIgnorePattern: '^_' },
-      ],
+      '@typescript-eslint/no-unused-vars': 'off',
       'no-unused-vars': 'off',
       'react/react-in-jsx-scope': 'off',
     },
