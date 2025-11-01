@@ -8,11 +8,13 @@ import AppRoutes from './routes/AppRoutes';
 import { lightTheme, darkTheme } from './theme/theme';
 import ErrorBoundary from './components/error/ErrorBoundary';
 import Loading from './components/ui/Loading';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 import { initSentry } from './config/sentry';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { useLanguageDetection } from './hooks/useLanguageDetection';
 import { getCurrentUser } from './store/auth/authThunks';
 import { useEffect } from 'react';
+import { getStoredToken } from './utils/tokenUtils';
 
 // Initialize Sentry
 initSentry();
@@ -28,15 +30,18 @@ function AppContent() {
 
   // Sayfa yüklendiğinde kullanıcı bilgilerini kontrol et
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = getStoredToken();
     if (token && !isAuthenticated) {
       dispatch(getCurrentUser());
     }
   }, [dispatch, isAuthenticated]);
 
+
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <ConfirmDialog />
       <Router
         future={{
           v7_relativeSplatPath: true,
