@@ -139,4 +139,39 @@ export const questions = {
     en: 'This field is required',
     de: 'Dieses Feld ist erforderlich',
   },
+  ask_question: {
+    tr: 'Sor',
+    en: 'Ask',
+    de: 'Fragen',
+  },
+  ask_question_about: {
+    tr: 'Bu Hakkında Soru Sor',
+    en: 'Ask Question About This',
+    de: 'Darüber fragen',
+  },
+  ask_question_about_question: {
+    tr: 'Bu Soru Hakkında Soru Sor',
+    en: 'Ask Question About This Question',
+    de: 'Frage zu dieser Frage stellen',
+  },
+  ask_question_about_answer: {
+    tr: 'Bu Cevap Hakkında Soru Sor',
+    en: 'Ask Question About This Answer',
+    de: 'Frage zu dieser Antwort stellen',
+  },
+  this_question_about: {
+    tr: 'Bu soru hakkında',
+    en: 'This question is about',
+    de: 'Diese Frage handelt von',
+  },
+  related_questions: {
+    tr: 'Bu hakkında sorulan sorular',
+    en: 'Questions about this',
+    de: 'Fragen dazu',
+  },
+  no_related_questions: {
+    tr: 'Henüz bu hakkında soru sorulmamış',
+    en: 'No questions about this yet',
+    de: 'Noch keine Fragen dazu',
+  },
 } as const;

@@ -104,4 +104,14 @@ export const common = {
     en: 'No',
     de: 'Nein',
   },
+  users_who_liked: {
+    tr: 'Beğenen Kullanıcılar',
+    en: 'Users Who Liked',
+    de: 'Benutzer, die gemocht haben',
+  },
+  no_likes_yet: {
+    tr: 'Henüz beğeni yok',
+    en: 'No likes yet',
+    de: 'Noch keine Likes',
+  },
 } as const;
