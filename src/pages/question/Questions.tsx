@@ -77,7 +77,7 @@ const Questions = () => {
     try {
       const question = questions.find((q: Question) => q.id === questionId);
       if (!question) return;
-      const isLiked = question.likes > 0; // Simplified for now
+      const isLiked = question.likedByUsers.includes(user?.id || '');
 
       if (isLiked) {
         await dispatch(unlikeQuestion(questionId)).unwrap();
@@ -241,8 +241,8 @@ const Questions = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {filteredQuestions.map((question: Question) => {
                 console.log('Rendering question:', question);
-                const isLiked = question.likes > 0; // Simplified for now
-                const likeCount = question.likes;
+                const isLiked = question.likedByUsers.includes(user?.id || '');
+                const likeCount = question.likesCount;
                 const answerCount = question.answers;
 
                 return (

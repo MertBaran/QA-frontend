@@ -430,13 +430,17 @@ const Header = () => {
                       }
                     }}
                   >
-                    {user?.profileImage ? (
+                    {user?.profile_image ? (
                       <Avatar
-                        src={user.profileImage}
+                        src={user.profile_image}
                         sx={{ width: 32, height: 32 }}
-                      />
+                      >
+                        {user?.name?.charAt(0)?.toUpperCase()}
+                      </Avatar>
                     ) : (
-                      <AccountCircle />
+                      <Avatar sx={{ width: 32, height: 32 }}>
+                        {user?.name?.charAt(0)?.toUpperCase() || '?'}
+                      </Avatar>
                     )}
                   </IconButton>
                 </Tooltip>

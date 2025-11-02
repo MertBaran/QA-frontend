@@ -188,7 +188,7 @@ const Profile = () => {
       // Calculate stats
       const totalQuestions = questions.length;
       const totalAnswers = answers.length;
-      const totalLikes = questions.reduce((sum, q) => sum + q.likes, 0) + answers.reduce((sum, a) => sum + a.likes, 0);
+      const totalLikes = questions.reduce((sum, q) => sum + q.likesCount, 0) + answers.reduce((sum, a) => sum + a.likesCount, 0);
       
       setStats({
         totalQuestions,
@@ -205,7 +205,7 @@ const Profile = () => {
           title: q.title,
           content: q.content,
           createdAt: q.createdAt?.toString() || new Date().toISOString(),
-          likes: q.likes,
+          likes: q.likesCount,
         })),
         ...answers.slice(0, 5).map(a => ({
           id: a.id,
@@ -213,7 +213,7 @@ const Profile = () => {
           title: '', // Answers don't have titles
           content: a.content,
           createdAt: a.createdAt?.toString() || new Date().toISOString(),
-          likes: a.likes,
+          likes: a.likesCount,
         })),
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
        .slice(0, 10);
@@ -656,7 +656,20 @@ const Profile = () => {
                                   cursor: 'pointer',
                                   '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
                                 }}
-                                onClick={() => window.location.href = `/questions/${question.id}`}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.button === 1) {
+                                    e.preventDefault();
+                                    window.open(`/questions/${question.id}`, '_blank');
+                                  } else {
+                                    navigate(`/questions/${question.id}`);
+                                  }
+                                }}
+                                onMouseDown={(e) => {
+                                  if (e.button === 1) {
+                                    e.preventDefault();
+                                    window.open(`/questions/${question.id}`, '_blank');
+                                  }
+                                }}
                               >
                                 <ListItemAvatar>
                                   <Avatar sx={{ bgcolor: 'primary.main' }}>
@@ -694,7 +707,7 @@ const Profile = () => {
                                     <Typography variant="caption" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
                                     }}>
-                                      {question.likes} {t('likes', currentLanguage)}
+                                      {question.likesCount} {t('likes', currentLanguage)}
                                     </Typography>
                                     <Typography variant="caption" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
@@ -744,7 +757,20 @@ const Profile = () => {
                                   cursor: 'pointer',
                                   '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }
                                 }}
-                                onClick={() => navigate(`/questions/${answer.questionId || ''}#answer-${answer.id}`)}
+                                onClick={(e) => {
+                                  if (e.ctrlKey || e.metaKey || e.button === 1) {
+                                    e.preventDefault();
+                                    window.open(`/questions/${answer.questionId || ''}#answer-${answer.id}`, '_blank');
+                                  } else {
+                                    navigate(`/questions/${answer.questionId || ''}#answer-${answer.id}`);
+                                  }
+                                }}
+                                onMouseDown={(e) => {
+                                  if (e.button === 1) {
+                                    e.preventDefault();
+                                    window.open(`/questions/${answer.questionId || ''}#answer-${answer.id}`, '_blank');
+                                  }
+                                }}
                               >
                                 <ListItemAvatar>
                                   <Avatar sx={{ bgcolor: 'secondary.main' }}>
@@ -783,7 +809,7 @@ const Profile = () => {
                                   <Typography variant="caption" sx={{ 
                                     color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
                                   }}>
-                                    {answer.likes} {t('likes', currentLanguage)}
+                                    {answer.likesCount} {t('likes', currentLanguage)}
                                   </Typography>
                                 </Box>
                               </ListItem>
