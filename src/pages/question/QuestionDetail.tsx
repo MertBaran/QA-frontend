@@ -14,16 +14,21 @@ import {
   Card,
   CardContent,
   Alert,
+  Badge,
 } from '@mui/material';
 import {
   ThumbUp,
   ThumbUpOutlined,
+  ThumbDown,
+  ThumbDownOutlined,
   Comment,
   Visibility,
   ArrowBack,
   Send,
   Edit,
   Delete,
+  HelpOutline,
+  KeyboardArrowRight,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
@@ -31,10 +36,18 @@ import { Question } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
 import BookmarkButton from '../../components/ui/BookmarkButton';
+import LikesModal from '../../components/ui/LikesModal';
+import ParentInfoChip from '../../components/ui/ParentInfoChip';
+import AskQuestionModal from '../../components/question/AskQuestionModal';
+import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
+import { openModal, closeModal } from '../../store/likes/likesSlice';
+import { fetchLikedUsers } from '../../store/likes/likesThunks';
+import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
+import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
 
 const QuestionCard = styled(Paper)(({ theme }) => ({
   background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
@@ -56,6 +69,33 @@ const AnswerCard = styled(Card)(({ theme }) => ({
   backdropFilter: 'blur(8px)',
 }));
 
+const AskButtonWrapper = styled(Box)(({ theme }) => ({
+  position: 'relative',
+  display: 'inline-flex',
+  alignItems: 'center',
+  cursor: 'pointer',
+  flexShrink: 0,
+  '& .hover-text': {
+    position: 'absolute',
+    left: '100%',
+    whiteSpace: 'nowrap',
+    opacity: 0,
+    transition: 'all 0.3s ease-in-out',
+    pointerEvents: 'none',
+    marginLeft: theme.spacing(0.5),
+    zIndex: 1000,
+  },
+  '& .hover-icon': {
+    transition: 'transform 0.3s ease-in-out',
+  },
+  '&:hover .hover-text': {
+    opacity: 1,
+  },
+  '&:hover .hover-icon': {
+    transform: 'rotate(180deg)',
+  },
+}));
+
 const ActionButton = styled(Button)(({ theme }) => ({
   background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
   color: 'white',
@@ -70,17 +110,40 @@ const ActionButton = styled(Button)(({ theme }) => ({
 const QuestionDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
+  const { answers, loading } = useAppSelector(state => state.answers);
   
   const [question, setQuestion] = useState<Question | null>(null);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [newAnswer, setNewAnswer] = useState('');
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [answerValidationError, setAnswerValidationError] = useState<string>('');
   const [highlightedAnswerId, setHighlightedAnswerId] = useState<string | null>(null);
+  
+  // Parent question/answer state
+  const [parentQuestion, setParentQuestion] = useState<Question | null>(null);
+  const [parentAnswer, setParentAnswer] = useState<Answer | null>(null);
+  const [parentAnswerQuestion, setParentAnswerQuestion] = useState<Question | null>(null);
+  
+  // Ask question modal states
+  const [askQuestionModalOpen, setAskQuestionModalOpen] = useState(false);
+  const [askQuestionMode, setAskQuestionMode] = useState<'question' | 'answer' | null>(null);
+  const [targetQuestionId, setTargetQuestionId] = useState<string | null>(null);
+  const [targetAnswerId, setTargetAnswerId] = useState<string | null>(null);
+  
+  // Related questions popover states
+  const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
+  const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
+  const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
+  const [currentRelatedTargetId, setCurrentRelatedTargetId] = useState<string | null>(null);
+  const [currentRelatedMode, setCurrentRelatedMode] = useState<'question' | 'answer' | null>(null);
+  
+  // Related questions count per answer
+  const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
 
   // Soru ve cevapları yükle
   useEffect(() => {
@@ -88,34 +151,75 @@ const QuestionDetail: React.FC = () => {
       if (!id) return;
       
       try {
-        setLoading(true);
         setError(null);
+        setLoadingQuestion(true);
         
         // Soru ve cevapları paralel olarak yükle
-        const [questionData, answersData] = await Promise.all([
+        const [questionData] = await Promise.all([
           questionService.getQuestionById(id),
-          answerService.getAnswersByQuestion(id)
+          dispatch(getAnswersByQuestion(id))
         ]);
         
         if (questionData) {
           setQuestion(questionData);
+          
+          // Parent question/answer yükle
+          const parentId = questionData.parentQuestionId || questionData.parentAnswerId;
+          if (parentId) {
+            const parentQ = await questionService.getQuestionById(parentId);
+            if (parentQ) {
+              setParentQuestion(parentQ);
+            } else {
+              const parentA = await answerService.getAnswerById(parentId);
+              if (parentA) {
+                setParentAnswer(parentA);
+                
+                // Load the question that this answer belongs to
+                if (parentA.questionId) {
+                  const answerQ = await questionService.getQuestionById(parentA.questionId);
+                  if (answerQ) {
+                    setParentAnswerQuestion(answerQ);
+                  }
+                }
+              }
+            }
+          }
         } else {
           setError('Soru bulunamadı');
         }
-        
-        setAnswers(answersData);
         
         logger.user.action('question_detail_loaded', { questionId: id });
       } catch (err) {
         console.error('Soru detayı yüklenirken hata:', err);
         setError('Soru yüklenirken bir hata oluştu');
       } finally {
-        setLoading(false);
+        setLoadingQuestion(false);
       }
     };
 
     loadQuestionData();
-  }, [id]);
+  }, [id, dispatch]);
+
+  // Load related questions count for each answer
+  useEffect(() => {
+    const loadRelatedCounts = async () => {
+      if (!answers || answers.length === 0) return;
+      
+      const counts: Record<string, number> = {};
+      for (const answer of answers) {
+        try {
+          const related = await questionService.getQuestionsByParent(answer.id);
+          counts[answer.id] = related.length;
+        } catch (err) {
+          console.error('Related questions count hatası:', err);
+          counts[answer.id] = 0;
+        }
+      }
+      setRelatedQuestionsCount(counts);
+    };
+    
+    loadRelatedCounts();
+  }, [answers]);
 
   // Hash'ten cevap ID'sini al ve highlight et
   useEffect(() => {
@@ -148,14 +252,11 @@ const QuestionDetail: React.FC = () => {
       setSubmittingAnswer(true);
       setAnswerValidationError('');
       
-      const answer = await answerService.createAnswer(id, { content: newAnswer });
+      await dispatch(createAnswer({ questionId: id, answerData: { content: newAnswer } }));
       
-      if (answer) {
-        setAnswers(prev => [answer, ...prev]);
-        setNewAnswer('');
-        setAnswerValidationError('');
-        logger.user.action('answer_submitted', { questionId: id });
-      }
+      setNewAnswer('');
+      setAnswerValidationError('');
+      logger.user.action('answer_submitted', { questionId: id });
     } catch (err: any) {
       console.error('Cevap gönderilirken hata:', err);
       
@@ -185,67 +286,256 @@ const QuestionDetail: React.FC = () => {
 
   // Soru beğen/beğenme
   const handleLikeQuestion = async () => {
-    if (!id || !user) return;
+    if (!id || !user || !question) return;
+    
+    // Optimistic update
+    const previousQuestion = { ...question };
+    setQuestion(prev => prev ? {
+      ...prev,
+      likesCount: prev.likesCount + 1,
+      likedByUsers: [...prev.likedByUsers, user.id],
+      // Remove from dislikes if exists
+      dislikesCount: prev.dislikedByUsers.includes(user.id) ? Math.max(0, prev.dislikesCount - 1) : prev.dislikesCount,
+      dislikedByUsers: prev.dislikedByUsers.filter(id => id !== user.id)
+    } : null);
     
     try {
       const success = await questionService.likeQuestion(id);
-      if (success && question) {
-        setQuestion(prev => prev ? {
-          ...prev,
-          likes: prev.likes + 1
-        } : null);
+      if (!success) {
+        // Revert on failure
+        setQuestion(previousQuestion);
       }
     } catch (err) {
       console.error('Soru beğenilirken hata:', err);
+      // Revert on error
+      setQuestion(previousQuestion);
     }
   };
 
   // Soru beğenmeyi kaldır
   const handleUnlikeQuestion = async () => {
-    if (!id || !user) return;
+    if (!id || !user || !question) return;
+    
+    // Optimistic update
+    const previousQuestion = { ...question };
+    setQuestion(prev => prev ? {
+      ...prev,
+      likesCount: Math.max(0, prev.likesCount - 1),
+      likedByUsers: prev.likedByUsers.filter(id => id !== user.id)
+    } : null);
     
     try {
       const success = await questionService.unlikeQuestion(id);
-      if (success && question) {
-        setQuestion(prev => prev ? {
-          ...prev,
-          likes: Math.max(0, prev.likes - 1)
-        } : null);
+      if (!success) {
+        // Revert on failure
+        setQuestion(previousQuestion);
       }
     } catch (err) {
       console.error('Soru beğenisi kaldırılırken hata:', err);
+      // Revert on error
+      setQuestion(previousQuestion);
+    }
+  };
+
+  // Soru beğenmeme
+  const handleDislikeQuestion = async () => {
+    if (!id || !user || !question) return;
+    
+    // Optimistic update
+    const previousQuestion = { ...question };
+    setQuestion(prev => prev ? {
+      ...prev,
+      dislikesCount: prev.dislikesCount + 1,
+      dislikedByUsers: [...prev.dislikedByUsers, user.id],
+      // Remove from likes if exists
+      likesCount: prev.likedByUsers.includes(user.id) ? Math.max(0, prev.likesCount - 1) : prev.likesCount,
+      likedByUsers: prev.likedByUsers.filter(id => id !== user.id)
+    } : null);
+    
+    try {
+      const success = await questionService.dislikeQuestion(id);
+      if (!success) {
+        // Revert on failure
+        setQuestion(previousQuestion);
+      }
+    } catch (err) {
+      console.error('Soru beğenilmeme hatası:', err);
+      // Revert on error
+      setQuestion(previousQuestion);
+    }
+  };
+
+  // Soru beğenmemeyi kaldır
+  const handleUndoDislikeQuestion = async () => {
+    if (!id || !user || !question) return;
+    
+    // Optimistic update
+    const previousQuestion = { ...question };
+    setQuestion(prev => prev ? {
+      ...prev,
+      dislikesCount: Math.max(0, prev.dislikesCount - 1),
+      dislikedByUsers: prev.dislikedByUsers.filter(id => id !== user.id)
+    } : null);
+    
+    try {
+      const success = await questionService.undoDislikeQuestion(id);
+      if (!success) {
+        // Revert on failure
+        setQuestion(previousQuestion);
+      }
+    } catch (err) {
+      console.error('Soru beğenmemeyi geri alırken hata:', err);
+      // Revert on error
+      setQuestion(previousQuestion);
     }
   };
 
   // Cevap beğen/beğenme
   const handleLikeAnswer = async (answerId: string) => {
+    if (!user) return;
+    
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+    
+    // Optimistic update
+    const previousAnswer = { ...answer };
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: {
+        likesCount: answer.likesCount + 1,
+        likedByUsers: [...answer.likedByUsers, user.id],
+        // Remove from dislikes if exists
+        dislikesCount: answer.dislikedByUsers.includes(user.id) ? Math.max(0, answer.dislikesCount - 1) : answer.dislikesCount,
+        dislikedByUsers: answer.dislikedByUsers.filter(id => id !== user.id)
+      }
+    }));
+    
     try {
-      const success = await answerService.likeAnswer(answerId, id!);
-      if (success) {
-        setAnswers(prev => prev.map(answer => 
-          answer.id === answerId 
-            ? { ...answer, likes: answer.likes + 1 }
-            : answer
-        ));
+      const success = await dispatch(likeAnswer({ answerId, questionId: id! }));
+      if (!success) {
+        // Revert on failure
+        dispatch(updateAnswerInList({
+          answerId,
+          updates: previousAnswer
+        }));
       }
     } catch (err) {
-      console.error('Cevap beğenilirken hata:', err);
+      // Revert on error
+      dispatch(updateAnswerInList({
+        answerId,
+        updates: previousAnswer
+      }));
     }
   };
 
   // Cevap beğenmeyi kaldır
   const handleUnlikeAnswer = async (answerId: string) => {
+    if (!user) return;
+    
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+    
+    // Optimistic update
+    const previousAnswer = { ...answer };
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: {
+        likesCount: Math.max(0, answer.likesCount - 1),
+        likedByUsers: answer.likedByUsers.filter(id => id !== user.id)
+      }
+    }));
+    
     try {
-      const success = await answerService.unlikeAnswer(answerId, id!);
-      if (success) {
-        setAnswers(prev => prev.map(answer => 
-          answer.id === answerId 
-            ? { ...answer, likes: Math.max(0, answer.likes - 1) }
-            : answer
-        ));
+      const success = await dispatch(unlikeAnswer({ answerId, questionId: id! }));
+      if (!success) {
+        // Revert on failure
+        dispatch(updateAnswerInList({
+          answerId,
+          updates: previousAnswer
+        }));
       }
     } catch (err) {
       console.error('Cevap beğenisi kaldırılırken hata:', err);
+      // Revert on error
+      dispatch(updateAnswerInList({
+        answerId,
+        updates: previousAnswer
+      }));
+    }
+  };
+
+  // Cevap beğenmeme
+  const handleDislikeAnswer = async (answerId: string) => {
+    if (!user) return;
+    
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+    
+    // Optimistic update
+    const previousAnswer = { ...answer };
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: {
+        dislikesCount: answer.dislikesCount + 1,
+        dislikedByUsers: [...answer.dislikedByUsers, user.id],
+        // Remove from likes if exists
+        likesCount: answer.likedByUsers.includes(user.id) ? Math.max(0, answer.likesCount - 1) : answer.likesCount,
+        likedByUsers: answer.likedByUsers.filter(id => id !== user.id)
+      }
+    }));
+    
+    try {
+      const success = await answerService.dislikeAnswer(answerId, id!);
+      if (!success) {
+        // Revert on failure
+        dispatch(updateAnswerInList({
+          answerId,
+          updates: previousAnswer
+        }));
+      }
+    } catch (err) {
+      console.error('Cevap beğenilmeme hatası:', err);
+      // Revert on error
+      dispatch(updateAnswerInList({
+        answerId,
+        updates: previousAnswer
+      }));
+    }
+  };
+
+  // Cevap beğenmemeyi kaldır
+  const handleUndoDislikeAnswer = async (answerId: string) => {
+    if (!user) return;
+    
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer) return;
+    
+    // Optimistic update
+    const previousAnswer = { ...answer };
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: {
+        dislikesCount: Math.max(0, answer.dislikesCount - 1),
+        dislikedByUsers: answer.dislikedByUsers.filter(id => id !== user.id)
+      }
+    }));
+    
+    try {
+      const success = await answerService.undoDislikeAnswer(answerId, id!);
+      if (!success) {
+        // Revert on failure
+        dispatch(updateAnswerInList({
+          answerId,
+          updates: previousAnswer
+        }));
+      }
+    } catch (err) {
+      console.error('Cevap beğenmemeyi geri alırken hata:', err);
+      // Revert on error
+      dispatch(updateAnswerInList({
+        answerId,
+        updates: previousAnswer
+      }));
     }
   };
 
@@ -281,21 +571,76 @@ const QuestionDetail: React.FC = () => {
     }
     
     // Optimistic update: UI'dan hemen sil
-    const previousAnswers = [...answers];
-    setAnswers(prev => prev.filter(answer => answer.id !== answerId));
+    dispatch(removeAnswerFromList(answerId));
     
     try {
-      await answerService.deleteAnswer(answerId, id!);
-      // Success - state already updated
+      await dispatch(deleteAnswer({ answerId, questionId: id! }));
     } catch (error) {
-      // Rollback on error
+      // Rollback on error - re-fetch answers
       console.error('Cevap silinirken hata:', error);
-      setAnswers(previousAnswers);
+      dispatch(getAnswersByQuestion(id!));
       alert(t('delete_failed', currentLanguage));
     }
   };
 
-  if (loading) {
+  // Ask question about question/answer handlers
+  const handleAskQuestionAboutQuestion = () => {
+    if (!question) return;
+    setAskQuestionMode('question');
+    setTargetQuestionId(question.id);
+    setAskQuestionModalOpen(true);
+  };
+
+  const handleAskQuestionAboutAnswer = (answerId: string) => {
+    setAskQuestionMode('answer');
+    setTargetAnswerId(answerId);
+    setAskQuestionModalOpen(true);
+  };
+
+  const handleSubmitRelatedQuestion = async (data: any) => {
+    if (!user) return;
+    
+    const questionData = {
+      ...data,
+      parentFormId: askQuestionMode === 'question' ? targetQuestionId : targetAnswerId,
+    };
+
+    const newQuestion = await questionService.createQuestion(questionData);
+    // Navigate to the newly created question
+    if (newQuestion) {
+      navigate(`/questions/${newQuestion.id}`);
+    }
+  };
+
+  // Related questions handlers
+  const handleShowRelatedQuestions = async (event: React.MouseEvent<HTMLElement>, targetId: string, mode: 'question' | 'answer') => {
+    setRelatedQuestionsAnchor(event.currentTarget);
+    setCurrentRelatedTargetId(targetId);
+    setCurrentRelatedMode(mode);
+    setLoadingRelatedQuestions(true);
+    
+    try {
+      const questions = await questionService.getQuestionsByParent(targetId);
+      setRelatedQuestions(questions);
+    } catch (error) {
+      console.error('İlişkili sorular yüklenirken hata:', error);
+      setRelatedQuestions([]);
+    } finally {
+      setLoadingRelatedQuestions(false);
+    }
+  };
+
+  const handleCloseRelatedQuestionsPopover = () => {
+    setRelatedQuestionsAnchor(null);
+  };
+
+  const handleRelatedQuestionClick = (questionId: string) => {
+    // Navigate to the clicked question
+    navigate(`/questions/${questionId}`);
+    setRelatedQuestionsAnchor(null);
+  };
+
+  if (loadingQuestion) {
     return (
       <Layout>
         <Container maxWidth="lg" sx={{ pt: 4 }}>
@@ -352,6 +697,20 @@ const QuestionDetail: React.FC = () => {
 
         {/* Soru Detayı */}
         <QuestionCard>
+          {/* Parent Question/Answer Info */}
+          {(question.parentQuestionId || question.parentAnswerId) && (() => {
+            const parentId = question.parentQuestionId || question.parentAnswerId;
+            
+            return (
+              <ParentInfoChip 
+                parentQuestion={parentQuestion}
+                parentAnswer={parentAnswer}
+                parentId={parentId!}
+                parentAnswerQuestion={parentAnswerQuestion}
+              />
+            );
+          })()}
+          
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
             <Box sx={{ flex: 1 }}>
               {/* Yazar Bilgisi */}
@@ -382,8 +741,8 @@ const QuestionDetail: React.FC = () => {
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     {question.timeAgo}
                   </Typography>
-                </Box>
               </Box>
+            </Box>
 
               {/* Kategori */}
               <Box sx={{ mb: 2 }}>
@@ -403,8 +762,9 @@ const QuestionDetail: React.FC = () => {
                 variant="h4" 
                 sx={{ 
                   fontWeight: 700, 
-                  mb: 3,
+                  flex: 1,
                   color: 'white',
+                  mb: 3,
                 }}
               >
                 {question.title}
@@ -445,10 +805,28 @@ const QuestionDetail: React.FC = () => {
 
               {/* İstatistikler */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <ThumbUp sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>
-                    {question.likes}
+                <Box 
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  onClick={async () => {
+                    if (question.likesCount > 0 && question.likedByUsers.length > 0) {
+                      try {
+                        await dispatch(fetchLikedUsers(question.likedByUsers));
+                        dispatch(openModal());
+                      } catch (err) {
+                        console.error('Kullanıcılar yüklenirken hata:', err);
+                      }
+                    }
+                  }}
+                >
+                  <ThumbUp sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', cursor: question.likesCount > 0 ? 'pointer' : 'default' }} />
+                  <span 
+                    style={{ 
+                      color: 'rgba(255,255,255,0.8)', 
+                      fontSize: 14,
+                      cursor: question.likesCount > 0 ? 'pointer' : 'default'
+                    }}
+                  >
+                    {question.likesCount}
                   </span>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -467,7 +845,32 @@ const QuestionDetail: React.FC = () => {
             </Box>
 
             {/* Aksiyon Butonları */}
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+              {user && (
+                <AskButtonWrapper onClick={handleAskQuestionAboutQuestion}>
+                  <IconButton
+                    className="hover-icon"
+                    sx={{
+                      color: 'rgba(255,255,255,0.7)',
+                      '&:hover': { color: '#FFB800' },
+                    }}
+                  >
+                    <HelpOutline />
+                  </IconButton>
+                  <Typography 
+                    className="hover-text"
+                    variant="caption"
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.8)',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    {t('ask_question', currentLanguage)}
+                  </Typography>
+                </AskButtonWrapper>
+              )}
               <BookmarkButton 
                 targetType={"question"}
                 targetId={question.id}
@@ -481,15 +884,26 @@ const QuestionDetail: React.FC = () => {
                 }}
               />
               <IconButton 
-                onClick={question.likes > 0 ? handleUnlikeQuestion : handleLikeQuestion}
+                onClick={question.likedByUsers.includes(user?.id || '') ? handleUnlikeQuestion : handleLikeQuestion}
                 sx={{ 
-                  color: question.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.7)',
+                  color: question.likedByUsers.includes(user?.id || '') ? '#FFB800' : 'rgba(255,255,255,0.7)',
                   '&:hover': {
-                    color: question.likes > 0 ? '#FF8F00' : '#FFB800',
+                    color: question.likedByUsers.includes(user?.id || '') ? '#FF8F00' : '#FFB800',
                   }
                 }}
               >
-                {question.likes > 0 ? <ThumbUp /> : <ThumbUpOutlined />}
+                {question.likedByUsers.includes(user?.id || '') ? <ThumbUp /> : <ThumbUpOutlined />}
+              </IconButton>
+              <IconButton 
+                onClick={question.dislikedByUsers.includes(user?.id || '') ? handleUndoDislikeQuestion : handleDislikeQuestion}
+                sx={{ 
+                  color: question.dislikedByUsers.includes(user?.id || '') ? '#FF6B6B' : 'rgba(255,255,255,0.7)',
+                  '&:hover': {
+                    color: question.dislikedByUsers.includes(user?.id || '') ? '#FF5252' : '#FF6B6B',
+                  }
+                }}
+              >
+                {question.dislikedByUsers.includes(user?.id || '') ? <ThumbDown /> : <ThumbDownOutlined />}
               </IconButton>
               {user && (
                 question.author.id === user.id || 
@@ -670,20 +1084,81 @@ const QuestionDetail: React.FC = () => {
                         </IconButton>
                       )}
                       <IconButton
-                        onClick={() =>
-                          answer.likes > 0
-                            ? handleUnlikeAnswer(answer.id)
-                            : handleLikeAnswer(answer.id)
-                        }
+                        onClick={() => {
+                          const isLiked = answer.likedByUsers.includes(user?.id || '');
+                          isLiked ? handleUnlikeAnswer(answer.id) : handleLikeAnswer(answer.id);
+                        }}
                         sx={{
-                          color: answer.likes > 0 ? '#FFB800' : 'rgba(255,255,255,0.7)',
+                          color: answer.likedByUsers.includes(user?.id || '') ? '#FFB800' : 'rgba(255,255,255,0.7)',
                           '&:hover': {
-                            color: answer.likes > 0 ? '#FF8F00' : '#FFB800',
+                            color: answer.likedByUsers.includes(user?.id || '') ? '#FF8F00' : '#FFB800',
                           },
                         }}
                       >
-                        {answer.likes > 0 ? <ThumbUp /> : <ThumbUpOutlined />}
+                        {answer.likedByUsers.includes(user?.id || '') ? <ThumbUp /> : <ThumbUpOutlined />}
                       </IconButton>
+                      <IconButton
+                        onClick={() => {
+                          const isDisliked = answer.dislikedByUsers.includes(user?.id || '');
+                          isDisliked ? handleUndoDislikeAnswer(answer.id) : handleDislikeAnswer(answer.id);
+                        }}
+                        sx={{
+                          color: answer.dislikedByUsers.includes(user?.id || '') ? '#FF6B6B' : 'rgba(255,255,255,0.7)',
+                          '&:hover': {
+                            color: answer.dislikedByUsers.includes(user?.id || '') ? '#FF5252' : '#FF6B6B',
+                          },
+                        }}
+                      >
+                        {answer.dislikedByUsers.includes(user?.id || '') ? <ThumbDown /> : <ThumbDownOutlined />}
+                      </IconButton>
+                      {user && (
+                        <>
+                          <AskButtonWrapper onClick={() => handleAskQuestionAboutAnswer(answer.id)}>
+                            <IconButton
+                              className="hover-icon"
+                              sx={{
+                                color: 'rgba(255,255,255,0.7)',
+                                '&:hover': { color: '#FFB800' },
+                              }}
+                            >
+                              <HelpOutline />
+                            </IconButton>
+                            <Typography 
+                              className="hover-text"
+                              variant="caption"
+                              sx={{ 
+                                color: 'rgba(255,255,255,0.8)',
+                                fontWeight: 600,
+                                whiteSpace: 'nowrap',
+                                fontSize: '0.75rem',
+                              }}
+                            >
+                              {t('ask_question', currentLanguage)}
+                            </Typography>
+                          </AskButtonWrapper>
+                          <Badge
+                            badgeContent={relatedQuestionsCount[answer.id] || 0}
+                            color="primary"
+                            sx={{
+                              '& .MuiBadge-badge': {
+                                bgcolor: '#FFB800',
+                                color: 'rgba(10,26,35,0.98)',
+                              }
+                            }}
+                          >
+                            <IconButton
+                              onClick={(e) => handleShowRelatedQuestions(e, answer.id, 'answer')}
+                              sx={{
+                                color: 'rgba(255,255,255,0.7)',
+                                '&:hover': { color: '#FFB800' },
+                              }}
+                              title={t('related_questions', currentLanguage)}
+                            >
+                              <Comment fontSize="small" />
+                            </IconButton>
+                          </Badge>
+                        </>
+                      )}
                     </Box>
                   </Box>
                   
@@ -697,10 +1172,28 @@ const QuestionDetail: React.FC = () => {
                     {answer.content}
                   </Typography>
                   
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
-                    <ThumbUp sx={{ fontSize: 16, color: 'rgba(255,255,255,0.7)' }} />
-                    <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
-                      {answer.likes}
+                  <Box 
+                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}
+                    onClick={async () => {
+                      if (answer.likesCount > 0 && answer.likedByUsers.length > 0) {
+                        try {
+                          await dispatch(fetchLikedUsers(answer.likedByUsers));
+                          dispatch(openModal());
+                        } catch (err) {
+                          console.error('Kullanıcılar yüklenirken hata:', err);
+                        }
+                      }
+                    }}
+                  >
+                    <ThumbUp sx={{ fontSize: 16, color: 'rgba(255,255,255,0.7)', cursor: answer.likesCount > 0 ? 'pointer' : 'default' }} />
+                    <span 
+                      style={{ 
+                        color: 'rgba(255,255,255,0.8)', 
+                        fontSize: 12,
+                        cursor: answer.likesCount > 0 ? 'pointer' : 'default'
+                      }}
+                    >
+                      {answer.likesCount}
                     </span>
                   </Box>
                 </CardContent>
@@ -709,6 +1202,32 @@ const QuestionDetail: React.FC = () => {
           )}
         </Box>
       </Container>
+      
+      {/* Likes Modal */}
+      <LikesModal 
+        open={likesModalOpen}
+        onClose={() => dispatch(closeModal())}
+        users={likesModalUsers}
+      />
+
+      {/* Ask Question Modal */}
+      <AskQuestionModal
+        open={askQuestionModalOpen}
+        onClose={() => setAskQuestionModalOpen(false)}
+        onSubmit={handleSubmitRelatedQuestion}
+        aboutQuestion={askQuestionMode === 'question' && targetQuestionId && question ? { id: targetQuestionId, title: question.title } : undefined}
+        aboutAnswer={askQuestionMode === 'answer' && targetAnswerId ? { id: targetAnswerId, content: answers.find(a => a.id === targetAnswerId)?.content || '' } : undefined}
+        title={askQuestionMode === 'question' ? t('ask_question_about_question', currentLanguage) : t('ask_question_about_answer', currentLanguage)}
+      />
+
+      {/* Related Questions Popover */}
+      <RelatedQuestionsPopover
+        anchorEl={relatedQuestionsAnchor}
+        onClose={handleCloseRelatedQuestionsPopover}
+        questions={relatedQuestions}
+        loading={loadingRelatedQuestions}
+        onQuestionClick={handleRelatedQuestionClick}
+      />
     </Layout>
   );
 };
