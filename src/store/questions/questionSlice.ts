@@ -68,17 +68,10 @@ const questionSlice = createSlice({
       state.totalQuestions += 1;
     },
 
-    // Update like status
+    // Update like status - deprecated, use handleLike/UnlikeQuestion thunks instead
     updateLikeStatus: (state, action) => {
-      const { questionId, isLiked } = action.payload;
-      const question = state.questions.find((q) => q.id === questionId);
-      if (question) {
-        if (isLiked) {
-          question.likes += 1;
-        } else {
-          question.likes = Math.max(0, question.likes - 1);
-        }
-      }
+      // Deprecated: This reducer is no longer used
+      // Like status is now handled by handleLikeQuestion/handleUnlikeQuestion thunks
     },
   },
   extraReducers: (builder) => {
@@ -179,28 +172,12 @@ const questionSlice = createSlice({
           typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
       })
 
-      // Like question
+      // Like question - disabled, state updates handled in component
       .addCase(likeQuestion.fulfilled, (state, action) => {
-        // Like action returns boolean, so we need to update the question manually
-        const questionId = (action as any).meta.arg as string;
-        const question = state.questions.find((q) => q.id === questionId);
-        if (question) {
-          question.likes += 1;
-        }
-        if (state.currentQuestion && state.currentQuestion.id === questionId) {
-          state.currentQuestion.likes += 1;
-        }
+        // State updates now handled in QuestionDetail component
       })
       .addCase(unlikeQuestion.fulfilled, (state, action) => {
-        // Unlike action returns boolean, so we need to update the question manually
-        const questionId = (action as any).meta.arg as string;
-        const question = state.questions.find((q) => q.id === questionId);
-        if (question) {
-          question.likes = Math.max(0, question.likes - 1);
-        }
-        if (state.currentQuestion && state.currentQuestion.id === questionId) {
-          state.currentQuestion.likes = Math.max(0, state.currentQuestion.likes - 1);
-        }
+        // State updates now handled in QuestionDetail component
       });
   },
 });

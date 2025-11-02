@@ -10,6 +10,9 @@ import questionReducer from './questions/questionSlice';
 import languageReducer from './language/languageSlice';
 import bookmarkReducer from './bookmarks/bookmarkSlice';
 import confirmReducer from './confirm/confirmSlice';
+import likesReducer from './likes/likesSlice';
+import answerReducer from './answers/answerSlice';
+import homeReducer from './home/homeSlice';
 
 // Persist configuration for auth slice
 const authPersistConfig = {
@@ -55,6 +58,9 @@ const store = configureStore({
     language: languageReducer,
     bookmarks: bookmarkReducer,
     confirm: confirmReducer,
+    likes: likesReducer,
+    answers: answerReducer,
+    home: homeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
