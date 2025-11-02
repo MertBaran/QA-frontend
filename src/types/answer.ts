@@ -20,6 +20,7 @@ export interface AnswerData {
     slug?: string;
   };
   likes: string[];
+  dislikes: string[];
   createdAt: string;
   __v?: number;
 }
@@ -40,7 +41,10 @@ export interface Answer {
     email: string;
     profile_image?: string;
   };
-  likes: number;
+  likesCount: number;
+  likedByUsers: string[];
+  dislikesCount: number;
+  dislikedByUsers: string[];
   createdAt: string;
   timeAgo: string;
   questionId?: string;

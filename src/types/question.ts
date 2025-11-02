@@ -16,7 +16,9 @@ export interface QuestionData {
     title?: string;
   };
   likes: string[];
+  dislikes: string[];
   answers: string[];
+  parentFormId?: string;
   __v?: number;
 }
 
@@ -54,19 +56,27 @@ export interface Question {
     profile_image?: string;
   };
   tags: string[];
-  likes: number;
+  likesCount: number;
+  likedByUsers: string[];
+  dislikesCount: number;
+  dislikedByUsers: string[];
   answers: number;
   views: number;
   timeAgo: string;
   isTrending: boolean;
   category: string;
   createdAt: string;
+  parentQuestionId?: string;
+  parentAnswerId?: string;
+  parentId?: string;
+  parentType?: 'question' | 'answer';
 }
 
 // Soru oluşturma için tip
 export interface CreateQuestionData {
   title: string;
   content: string;
+  parentFormId?: string;
 }
 
 // Soru güncelleme için tip
