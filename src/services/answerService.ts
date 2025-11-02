@@ -50,7 +50,10 @@ const transformAnswerData = (answerData: AnswerData): Answer => {
       email: userInfo.email,
       profile_image: userInfo.profile_image,
     },
-    likes: answerData.likes.length,
+    likesCount: answerData.likes.length,
+    likedByUsers: answerData.likes,
+    dislikesCount: answerData.dislikes.length,
+    dislikedByUsers: answerData.dislikes,
     createdAt: answerData.createdAt,
     timeAgo,
     questionId: answerData.questionInfo?._id ?? answerData.question,
@@ -134,8 +137,7 @@ class AnswerService {
     try {
       const response = await api.get(`/questions/${questionId}/answers/${answerId}/like`);
       return response.data.success || false;
-    } catch (error) {
-      console.error('Cevap beğenilirken hata:', error);
+    } catch (error: any) {
       throw error;
     }
   }
@@ -147,6 +149,28 @@ class AnswerService {
       return response.data.success || false;
     } catch (error) {
       console.error('Cevap beğenisi geri alınırken hata:', error);
+      throw error;
+    }
+  }
+
+  // Cevap beğenmeme
+  async dislikeAnswer(answerId: string, questionId: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/questions/${questionId}/answers/${answerId}/dislike`);
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Cevap beğenilmeme hatası:', error);
+      throw error;
+    }
+  }
+
+  // Cevap beğenmemeyi geri al
+  async undoDislikeAnswer(answerId: string, questionId: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/questions/${questionId}/answers/${answerId}/undo_dislike`);
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Cevap beğenmemeyi geri alırken hata:', error);
       throw error;
     }
   }

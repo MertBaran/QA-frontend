@@ -131,13 +131,18 @@ const transformQuestionData = (questionData: QuestionData): Question => {
       profile_image: userInfo.profile_image,
     },
     tags,
-    likes: questionData.likes.length,
+    likesCount: questionData.likes.length,
+    likedByUsers: questionData.likes,
+    dislikesCount: questionData.dislikes.length,
+    dislikedByUsers: questionData.dislikes,
     answers: questionData.answers.length,
     views: Math.floor(Math.random() * 1000) + 50, // Backend'de view sistemi yok, geçici
     timeAgo,
     isTrending,
     category,
     createdAt: questionData.createdAt,
+    parentQuestionId: questionData.parentFormId,
+    parentAnswerId: questionData.parentFormId, // TODO: Bu eğer cevap ise parentAnswerId olmalı
   };
 };
 
@@ -224,8 +229,11 @@ class QuestionService {
         return transformQuestionData(response.data.data);
       }
       return null;
-    } catch (error) {
-      console.error('Soru getirilirken hata:', error);
+    } catch (error: any) {
+      // 404 is expected when checking if a parent is a question or answer
+      if (error?.response?.status !== 404) {
+        console.error('Soru getirilirken hata:', error);
+      }
       return null;
     }
   }
@@ -291,6 +299,28 @@ class QuestionService {
     }
   }
 
+  // Soru beğenmeme
+  async dislikeQuestion(id: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/questions/${id}/dislike`);
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Soru beğenilmeme hatası:', error);
+      throw error;
+    }
+  }
+
+  // Soru beğenmemeyi geri al
+  async undoDislikeQuestion(id: string): Promise<boolean> {
+    try {
+      const response = await api.get(`/questions/${id}/undo_dislike`);
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Soru beğenmemeyi geri alırken hata:', error);
+      throw error;
+    }
+  }
+
   // Kullanıcıya ait soruları getir
   async getQuestionsByUser(userId: string): Promise<Question[]> {
     try {
@@ -301,6 +331,20 @@ class QuestionService {
       return [];
     } catch (error) {
       console.error('Kullanıcı soruları getirilirken hata:', error);
+      return [];
+    }
+  }
+
+  // Parent'a ait soruları getir
+  async getQuestionsByParent(parentId: string): Promise<Question[]> {
+    try {
+      const response = await api.get<QuestionsResponse>(`/questions/parent/${parentId}`);
+      if (response.data.success && response.data.data) {
+        return response.data.data.map(transformQuestionData);
+      }
+      return [];
+    } catch (error) {
+      console.error('Parent soruları getirilirken hata:', error);
       return [];
     }
   }
@@ -337,7 +381,7 @@ class QuestionService {
         filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         break;
       case 'En Popüler':
-        filtered.sort((a, b) => b.likes - a.likes);
+        filtered.sort((a, b) => b.likesCount - a.likesCount);
         break;
       case 'En Çok Görüntülenen':
         filtered.sort((a, b) => b.views - a.views);

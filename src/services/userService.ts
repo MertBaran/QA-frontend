@@ -35,10 +35,10 @@ class UserService {
     }
   }
 
-  // Tek kullanıcı getir (admin)
+  // Tek kullanıcı getir (public)
   async getUserById(id: string): Promise<User | null> {
     try {
-      const response = await api.get<UserResponse>(`/users/${id}`);
+      const response = await api.get<UserResponse>(`/public/users/${id}`);
       if (response.data.success && response.data.data) {
         return transformUserData(response.data.data);
       }
