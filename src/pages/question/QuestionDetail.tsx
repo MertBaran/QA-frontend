@@ -602,7 +602,7 @@ const QuestionDetail: React.FC = () => {
     
     const questionData = {
       ...data,
-      parentFormId: askQuestionMode === 'question' ? targetQuestionId : targetAnswerId,
+      parentContentId: askQuestionMode === 'question' ? targetQuestionId : targetAnswerId,
     };
 
     const newQuestion = await questionService.createQuestion(questionData);

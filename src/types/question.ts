@@ -18,7 +18,7 @@ export interface QuestionData {
   likes: string[];
   dislikes: string[];
   answers: string[];
-  parentFormId?: string;
+  parentContentId?: string;
   __v?: number;
 }
 
@@ -76,7 +76,7 @@ export interface Question {
 export interface CreateQuestionData {
   title: string;
   content: string;
-  parentFormId?: string;
+  parentContentId?: string;
 }
 
 // Soru güncelleme için tip

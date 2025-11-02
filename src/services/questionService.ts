@@ -141,8 +141,8 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     isTrending,
     category,
     createdAt: questionData.createdAt,
-    parentQuestionId: questionData.parentFormId,
-    parentAnswerId: questionData.parentFormId, // TODO: Bu eğer cevap ise parentAnswerId olmalı
+    parentQuestionId: questionData.parentContentId,
+    parentAnswerId: questionData.parentContentId, // TODO: Bu eğer cevap ise parentAnswerId olmalı
   };
 };
 
