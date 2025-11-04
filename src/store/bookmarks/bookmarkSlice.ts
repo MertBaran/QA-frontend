@@ -5,6 +5,7 @@ import {
   addBookmarkThunk,
   removeBookmarkThunk,
 } from '../../store/bookmarks/bookmarkThunks';
+import { logoutUser } from '../auth/authThunks';
 
 interface BookmarkState {
   items: BookmarkResponse[];
@@ -43,6 +44,12 @@ const bookmarkSlice = createSlice({
       })
       .addCase(removeBookmarkThunk.fulfilled, (state, action) => {
         state.items = state.items.filter((b) => b._id !== action.meta.arg);
+      })
+      // Clear bookmarks on logout
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.items = [];
+        state.loading = false;
+        state.error = null;
       });
   },
 });

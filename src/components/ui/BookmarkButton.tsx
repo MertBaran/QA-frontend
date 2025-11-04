@@ -1,44 +1,35 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { IconButton, Tooltip } from '@mui/material';
 import { Bookmark as BookmarkIcon, BookmarkBorder } from '@mui/icons-material';
-import { bookmarkService } from '../../services/bookmarkService';
 import type { AddBookmarkRequest, BookmarkResponse } from '../../types/bookmark';
 import { showErrorToast } from '../../utils/notificationUtils';
 import { t } from '../../utils/translations';
-import { useAppSelector } from '../../store/hooks';
+import { useAppSelector, useAppDispatch } from '../../store/hooks';
+import { addBookmarkThunk, removeBookmarkThunk } from '../../store/bookmarks/bookmarkThunks';
 
 interface Props {
   targetType: AddBookmarkRequest['targetType'];
   targetId: string;
   targetData: AddBookmarkRequest['targetData'];
   onChange?: (bookmark?: BookmarkResponse) => void;
+  // Optional: if provided, skip the initial check
+  isBookmarked?: boolean;
+  bookmarkId?: string | null;
 }
 
-export default function BookmarkButton({ targetType, targetId, targetData, onChange }: Props) {
+export default function BookmarkButton({ targetType, targetId, targetData, onChange, isBookmarked: initialBookmarked, bookmarkId: initialBookmarkId }: Props) {
+  const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
-  const [bookmarked, setBookmarked] = useState(false);
-  const [bookmarkId, setBookmarkId] = useState<string | null>(null);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        if (!isAuthenticated) return;
-        const exists = await bookmarkService.checkBookmark(targetType, targetId);
-        if (mounted) setBookmarked(exists);
-        if (exists) {
-          // Opsiyonel: kullanıcının bookmark listesinde bulup id cache'lemek istenirse burada yapılabilir
-        }
-      } catch {
-        // sessiz geç
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [isAuthenticated, targetType, targetId]);
+  // Determine bookmark state: prefer prop, fallback to Redux
+  const bookmark = bookmarks.find(
+    b => b.target_type === targetType && b.target_id === targetId
+  );
+  const bookmarked = initialBookmarked !== undefined ? initialBookmarked : !!bookmark;
+  const bookmarkIdValue = initialBookmarkId !== undefined ? initialBookmarkId : (bookmark?._id || null);
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,31 +49,28 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
           url: targetData.url ? limit(targetData.url, 500) : undefined,
         } as AddBookmarkRequest['targetData'];
 
-        const created = await bookmarkService.addBookmark({
+        const result = await dispatch(addBookmarkThunk({
           targetType,
           targetId,
           targetData: sanitized,
-        });
-        setBookmarked(true);
-        setBookmarkId(created._id);
-        onChange?.(created);
-      } else if (bookmarkId) {
-        const removed = await bookmarkService.removeBookmark(bookmarkId);
-        if (removed) {
-          setBookmarked(false);
-          setBookmarkId(null);
+        }));
+        
+        if (addBookmarkThunk.fulfilled.match(result)) {
+          onChange?.(result.payload);
+        }
+      } else if (bookmarkIdValue) {
+        const result = await dispatch(removeBookmarkThunk(bookmarkIdValue));
+        
+        if (removeBookmarkThunk.fulfilled.match(result) && result.payload) {
           onChange?.();
         }
       } else {
-        // Bookmark id bilinmiyorsa, kullanıcı bookmarklarını çekip ilgili kaydı bulmak gerekebilir
-        const list = await bookmarkService.getUserBookmarks();
-        const found = list.find(b => b.target_id === targetId && b.target_type === targetType);
+        // Bookmark id bilinmiyorsa, Redux'tan bul
+        const found = bookmarks.find(b => b.target_id === targetId && b.target_type === targetType);
         if (found) {
-          setBookmarkId(found._id);
-          const removed = await bookmarkService.removeBookmark(found._id);
-          if (removed) {
-            setBookmarked(false);
-            setBookmarkId(null);
+          const result = await dispatch(removeBookmarkThunk(found._id));
+          
+          if (removeBookmarkThunk.fulfilled.match(result) && result.payload) {
             onChange?.();
           }
         }
@@ -98,7 +86,18 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
   return (
     <Tooltip title={bookmarked ? t('bookmark_saved', currentLanguage) : t('bookmark_save', currentLanguage)}>
       <span>
-        <IconButton size="small" onClick={handleToggle} disabled={!isAuthenticated || loading}>
+        <IconButton 
+          size="small" 
+          onClick={handleToggle} 
+          disabled={!isAuthenticated || loading}
+          sx={{
+            width: '40px',
+            height: '40px',
+            padding: 0,
+            minWidth: '40px',
+            minHeight: '40px',
+          }}
+        >
           {bookmarked ? (
             <BookmarkIcon sx={{ color: '#FFB800' }} />
           ) : (
