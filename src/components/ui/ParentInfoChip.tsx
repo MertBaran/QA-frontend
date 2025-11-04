@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Chip, Box, Avatar, Typography } from '@mui/material';
 import { KeyboardArrowRight } from '@mui/icons-material';
-import { Question } from '../../types/question';
+import { Question, ParentContentInfo } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
@@ -12,6 +12,7 @@ interface ParentInfoChipProps {
   parentAnswer?: Answer | null;
   parentId?: string;
   parentAnswerQuestion?: Question | null;
+  parentContentInfo?: ParentContentInfo;
 }
 
 const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
@@ -19,13 +20,17 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   parentAnswer,
   parentId,
   parentAnswerQuestion,
+  parentContentInfo,
 }) => {
   const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
 
   if (!parentId) return null;
 
-  const isAnswer = !!parentAnswer;
+  // Use backend parentContentInfo if available
+  const isAnswer = parentContentInfo 
+    ? parentContentInfo.type === 'answer'
+    : !!parentAnswer;
 
   const handleProfileNavigation = (e: React.MouseEvent, userId: string) => {
     e.stopPropagation();
@@ -43,21 +48,24 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   const handleChipNavigation = (e: React.MouseEvent) => {
     e.stopPropagation();
     
+    // Determine URL based on parent type
+    let url = `/questions/${parentId}`;
+    if (isAnswer) {
+      // For answers, navigate to the answer's question and highlight the answer
+      const questionId = parentContentInfo?.questionId || parentAnswer?.questionId;
+      if (questionId) {
+        url = `/questions/${questionId}#answer-${parentId}`;
+      }
+    }
+    
     // Ctrl/Cmd + click veya middle click için yeni sekme
     if (e.ctrlKey || e.metaKey || e.button === 1) {
       e.preventDefault();
-      const url = isAnswer && parentAnswer 
-        ? `/questions/${parentAnswer.questionId}#answer-${parentId}`
-        : `/questions/${parentId}`;
       window.open(url, '_blank');
       return;
     }
 
-    if (isAnswer && parentAnswer) {
-      navigate(`/questions/${parentAnswer.questionId}#answer-${parentId}`);
-    } else {
-      navigate(`/questions/${parentId}`);
-    }
+    navigate(url);
   };
 
   const chipSx = {
@@ -74,8 +82,79 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content' }}>
-      {parentQuestion ? (
+    <Box sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content', maxWidth: '100%' }}>
+      {parentContentInfo ? (
+        // Use backend parentContentInfo
+        <Chip
+          label={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, maxWidth: '100%', overflow: 'hidden' }}>
+              {parentContentInfo.userInfo && (
+                <>
+                  <Avatar 
+                    src={parentContentInfo.userInfo.profile_image} 
+                    sx={{ 
+                      width: 20, 
+                      height: 20, 
+                      cursor: 'pointer',
+                      '&:hover': { opacity: 0.7, transform: 'scale(1.1)' },
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    onClick={(e) => handleProfileNavigation(e, parentContentInfo.userInfo!._id)}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) {
+                        handleProfileNavigation(e, parentContentInfo.userInfo!._id);
+                      }
+                    }}
+                  />
+                  <Typography 
+                    variant="caption" 
+                    sx={{ 
+                      fontWeight: 600, 
+                      cursor: 'pointer',
+                      '&:hover': { opacity: 0.7, textDecoration: 'underline' },
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0
+                    }}
+                    onClick={(e) => handleProfileNavigation(e, parentContentInfo.userInfo!._id)}
+                    onMouseDown={(e) => {
+                      if (e.button === 1) {
+                        handleProfileNavigation(e, parentContentInfo.userInfo!._id);
+                      }
+                    }}
+                  >
+                    {parentContentInfo.userInfo.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>
+                    • 
+                  </Typography>
+                </>
+              )}
+              {parentContentInfo.type === 'question' && parentContentInfo.title ? (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+                  {parentContentInfo.title}
+                </Typography>
+              ) : parentContentInfo.type === 'answer' && parentContentInfo.questionTitle ? (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+                  {parentContentInfo.questionTitle}
+                </Typography>
+              ) : (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {t('this_question_about', currentLanguage)}
+                </Typography>
+              )}
+            </Box>
+          }
+          onClick={handleChipNavigation}
+          onMouseDown={(e) => {
+            if (e.button === 1) {
+              handleChipNavigation(e);
+            }
+          }}
+          sx={chipSx}
+          icon={<KeyboardArrowRight />}
+        />
+      ) : parentQuestion ? (
         <Chip
           label={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
