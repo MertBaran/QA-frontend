@@ -1,12 +1,9 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { questionService } from '../../services/questionService';
-import { answerService } from '../../services/answerService';
 import { bookmarkService } from '../../services/bookmarkService';
 import { handleError } from '../../utils/errorHandling/enhancedErrorHandler';
 import logger from '../../utils/logger';
-import { Question } from '../../types/question';
-import { Answer } from '../../types/answer';
-import { CreateQuestionData } from '../../types/question';
+import { Question, CreateQuestionData } from '../../types/question';
 import { AxiosError } from 'axios';
 
 export interface FetchQuestionsParams {
@@ -33,7 +30,7 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
     try {
       logger.user.action('fetch_home_questions', params);
 
-      const result = await questionService.getQuestionsPaginated({
+      const result = await questionService.getQuestionsPaginatedWithParents({
         page: params.page,
         limit: params.limit,
         sortBy:
@@ -84,74 +81,6 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
     }
   },
 );
-
-// Load parent questions and answers
-export const loadParents = createAsyncThunk<
-  {
-    parentQuestions: Record<string, Question>;
-    parentAnswers: Record<string, Answer>;
-    parentAnswerQuestions: Record<string, Question>;
-  },
-  Question[]
->('home/loadParents', async (questions, { rejectWithValue }) => {
-  try {
-    if (!questions || questions.length === 0) {
-      return {
-        parentQuestions: {},
-        parentAnswers: {},
-        parentAnswerQuestions: {},
-      };
-    }
-
-    const parentIds = new Set(
-      questions
-        .filter((q) => q.parentQuestionId || q.parentAnswerId)
-        .map((q) => (q.parentQuestionId || q.parentAnswerId)!),
-    );
-
-    if (parentIds.size === 0) {
-      return {
-        parentQuestions: {},
-        parentAnswers: {},
-        parentAnswerQuestions: {},
-      };
-    }
-
-    const parents: Record<string, Question> = {};
-    const answerParents: Record<string, Answer> = {};
-    const answerQuestionParents: Record<string, Question> = {};
-
-    for (const parentId of parentIds) {
-      const questionParent = await questionService.getQuestionById(parentId);
-      if (questionParent) {
-        parents[parentId] = questionParent;
-      } else {
-        const answerParent = await answerService.getAnswerById(parentId);
-        if (answerParent) {
-          answerParents[parentId] = answerParent;
-
-          if (answerParent.questionId) {
-            const answerQ = await questionService.getQuestionById(answerParent.questionId);
-            if (answerQ) {
-              answerQuestionParents[parentId] = answerQ;
-            }
-          }
-        }
-      }
-    }
-
-    return {
-      parentQuestions: parents,
-      parentAnswers: answerParents,
-      parentAnswerQuestions: answerQuestionParents,
-    };
-  } catch (error) {
-    const errorInfo = await handleError(error, {
-      action: 'loadParents',
-    });
-    return rejectWithValue(errorInfo.message);
-  }
-});
 
 // Create question on home page with validation error handling
 export const createHomeQuestion = createAsyncThunk<

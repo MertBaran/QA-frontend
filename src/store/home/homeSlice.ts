@@ -1,16 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { HomeState, QuestionFilters, NewQuestion, ValidationErrors } from './homeState';
-import { fetchHomeQuestions, loadParents, createHomeQuestion } from './homeThunks';
+import { fetchHomeQuestions, createHomeQuestion } from './homeThunks';
 import { Question } from '../../types/question';
-import { Answer } from '../../types/answer';
 
 const initialState: HomeState = {
   questions: [],
   loading: false,
   error: null,
-  parentQuestions: {},
-  parentAnswers: {},
-  parentAnswerQuestions: {},
   filters: {
     search: '',
     category: '',
@@ -141,13 +137,6 @@ const homeSlice = createSlice({
         state.loading = false;
         state.error =
           typeof action.payload === 'string' ? action.payload : (action.error?.message ?? null);
-      })
-
-      // Load parents
-      .addCase(loadParents.fulfilled, (state, action) => {
-        state.parentQuestions = action.payload.parentQuestions;
-        state.parentAnswers = action.payload.parentAnswers;
-        state.parentAnswerQuestions = action.payload.parentAnswerQuestions;
       })
 
       // Create home question

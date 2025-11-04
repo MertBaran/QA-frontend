@@ -141,8 +141,12 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     isTrending,
     category,
     createdAt: questionData.createdAt,
-    parentQuestionId: questionData.parentContentId,
-    parentAnswerId: questionData.parentContentId, // TODO: Bu eğer cevap ise parentAnswerId olmalı
+    parentQuestionId: questionData.parent?.type === 'question' ? questionData.parent.id : undefined,
+    parentAnswerId: questionData.parent?.type === 'answer' ? questionData.parent.id : undefined,
+    parentId: questionData.parent?.id,
+    parentType: questionData.parent?.type,
+    ancestors: questionData.ancestors,
+    parentContentInfo: questionData.parentContentInfo,
   };
 };
 
@@ -186,6 +190,66 @@ class QuestionService {
           };
         };
       }>('/questions/paginated', { params });
+
+      if (response.data.success && response.data.data) {
+        return {
+          data: response.data.data.data.map(transformQuestionData),
+          pagination: response.data.data.pagination,
+        };
+      }
+
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: 10,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+    } catch (error) {
+      console.error('Paginated sorular getirilirken hata:', error);
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: 10,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+    }
+  }
+
+  // Paginated soruları getir (with parents)
+  async getQuestionsPaginatedWithParents(params: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    search?: string;
+    category?: string;
+    tags?: string;
+  }): Promise<PaginatedQuestionsResponse> {
+    try {
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          data: QuestionData[];
+          pagination: {
+            currentPage: number;
+            totalPages: number;
+            totalItems: number;
+            itemsPerPage: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+          };
+        };
+      }>('/questions/paginated/with-parents', { params });
 
       if (response.data.success && response.data.data) {
         return {

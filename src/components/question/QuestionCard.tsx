@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -13,11 +13,14 @@ import {
   Comment,
   Visibility,
   Delete,
+  AccountTree,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { Question } from '../../types/question';
 import BookmarkButton from '../ui/BookmarkButton';
 import ParentInfoChip from '../ui/ParentInfoChip';
+import AncestorsDrawer from './AncestorsDrawer';
+import MarkdownRenderer from '../ui/MarkdownRenderer';
 import { t } from '../../utils/translations';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { openModal } from '../../store/likes/likesSlice';
@@ -83,7 +86,16 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { user } = useAppSelector(state => state.auth);
+  const { user, isAuthenticated } = useAppSelector(state => state.auth);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
+  const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
+
+  // Check if this question is bookmarked
+  const questionBookmark = bookmarks.find(
+    b => b.target_type === 'question' && b.target_id === question.id
+  );
+  const isBookmarked = !!questionBookmark;
+  const bookmarkId = questionBookmark?._id || null;
 
   const handleLikeClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -106,21 +118,122 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     }
   };
 
-  const parentId = question.parentQuestionId || question.parentAnswerId;
-  const parentQ = parentId ? parentQuestions[parentId] : undefined;
-  const parentA = parentId ? parentAnswers[parentId] : undefined;
-  const parentAQ = parentId ? parentAnswerQuestions[parentId] : undefined;
+  // Use parentContentInfo from backend if available, otherwise fall back to old logic
+  const parentId = question.parentContentInfo?.id || question.parentQuestionId || question.parentAnswerId;
+  const hasBackendParentInfo = !!question.parentContentInfo;
+  
+  // Old logic for backward compatibility
+  const parentQ = parentId && !hasBackendParentInfo ? parentQuestions[parentId] : undefined;
+  const parentA = parentId && !hasBackendParentInfo ? parentAnswers[parentId] : undefined;
+  const parentAQ = parentId && !hasBackendParentInfo ? parentAnswerQuestions[parentId] : undefined;
 
   return (
     <StyledPaper ref={ref}>
-      {/* Parent Question/Answer Info */}
+      {/* Action Buttons - Sağ Üst Köşe */}
+      <Box sx={{ 
+        position: 'absolute',
+        top: theme => theme.spacing(2),
+        right: theme => theme.spacing(2),
+        display: 'flex',
+        gap: 0.5,
+        alignItems: 'center',
+        zIndex: 10,
+      }}>
+        <Box sx={{ 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          width: '40px',
+          height: '40px',
+          flexShrink: 0,
+          '& > span': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            '& .MuiIconButton-root': {
+              width: '40px !important',
+              height: '40px !important',
+              padding: '0 !important',
+              minWidth: '40px',
+              minHeight: '40px',
+            },
+          },
+        }}>
+          <BookmarkButton 
+            targetType={'question'} 
+            targetId={question.id} 
+            targetData={{
+              title: question.title,
+              content: question.content,
+              author: question.author?.name,
+              authorId: question.author?.id,
+              created_at: question.createdAt,
+              url: window.location.origin + '/questions/' + question.id,
+            }}
+            isBookmarked={isBookmarked}
+            bookmarkId={bookmarkId}
+          />
+        </Box>
+        {user && (
+          question.author.id === user.id || 
+          question.userInfo?._id === user.id ||
+          question.author.id === user.id?.toString()
+        ) && (
+          <IconButton 
+            size="small" 
+            sx={{ 
+              color: 'rgba(255,80,80,0.8)',
+              cursor: 'pointer',
+              width: '40px',
+              height: '40px',
+              padding: 0,
+              '&:hover': {
+                color: 'rgba(255,80,80,1)',
+              }
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(question.id);
+            }}
+            title={t('delete', currentLanguage)}
+          >
+            <Delete />
+          </IconButton>
+        )}
+      </Box>
+
+      {/* Parent Question/Answer Info with Ancestors Button */}
       {parentId && (
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2 }}>
+      {question.ancestors && question.ancestors.length > 1 && (
+            <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                setAncestorsDrawerOpen(true);
+                  }}
+                  sx={{
+                color: 'rgba(255,184,0,0.8)',
+                    '&:hover': {
+                  color: 'rgba(255,184,0,1)',
+                  bgcolor: 'rgba(255,184,0,0.1)',
+                }
+              }}
+              title={t('show_all_ancestors', currentLanguage)}
+            >
+              <AccountTree />
+            </IconButton>
+          )}
         <ParentInfoChip 
-          parentQuestion={parentQ}
-          parentAnswer={parentA}
+          parentQuestion={hasBackendParentInfo ? undefined : parentQ}
+          parentAnswer={hasBackendParentInfo ? undefined : parentA}
           parentId={parentId}
-          parentAnswerQuestion={parentAQ}
+          parentAnswerQuestion={hasBackendParentInfo ? undefined : parentAQ}
+          parentContentInfo={question.parentContentInfo}
         />
+        </Box>
       )}
       
       {/* Tıklanabilir alan - kartın çeperlerinden 2px içeride */}
@@ -129,6 +242,9 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
           cursor: 'pointer',
           padding: '2px',
           margin: '-2px',
+          display: 'flex',
+          gap: 2,
+          alignItems: 'flex-start',
           borderRadius: '14px',
           '&:hover': {
             opacity: 0.9
@@ -192,20 +308,45 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                 fontWeight: 600, 
                 mb: 2,
                 color: 'white',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                wordBreak: 'break-word',
+                maxWidth: '100%',
               }}
             >
               {question.title}
             </Typography>
-            <Typography 
-              variant="body1" 
-              sx={{ mb: 3, lineHeight: 1.6, color: 'rgba(255,255,255,0.9)' }}
-            >
+            <Box sx={{ 
+              mb: 3, 
+              overflow: 'hidden', 
+              wordWrap: 'break-word',
+              wordBreak: 'break-word',
+              maxWidth: '100%',
+            }}>
               {question.content.length > 200 
-                ? `${question.content.substring(0,200)}...` 
-                : question.content
+                ? (
+                    <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
+                      <MarkdownRenderer content={question.content.substring(0, 200)} />
+                      <Typography variant="body2" sx={{ color: 'rgba(255,184,0,0.8)', mt: 1 }}>
+                        ...
+                      </Typography>
+                    </Box>
+                  )
+                : <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
+                    <MarkdownRenderer content={question.content} />
+                  </Box>
               }
-            </Typography>
+            </Box>
             
+            <Box sx={{ 
+              flex: 1,
+              minWidth: 0,
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}>
             <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
               {question.tags.map((tag) => (
                 <Chip
@@ -260,47 +401,17 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
               </Box>
             </Box>
           </Box>
-          
-          {/* Right side buttons */}
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-start', ml: 2 }}>
-            <BookmarkButton 
-              targetType={'question'} 
-              targetId={question.id} 
-              targetData={{
-                title: question.title,
-                content: question.content,
-                author: question.author?.name,
-                authorId: question.author?.id,
-                created_at: question.createdAt,
-                url: window.location.origin + '/questions/' + question.id,
-              }}
-            />
-            {user && (
-              question.author.id === user.id || 
-              question.userInfo?._id === user.id ||
-              question.author.id === user.id?.toString()
-            ) && (
-              <IconButton 
-                size="small" 
-                sx={{ 
-                  color: 'rgba(255,80,80,0.8)',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    color: 'rgba(255,80,80,1)',
-                  }
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(question.id);
-                }}
-                title={t('delete', currentLanguage)}
-              >
-                <Delete />
-              </IconButton>
-            )}
           </Box>
         </Box>
       </Box>
+      
+      {/* Ancestors Drawer */}
+      <AncestorsDrawer
+        open={ancestorsDrawerOpen}
+        onClose={() => setAncestorsDrawerOpen(false)}
+        ancestors={question.ancestors || []}
+        currentQuestionId={question.id}
+      />
     </StyledPaper>
   );
 });

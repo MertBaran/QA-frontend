@@ -1,5 +1,4 @@
 import { Question } from '../../types/question';
-import { Answer } from '../../types/answer';
 
 export interface QuestionFilters {
   search: string;
@@ -28,11 +27,6 @@ export interface HomeState {
   questions: Question[];
   loading: boolean;
   error: string | null;
-
-  // Parent relationships
-  parentQuestions: Record<string, Question>;
-  parentAnswers: Record<string, Answer>;
-  parentAnswerQuestions: Record<string, Question>;
 
   // Filters
   filters: QuestionFilters;

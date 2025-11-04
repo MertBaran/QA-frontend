@@ -1,5 +1,39 @@
 import { ApiResponse } from './api';
 
+// Parent content bilgisi
+export interface ParentContentInfo {
+  id: string;
+  type: 'question' | 'answer';
+  // Question ise
+  title?: string;
+  slug?: string;
+  // Answer ise
+  questionId?: string;
+  questionTitle?: string;
+  questionSlug?: string;
+  // Common fields
+  user?: string;
+  userInfo?: {
+    _id: string;
+    name: string;
+    email: string;
+    profile_image?: string;
+  };
+}
+
+// Parent referansı
+export interface ParentReference {
+  id: string;
+  type: 'question' | 'answer';
+}
+
+// Ancestor referansı (depth ile)
+export interface AncestorReference {
+  id: string;
+  type: 'question' | 'answer';
+  depth: number;
+}
+
 // Backend'den gelecek ham soru tipi
 export interface QuestionData {
   _id: string;
@@ -18,7 +52,9 @@ export interface QuestionData {
   likes: string[];
   dislikes: string[];
   answers: string[];
-  parentContentId?: string;
+  parent?: ParentReference;
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
   __v?: number;
 }
 
@@ -70,13 +106,15 @@ export interface Question {
   parentAnswerId?: string;
   parentId?: string;
   parentType?: 'question' | 'answer';
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
 }
 
 // Soru oluşturma için tip
 export interface CreateQuestionData {
   title: string;
   content: string;
-  parentContentId?: string;
+  parent?: ParentReference;
 }
 
 // Soru güncelleme için tip
