@@ -13,12 +13,10 @@ import ActiveFilters from '../components/home/ActiveFilters';
 import ItemsPerPageSelector from '../components/home/ItemsPerPageSelector';
 import CreateQuestionModal from '../components/question/CreateQuestionModal';
 import { type Question } from '../types/question';
-import { type Answer } from '../types/answer';
 import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import {
   fetchHomeQuestions,
-  loadParents,
   createHomeQuestion,
 } from '../store/home/homeThunks';
 import {
@@ -35,6 +33,7 @@ import {
   removeQuestionFromList,
 } from '../store/home/homeSlice';
 import { likeQuestion, unlikeQuestion, deleteQuestion } from '../store/questions/questionThunks';
+import { fetchUserBookmarks } from '../store/bookmarks/bookmarkThunks';
 
 const PaginationContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
@@ -51,16 +50,14 @@ const PaginationContainer = styled(Box)(({ theme }) => ({
 const Home = () => {
   const dispatch = useAppDispatch();
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { user } = useAppSelector(state => state.auth);
+  const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   
   // Redux state
   const {
     loading,
     questions,
-    parentQuestions,
-    parentAnswers,
-    parentAnswerQuestions,
     filters,
     activeFilters,
     filterModalOpen,
@@ -86,14 +83,17 @@ const Home = () => {
       tags: filters.tags || undefined,
       savedOnly: filters.savedOnly || undefined,
     }));
-  }, [dispatch, currentPage, itemsPerPage, filters]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, itemsPerPage, filters.search, filters.category, filters.tags, filters.sortBy, filters.savedOnly]);
 
-  // Load parent questions and answers for questions that have a parent
+  // Fetch bookmarks once on mount if authenticated
   useEffect(() => {
-    if (questions && questions.length > 0) {
-      dispatch(loadParents(questions));
+    if (isAuthenticated && bookmarks.length === 0) {
+      dispatch(fetchUserBookmarks());
     }
-  }, [dispatch, questions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]); // Only fetch once when authenticated
+
 
   const handleFilterChange = (field: string, value: string) => {
     dispatch(updateFilter({ field, value }));
@@ -281,9 +281,6 @@ const Home = () => {
                     onLike={handleLikeQuestion}
                     onUnlike={handleUnlikeQuestion}
                     onDelete={handleDeleteQuestion}
-                    parentQuestions={parentQuestions}
-                    parentAnswers={parentAnswers}
-                    parentAnswerQuestions={parentAnswerQuestions}
                   />
                 </Fade>
               ))}

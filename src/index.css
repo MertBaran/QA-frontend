@@ -11,3 +11,31 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Markdown Editor Custom Font Size Override */
+.w-md-editor .w-md-editor-text {
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+}
+
+.w-md-editor .w-md-editor-text-pre {
+  font-size: 16px !important;
+  line-height: 1.6 !important;
+}
+
+.w-md-editor .wmde-markdown {
+  font-size: 16px !important;
+}
+
+.w-md-editor .wmde-markdown p {
+  font-size: 16px !important;
+}
+
+/* Markdown Renderer (standalone) */
+.wmde-markdown {
+  font-size: 16px !important;
+}
+
+.wmde-markdown p {
+  font-size: 16px !important;
+}

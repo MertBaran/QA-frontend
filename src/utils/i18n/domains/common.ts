@@ -114,4 +114,19 @@ export const common = {
     en: 'No likes yet',
     de: 'Noch keine Likes',
   },
+  ancestors: {
+    tr: 'Sorunun Soyu',
+    en: "Question's Ancestors",
+    de: 'Fragenvorläufer',
+  },
+  no_ancestors: {
+    tr: 'Henüz soyu yok',
+    en: 'No ancestors yet',
+    de: 'Noch keine Vorfahren',
+  },
+  show_all_ancestors: {
+    tr: 'Soyunu göster',
+    en: 'Show all ancestors',
+    de: 'Alle Vorfahren anzeigen',
+  },
 } as const;
