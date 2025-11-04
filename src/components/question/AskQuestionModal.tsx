@@ -14,11 +14,12 @@ import { styled } from '@mui/material/styles';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { CreateQuestionData } from '../../types/question';
+import RichTextEditor from '../ui/RichTextEditor';
 
 const StyledDrawer = styled(Drawer)(({ theme }) => ({
   '& .MuiDrawer-paper': {
     width: '90%',
-    maxWidth: 600,
+    maxWidth: 800,
     background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
     borderLeft: '1px solid rgba(255, 184, 0, 0.2)',
     backdropFilter: 'blur(10px)',
@@ -181,26 +182,17 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
           }}
         />
 
-        <TextField
-          label={t('question_content', currentLanguage)}
-          multiline
-          rows={8}
-          fullWidth
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body2" sx={{ mb: 1, color: 'rgba(255, 255, 255, 0.7)' }}>
+            {t('question_content', currentLanguage)}
+          </Typography>
+          <RichTextEditor
           value={questionContent}
-          onChange={(e) => setQuestionContent(e.target.value)}
-          disabled={submitting}
+            onChange={(value) => setQuestionContent(value || '')}
+            minHeight={300}
           error={error.includes('content')}
-          sx={{
-            mb: 3,
-            '& .MuiOutlinedInput-root': {
-              color: 'white',
-              '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-              '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
-              '&.Mui-focused fieldset': { borderColor: '#FFB800' },
-            },
-            '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-          }}
-        />
+          />
+        </Box>
 
         <Box sx={{ display: 'flex', gap: 2, mt: 'auto' }}>
           <Button

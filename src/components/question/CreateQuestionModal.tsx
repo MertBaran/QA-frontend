@@ -12,9 +12,11 @@ import {
   MenuItem,
   Stack,
   Typography,
+  Box,
 } from '@mui/material';
 import { categories } from '../../types/question';
 import { t } from '../../utils/translations';
+import RichTextEditor from '../ui/RichTextEditor';
 
 interface CreateQuestionModalProps {
   open: boolean;
@@ -51,14 +53,14 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
     <Dialog 
       open={open} 
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
       sx={{
         '& .MuiDialog-paper': {
           borderRadius: 2,
           margin: 1,
           maxHeight: '95vh',
-          minWidth: 500,
+          minWidth: 700,
           width: '100%',
         }
       }}
@@ -118,39 +120,18 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
               },
             }}
           />
-          <TextField
-            label={t('question_content', currentLanguage)}
-            fullWidth
-            multiline
-            rows={4}
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, color: 'rgba(255, 255, 255, 0.7)' }}>
+              {t('question_content', currentLanguage)}
+            </Typography>
+            <RichTextEditor
             value={question.content}
-            onChange={(e) => onQuestionChange('content', e.target.value)}
+              onChange={(value) => onQuestionChange('content', value || '')}
+              minHeight={300}
             error={!!validationErrors.content}
             helperText={validationErrors.content}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                color: 'white',
-                '& fieldset': {
-                  borderColor: validationErrors.content ? '#f44336' : 'rgba(255, 255, 255, 0.3)',
-                },
-                '&:hover fieldset': {
-                  borderColor: validationErrors.content ? '#f44336' : 'rgba(255, 184, 0, 0.5)',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: validationErrors.content ? '#f44336' : '#FFB800',
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: validationErrors.content ? '#f44336' : 'rgba(255, 255, 255, 0.7)',
-                '&.Mui-focused': {
-                  color: validationErrors.content ? '#f44336' : '#FFB800',
-                },
-              },
-              '& .MuiFormHelperText-root': {
-                color: '#f44336',
-              },
-            }}
-          />
+            />
+          </Box>
           <FormControl fullWidth error={!!validationErrors.category}>
             <InputLabel sx={{ color: validationErrors.category ? '#f44336' : 'rgba(255, 255, 255, 0.7)' }}>{t('category', currentLanguage)}</InputLabel>
             <Select

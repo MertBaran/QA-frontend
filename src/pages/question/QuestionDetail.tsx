@@ -40,10 +40,13 @@ import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
 import BookmarkButton from '../../components/ui/BookmarkButton';
+import ActionButtons from '../../components/ui/ActionButtons';
 import LikesModal from '../../components/ui/LikesModal';
 import ParentInfoChip from '../../components/ui/ParentInfoChip';
 import AskQuestionModal from '../../components/question/AskQuestionModal';
 import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
+import RichTextEditor from '../../components/ui/RichTextEditor';
+import MarkdownRenderer from '../../components/ui/MarkdownRenderer';
 import { openModal, closeModal } from '../../store/likes/likesSlice';
 import { fetchLikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
@@ -53,7 +56,7 @@ const QuestionCard = styled(Paper)(({ theme }) => ({
   background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
   border: '1px solid rgba(255, 184, 0, 0.2)',
   borderRadius: 16,
-  padding: theme.spacing(3),
+  padding: theme.spacing(4),
   marginBottom: theme.spacing(3),
   color: 'white',
   backdropFilter: 'blur(10px)',
@@ -67,34 +70,12 @@ const AnswerCard = styled(Card)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   color: 'white',
   backdropFilter: 'blur(8px)',
+  '& .MuiCardContent-root': {
+    padding: theme.spacing(3),
+  },
 }));
 
-const AskButtonWrapper = styled(Box)(({ theme }) => ({
-  position: 'relative',
-  display: 'inline-flex',
-  alignItems: 'center',
-  cursor: 'pointer',
-  flexShrink: 0,
-  '& .hover-text': {
-    position: 'absolute',
-    left: '100%',
-    whiteSpace: 'nowrap',
-    opacity: 0,
-    transition: 'all 0.3s ease-in-out',
-    pointerEvents: 'none',
-    marginLeft: theme.spacing(0.5),
-    zIndex: 1000,
-  },
-  '& .hover-icon': {
-    transition: 'transform 0.3s ease-in-out',
-  },
-  '&:hover .hover-text': {
-    opacity: 1,
-  },
-  '&:hover .hover-icon': {
-    transform: 'rotate(180deg)',
-  },
-}));
+
 
 const ActionButton = styled(Button)(({ theme }) => ({
   background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
@@ -112,6 +93,7 @@ const QuestionDetail: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
   const { answers, loading } = useAppSelector(state => state.answers);
@@ -223,25 +205,39 @@ const QuestionDetail: React.FC = () => {
 
   // Hash'ten cevap ID'sini al ve highlight et
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash && hash.startsWith('#answer-')) {
-      const answerId = hash.substring('#answer-'.length);
-      setHighlightedAnswerId(answerId);
-      
-      // Scroll to answer
-      setTimeout(() => {
-        const element = document.getElementById(`answer-${answerId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          
-          // Remove highlight after animation
-          setTimeout(() => {
-            setHighlightedAnswerId(null);
-            window.history.replaceState(null, '', window.location.pathname);
-          }, 3000);
-        }
-      }, 100);
-    }
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#answer-')) {
+        const answerId = hash.substring('#answer-'.length);
+        setHighlightedAnswerId(answerId);
+        
+        // Scroll to answer
+        setTimeout(() => {
+          const element = document.getElementById(`answer-${answerId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Remove highlight after animation
+            setTimeout(() => {
+              setHighlightedAnswerId(null);
+              window.history.replaceState(null, '', window.location.pathname);
+            }, 3000);
+          }
+        }, 100);
+      } else {
+        setHighlightedAnswerId(null);
+      }
+    };
+    
+    // Check hash on mount and when answers change
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
   }, [answers, id]);
 
   // Cevap gönder
@@ -602,7 +598,10 @@ const QuestionDetail: React.FC = () => {
     
     const questionData = {
       ...data,
-      parentContentId: askQuestionMode === 'question' ? targetQuestionId : targetAnswerId,
+      parent: {
+        id: askQuestionMode === 'question' ? targetQuestionId! : targetAnswerId!,
+        type: askQuestionMode,
+      },
     };
 
     const newQuestion = await questionService.createQuestion(questionData);
@@ -757,31 +756,60 @@ const QuestionDetail: React.FC = () => {
                 />
               </Box>
 
+              <Box sx={{ 
+                display: 'flex',
+                gap: 2,
+                alignItems: 'flex-start',
+                mb: 3,
+              }}>
+                <Box sx={{ 
+                  flex: 1,
+                  minWidth: 0,
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                }}>
               {/* Soru Başlığı */}
               <Typography 
                 variant="h4" 
                 sx={{ 
                   fontWeight: 700, 
-                  flex: 1,
                   color: 'white',
                   mb: 3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      wordBreak: 'break-word',
+                      maxWidth: '100%',
                 }}
               >
                 {question.title}
               </Typography>
 
               {/* Soru İçeriği */}
-              <Typography 
-                variant="body1" 
-                sx={{ 
+                  <Box sx={{ 
                   mb: 4, 
-                  lineHeight: 1.8, 
-                  color: 'rgba(255,255,255,0.9)',
-                  fontSize: '1.1rem',
-                }}
-              >
-                {question.content}
-              </Typography>
+                    overflow: 'hidden',
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word',
+                    maxWidth: '100%',
+                  }}>
+                    <MarkdownRenderer content={question.content} />
+                  </Box>
+                </Box>
+                
+                {/* Right side buttons */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  gap: 1, 
+                  alignItems: 'flex-start',
+                  flexShrink: 0,
+                }}>
+
+                </Box>
+              </Box>
 
               {/* Tag'ler */}
               {question.tags.length > 0 && (
@@ -804,7 +832,7 @@ const QuestionDetail: React.FC = () => {
               )}
 
               {/* İstatistikler */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
                 <Box 
                   sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
                   onClick={async () => {
@@ -845,34 +873,8 @@ const QuestionDetail: React.FC = () => {
             </Box>
 
             {/* Aksiyon Butonları */}
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-              {user && (
-                <AskButtonWrapper onClick={handleAskQuestionAboutQuestion}>
-                  <IconButton
-                    className="hover-icon"
-                    sx={{
-                      color: 'rgba(255,255,255,0.7)',
-                      '&:hover': { color: '#FFB800' },
-                    }}
-                  >
-                    <HelpOutline />
-                  </IconButton>
-                  <Typography 
-                    className="hover-text"
-                    variant="caption"
-                    sx={{ 
-                      color: 'rgba(255,255,255,0.8)',
-                      fontWeight: 600,
-                      whiteSpace: 'nowrap',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    {t('ask_question', currentLanguage)}
-                  </Typography>
-                </AskButtonWrapper>
-              )}
-              <BookmarkButton 
-                targetType={"question"}
+            <ActionButtons
+              targetType="question"
                 targetId={question.id}
                 targetData={{
                   title: question.title,
@@ -882,18 +884,32 @@ const QuestionDetail: React.FC = () => {
                   created_at: question.createdAt,
                   url: window.location.origin + '/questions/' + question.id,
                 }}
-              />
-              <IconButton 
-                onClick={question.likedByUsers.includes(user?.id || '') ? handleUnlikeQuestion : handleLikeQuestion}
-                sx={{ 
-                  color: question.likedByUsers.includes(user?.id || '') ? '#FFB800' : 'rgba(255,255,255,0.7)',
-                  '&:hover': {
-                    color: question.likedByUsers.includes(user?.id || '') ? '#FF8F00' : '#FFB800',
-                  }
-                }}
-              >
-                {question.likedByUsers.includes(user?.id || '') ? <ThumbUp /> : <ThumbUpOutlined />}
-              </IconButton>
+              position="relative"
+              showBookmark={true}
+              showLike={true}
+              showDislike={true}
+              showDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
+              showHelp={true}
+              isLiked={question.likedByUsers.includes(user?.id || '')}
+              isDisliked={question.dislikedByUsers.includes(user?.id || '')}
+              canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
+              isBookmarked={!!bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)}
+              bookmarkId={bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)?._id || null}
+              onLike={handleLikeQuestion}
+              onUnlike={handleUnlikeQuestion}
+              onDislike={handleDislikeQuestion}
+              onUndislike={handleUndoDislikeQuestion}
+              onDelete={(e) => {
+                e.stopPropagation();
+                handleDeleteQuestion();
+              }}
+              onHelp={(e) => {
+                e.stopPropagation();
+                handleAskQuestionAboutQuestion();
+              }}
+            />
+            <Box sx={{ display: 'none' }}>
+              {/* Eski butonlar - silinebilir */}
               <IconButton 
                 onClick={question.dislikedByUsers.includes(user?.id || '') ? handleUndoDislikeQuestion : handleDislikeQuestion}
                 sx={{ 
@@ -934,45 +950,17 @@ const QuestionDetail: React.FC = () => {
               {t('write_answer', currentLanguage)}
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
-              * {t('validation_answer_min', currentLanguage)} (Enter ile gönder, Shift+Enter yeni satır)
+              * {t('validation_answer_min', currentLanguage)}
             </Typography>
-            <TextField
-              multiline
-              rows={4}
-              fullWidth
+            <Box sx={{ mb: 2 }}>
+              <RichTextEditor
               value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !submittingAnswer && newAnswer.trim()) {
-                  e.preventDefault();
-                  handleSubmitAnswer();
-                }
-              }}
-              placeholder={t('answer_placeholder', currentLanguage)}
-              variant="outlined"
-              disabled={submittingAnswer}
+                onChange={(value) => setNewAnswer(value || '')}
+                minHeight={300}
               error={!!answerValidationError}
               helperText={answerValidationError}
-              sx={{
-                mb: 2,
-                '& .MuiOutlinedInput-root': {
-                  color: 'white',
-                  '& fieldset': { 
-                    borderColor: answerValidationError ? '#f44336' : 'rgba(255,255,255,0.3)' 
-                  },
-                  '&:hover fieldset': { 
-                    borderColor: answerValidationError ? '#f44336' : 'rgba(255,184,0,0.5)' 
-                  },
-                  '&.Mui-focused fieldset': { 
-                    borderColor: answerValidationError ? '#f44336' : 'rgba(255,184,0,0.8)' 
-                  },
-                },
-                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                '& .MuiFormHelperText-root': {
-                  color: '#f44336',
-                },
-              }}
-            />
+              />
+            </Box>
             <ActionButton
               onClick={handleSubmitAnswer}
               disabled={!newAnswer.trim() || submittingAnswer}
@@ -1044,9 +1032,8 @@ const QuestionDetail: React.FC = () => {
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      {/* Bookmark for Answer (sağ üst, like ile yan yana) */}
-                      <BookmarkButton
-                        targetType={"answer"}
+                      <ActionButtons
+                        targetType="answer"
                         targetId={answer.id}
                         targetData={{
                           title: question.title,
@@ -1061,81 +1048,44 @@ const QuestionDetail: React.FC = () => {
                             '#answer-' +
                             answer.id,
                         }}
+                        position="relative"
+                        showBookmark={true}
+                        showLike={true}
+                        showDislike={true}
+                        showDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
+                        showHelp={true}
+                        isLiked={answer.likedByUsers.includes(user?.id || '')}
+                        isDisliked={answer.dislikedByUsers.includes(user?.id || '')}
+                        canDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
+                        isBookmarked={!!bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)}
+                        bookmarkId={bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)?._id || null}
+                        onLike={(e) => {
+                            e.stopPropagation();
+                          handleLikeAnswer(answer.id);
+                          }}
+                        onUnlike={(e) => {
+                          e.stopPropagation();
+                          handleUnlikeAnswer(answer.id);
+                        }}
+                        onDislike={(e) => {
+                          e.stopPropagation();
+                          handleDislikeAnswer(answer.id);
+                        }}
+                        onUndislike={(e) => {
+                          e.stopPropagation();
+                          handleUndoDislikeAnswer(answer.id);
+                        }}
+                        onDelete={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAnswer(answer.id);
+                        }}
+                        onHelp={(e) => {
+                          e.stopPropagation();
+                          handleAskQuestionAboutAnswer(answer.id);
+                        }}
                       />
                       {user && (
-                        answer.author.id === user.id || 
-                        answer.userInfo?._id === user.id ||
-                        answer.author.id === user.id?.toString()
-                      ) && (
-                        <IconButton
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteAnswer(answer.id);
-                          }}
-                          sx={{
-                            color: 'rgba(255,80,80,0.8)',
-                            '&:hover': {
-                              color: 'rgba(255,80,80,1)',
-                            },
-                          }}
-                          title={t('delete', currentLanguage)}
-                        >
-                          <Delete />
-                        </IconButton>
-                      )}
-                      <IconButton
-                        onClick={() => {
-                          const isLiked = answer.likedByUsers.includes(user?.id || '');
-                          isLiked ? handleUnlikeAnswer(answer.id) : handleLikeAnswer(answer.id);
-                        }}
-                        sx={{
-                          color: answer.likedByUsers.includes(user?.id || '') ? '#FFB800' : 'rgba(255,255,255,0.7)',
-                          '&:hover': {
-                            color: answer.likedByUsers.includes(user?.id || '') ? '#FF8F00' : '#FFB800',
-                          },
-                        }}
-                      >
-                        {answer.likedByUsers.includes(user?.id || '') ? <ThumbUp /> : <ThumbUpOutlined />}
-                      </IconButton>
-                      <IconButton
-                        onClick={() => {
-                          const isDisliked = answer.dislikedByUsers.includes(user?.id || '');
-                          isDisliked ? handleUndoDislikeAnswer(answer.id) : handleDislikeAnswer(answer.id);
-                        }}
-                        sx={{
-                          color: answer.dislikedByUsers.includes(user?.id || '') ? '#FF6B6B' : 'rgba(255,255,255,0.7)',
-                          '&:hover': {
-                            color: answer.dislikedByUsers.includes(user?.id || '') ? '#FF5252' : '#FF6B6B',
-                          },
-                        }}
-                      >
-                        {answer.dislikedByUsers.includes(user?.id || '') ? <ThumbDown /> : <ThumbDownOutlined />}
-                      </IconButton>
-                      {user && (
                         <>
-                          <AskButtonWrapper onClick={() => handleAskQuestionAboutAnswer(answer.id)}>
-                            <IconButton
-                              className="hover-icon"
-                              sx={{
-                                color: 'rgba(255,255,255,0.7)',
-                                '&:hover': { color: '#FFB800' },
-                              }}
-                            >
-                              <HelpOutline />
-                            </IconButton>
-                            <Typography 
-                              className="hover-text"
-                              variant="caption"
-                              sx={{ 
-                                color: 'rgba(255,255,255,0.8)',
-                                fontWeight: 600,
-                                whiteSpace: 'nowrap',
-                                fontSize: '0.75rem',
-                              }}
-                            >
-                              {t('ask_question', currentLanguage)}
-                            </Typography>
-                          </AskButtonWrapper>
                           <Badge
                             badgeContent={relatedQuestionsCount[answer.id] || 0}
                             color="primary"
@@ -1162,15 +1112,9 @@ const QuestionDetail: React.FC = () => {
                     </Box>
                   </Box>
                   
-                  <Typography 
-                    variant="body1" 
-                    sx={{ 
-                      color: 'rgba(255,255,255,0.9)',
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    {answer.content}
-                  </Typography>
+                  <Box>
+                    <MarkdownRenderer content={answer.content} />
+                  </Box>
                   
                   <Box 
                     sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}
