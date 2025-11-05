@@ -29,9 +29,10 @@ import {
   Notifications,
   AccountCircle,
   Logout,
-  Language,
   Home,
 } from '@mui/icons-material';
+import preferLanguageIconBlack from '../../asset/icons/home/prefer_language_black.png';
+import preferLanguageIconWhite from '../../asset/icons/home/prefer_language_white.png';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logout } from '../../store/auth/authSlice';
@@ -192,7 +193,15 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   }
                 }}
               >
-                <Language />
+                <img
+                  src={
+                    theme.palette.mode === 'dark'
+                      ? preferLanguageIconWhite
+                      : preferLanguageIconBlack
+                  }
+                  alt="Language"
+                  style={{ width: 24, height: 24 }}
+                />
               </IconButton>
             </Tooltip>
 
