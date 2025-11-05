@@ -68,18 +68,18 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
     navigate(url);
   };
 
-  const chipSx = {
+  const chipSx = (theme: any) => ({
     mb: 2,
-    bgcolor: 'rgba(255,184,0,0.1)',
-    color: 'rgba(255,184,0,0.9)',
-    border: '1px solid rgba(255,184,0,0.3)',
+    bgcolor: `${theme.palette.primary.main}22`,
+    color: theme.palette.primary.main,
+    border: `1px solid ${theme.palette.primary.main}55`,
     cursor: 'pointer',
     height: 'auto',
     py: 0.5,
     '&:hover': {
-      bgcolor: 'rgba(255,184,0,0.2)',
+      bgcolor: `${theme.palette.primary.main}33`,
     },
-  };
+  });
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content', maxWidth: '100%' }}>
@@ -125,21 +125,21 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                   >
                     {parentContentInfo.userInfo.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', flexShrink: 0 }}>
+                  <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, flexShrink: 0 })}>
                     • 
                   </Typography>
                 </>
               )}
               {parentContentInfo.type === 'question' && parentContentInfo.title ? (
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+                <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' })}>
                   {parentContentInfo.title}
                 </Typography>
               ) : parentContentInfo.type === 'answer' && parentContentInfo.questionTitle ? (
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' }}>
+                <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' })}>
                   {parentContentInfo.questionTitle}
                 </Typography>
               ) : (
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
                   {t('this_question_about', currentLanguage)}
                 </Typography>
               )}
@@ -191,7 +191,7 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
               >
                 {parentQuestion.userInfo?.name || parentQuestion.author.name}
               </Typography>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
                 • {parentQuestion.title}
               </Typography>
             </Box>
@@ -331,7 +331,7 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                 >
                   {parentAnswer.userInfo?.name || parentAnswer.author.name}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
                   • {parentAnswer.content.substring(0, 30)}...
                 </Typography>
               </Box>

@@ -15,6 +15,8 @@ import CreateQuestionModal from '../components/question/CreateQuestionModal';
 import { type Question } from '../types/question';
 import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
+import papyrusWholeLight from '../asset/textures/papyrus_whole.png';
+import papyrusWholeDark from '../asset/textures/papyrus_whole_dark.png';
 import {
   fetchHomeQuestions,
   createHomeQuestion,
@@ -42,9 +44,11 @@ const PaginationContainer = styled(Box)(({ theme }) => ({
   gap: theme.spacing(2),
   marginTop: theme.spacing(4),
   padding: theme.spacing(2),
-  background: 'linear-gradient(135deg, rgba(30, 58, 71, 0.95) 0%, rgba(21, 42, 53, 0.98) 100%)',
+  background: theme.palette.mode === 'dark'
+    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
   borderRadius: 16,
-  border: '1px solid rgba(255, 184, 0, 0.15)',
+  border: `1px solid ${theme.palette.primary.main}33`,
 }));
 
 const Home = () => {
@@ -230,8 +234,32 @@ const Home = () => {
     dispatch(setItemsPerPage(newItemsPerPage));
   };
 
+  const { themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+  const papyrusTexture = mode === 'dark' ? papyrusWholeDark : papyrusWholeLight;
+
   return (
     <Layout>
+      {/* Papyrus Background for Home Page */}
+      {isPapirus && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusTexture})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.2 : 0.3,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
+
       {/* Filter Modal */}
       <FilterModal
         open={filterModalOpen}
@@ -245,7 +273,7 @@ const Home = () => {
       />
 
       {/* Header with Filter Button */}
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 2 }}>
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 2, position: 'relative', zIndex: 1 }}>
         <HomeHeader
           onOpenCreateModal={handleOpenCreateQuestionModal}
           onOpenFilterModal={handleOpenFilterModal}
@@ -268,7 +296,7 @@ const Home = () => {
       </Container>
 
       {/* Timeline (Soru Kartları) */}
-      <Container maxWidth="lg" sx={{ pb: 8 }}>
+      <Container maxWidth="lg" sx={{ pb: 8, position: 'relative', zIndex: 1 }}>
         <Box>
           {loading ? (
             <HomePageSkeleton />
@@ -296,28 +324,30 @@ const Home = () => {
                     size="large"
                     showFirstButton
                     showLastButton
-                    sx={{
+                    sx={(theme) => ({
                       '& .MuiPaginationItem-root': {
-                        color: 'rgba(255,255,255,0.8)',
-                        border: '1px solid rgba(255,184,0,0.3)',
-                        backgroundColor: 'rgba(255,255,255,0.05)',
+                        color: theme.palette.text.secondary,
+                        border: `1px solid ${theme.palette.primary.main}50`,
+                        backgroundColor: theme.palette.mode === 'dark' 
+                          ? 'rgba(255,255,255,0.05)' 
+                          : 'rgba(0,0,0,0.03)',
                         '&:hover': {
-                          backgroundColor: 'rgba(255,184,0,0.1)',
-                          borderColor: 'rgba(255,184,0,0.5)',
+                          backgroundColor: `${theme.palette.primary.main}22`,
+                          borderColor: theme.palette.primary.main,
                         },
                         '&.Mui-selected': {
-                          backgroundColor: '#FFB800',
-                          color: 'white',
-                          borderColor: '#FFB800',
+                          backgroundColor: theme.palette.primary.main,
+                          color: theme.palette.primary.contrastText,
+                          borderColor: theme.palette.primary.main,
                           '&:hover': {
-                            backgroundColor: '#FFD54F',
+                            backgroundColor: theme.palette.primary.dark,
                           },
                         },
                       },
                       '& .MuiPaginationItem-icon': {
-                        color: 'rgba(255,255,255,0.8)',
+                        color: theme.palette.text.secondary,
                       },
-                    }}
+                    })}
                   />
                 </PaginationContainer>
               )}

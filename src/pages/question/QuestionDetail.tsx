@@ -16,6 +16,9 @@ import {
   Alert,
   Badge,
 } from '@mui/material';
+import papyrusGenisDark from '../../asset/textures/papyrus_genis_2_dark.png';
+import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
+import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import {
   ThumbUp,
   ThumbUpOutlined,
@@ -53,38 +56,82 @@ import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAns
 import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
 
 const QuestionCard = styled(Paper)(({ theme }) => ({
-  background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
-  border: '1px solid rgba(255, 184, 0, 0.2)',
+  position: 'relative',
+  background: theme.palette.mode === 'dark'
+    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+  border: `1px solid ${theme.palette.primary.main}33`,
   borderRadius: 16,
   padding: theme.spacing(4),
   marginBottom: theme.spacing(3),
-  color: 'white',
+  color: theme.palette.text.primary,
   backdropFilter: 'blur(10px)',
-  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+  boxShadow: theme.palette.mode === 'dark'
+    ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+    : '0 8px 32px rgba(0, 0, 0, 0.1)',
+  overflow: 'hidden',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    opacity: 0.15,
+    pointerEvents: 'none',
+    zIndex: 0,
+  },
+  '& > *': {
+    position: 'relative',
+    zIndex: 1,
+  },
 }));
 
 const AnswerCard = styled(Card)(({ theme }) => ({
-  background: 'linear-gradient(135deg, rgba(15, 31, 40, 0.95) 0%, rgba(26, 47, 58, 0.97) 100%)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  position: 'relative',
+  background: theme.palette.mode === 'dark'
+    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+  border: `1px solid ${theme.palette.divider}`,
   borderRadius: 12,
   marginBottom: theme.spacing(2),
-  color: 'white',
+  color: theme.palette.text.primary,
   backdropFilter: 'blur(8px)',
+  overflow: 'hidden',
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    opacity: 0.12,
+    pointerEvents: 'none',
+    zIndex: 0,
+  },
   '& .MuiCardContent-root': {
     padding: theme.spacing(3),
+    position: 'relative',
+    zIndex: 1,
   },
 }));
 
 
 
 const ActionButton = styled(Button)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
-  color: 'white',
+  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+  color: theme.palette.primary.contrastText,
   borderRadius: 8,
   textTransform: 'none',
   fontWeight: 600,
   '&:hover': {
-    background: 'linear-gradient(135deg, #FF8F00 0%, #FF6B00 100%)',
+    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.light} 100%)`,
   },
 }));
 
@@ -97,6 +144,8 @@ const QuestionDetail: React.FC = () => {
   const { currentLanguage } = useAppSelector(state => state.language);
   const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
   const { answers, loading } = useAppSelector(state => state.answers);
+  const { themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
   
   const [question, setQuestion] = useState<Question | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -675,7 +724,27 @@ const QuestionDetail: React.FC = () => {
 
   return (
     <Layout>
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 8 }}>
+      {/* Papyrus Background for Question Detail Page */}
+      {isPapirus && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusGenisDark})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.2 : 0.3,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
+
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 8, position: 'relative', zIndex: 1 }}>
         {/* Geri Dön Butonu */}
         <Button
           variant="outlined"
@@ -695,7 +764,13 @@ const QuestionDetail: React.FC = () => {
         </Button>
 
         {/* Soru Detayı */}
-        <QuestionCard>
+        <QuestionCard
+          sx={isPapirus ? {
+            '&::before': {
+              backgroundImage: `url(${papyrusHorizontal1})`,
+            }
+          } : {}}
+        >
           {/* Parent Question/Answer Info */}
           {(question.parentQuestionId || question.parentAnswerId) && (() => {
             const parentId = question.parentQuestionId || question.parentAnswerId;
@@ -973,13 +1048,19 @@ const QuestionDetail: React.FC = () => {
 
         {/* Cevaplar */}
         <Box sx={{ mt: 4 }}>
-          <Typography variant="h5" sx={{ mb: 3, color: 'white', fontWeight: 600 }}>
+          <Typography variant="h5" sx={(theme) => ({ mb: 3, color: theme.palette.text.primary, fontWeight: 600 })}>
             {t('answers', currentLanguage)} ({answers.length})
           </Typography>
           
           {answers.length === 0 ? (
-            <QuestionCard>
-              <Typography sx={{ textAlign: 'center', color: 'rgba(255,255,255,0.7)' }}>
+            <QuestionCard
+              sx={isPapirus ? {
+                '&::before': {
+                  backgroundImage: `url(${papyrusHorizontal1})`,
+                }
+              } : {}}
+            >
+              <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
                 {t('no_answers', currentLanguage)}
               </Typography>
             </QuestionCard>
@@ -988,9 +1069,9 @@ const QuestionDetail: React.FC = () => {
               <AnswerCard 
                 key={answer.id}
                 id={`answer-${answer.id}`}
-                sx={{
-                  border: highlightedAnswerId === answer.id ? '2px solid #FFB800' : '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: highlightedAnswerId === answer.id ? '0 0 20px rgba(255, 184, 0, 0.5)' : 'none',
+                sx={(theme) => ({
+                  border: highlightedAnswerId === answer.id ? `2px solid ${theme.palette.primary.main}` : `1px solid ${theme.palette.divider}`,
+                  boxShadow: highlightedAnswerId === answer.id ? `0 0 20px ${theme.palette.primary.main}80` : 'none',
                   transition: 'all 0.3s ease-in-out',
                   animation: highlightedAnswerId === answer.id ? 'pulse 0.5s ease-in-out' : 'none',
                   '@keyframes pulse': {
@@ -998,7 +1079,12 @@ const QuestionDetail: React.FC = () => {
                     '50%': { transform: 'scale(1.02)' },
                     '100%': { transform: 'scale(1)' },
                   },
-                }}
+                  ...(isPapirus ? {
+                    '&::before': {
+                      backgroundImage: `url(${papyrusVertical1})`,
+                    }
+                  } : {}),
+                })}
               >
                 <CardContent>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
