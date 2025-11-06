@@ -19,6 +19,7 @@ import {
   InputBase,
   Badge,
   Tooltip,
+  Container,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -30,9 +31,12 @@ import {
   TrendingUp,
   Home,
   AdminPanelSettings,
+  HelpOutline,
+  FindInPage,
 } from '@mui/icons-material';
 import preferLanguageIconBlack from '../../asset/icons/home/prefer_language_black.png';
 import preferLanguageIconWhite from '../../asset/icons/home/prefer_language_white.png';
+import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import { styled, alpha } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -46,7 +50,7 @@ import { t } from '../../utils/translations';
 // Styled search component
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
-  borderRadius: 25,
+  borderRadius: 12,
   backgroundColor: theme.palette.mode === 'dark' 
     ? alpha(theme.palette.common.white, 0.15)
     : alpha(theme.palette.common.black, 0.05),
@@ -55,13 +59,10 @@ const Search = styled('div')(({ theme }) => ({
       ? alpha(theme.palette.common.white, 0.25)
       : alpha(theme.palette.common.black, 0.08),
   },
-  marginRight: theme.spacing(2),
+  marginRight: 0,
   marginLeft: 0,
   width: '100%',
-  [theme.breakpoints.up('sm')]: {
-    marginLeft: theme.spacing(3),
-    width: 'auto',
-  },
+  flex: 1,
   border: `1px solid ${theme.palette.divider}`,
 }));
 
@@ -83,9 +84,6 @@ const StyledInputBase = styled(InputBase)(({ theme }) => ({
     paddingLeft: `calc(1em + ${theme.spacing(4)})`,
     transition: theme.transitions.create('width'),
     width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '20ch',
-    },
     '&::placeholder': {
       color: theme.palette.mode === 'dark' 
         ? alpha(theme.palette.common.white, 0.7)
@@ -115,6 +113,8 @@ const Header = () => {
     }),
   );
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -172,10 +172,10 @@ const Header = () => {
   const isMenuOpen = Boolean(anchorEl);
 
   const renderMenu = (
-    <Menu
+      <Menu
       anchorEl={anchorEl}
       anchorOrigin={{
-        vertical: 'top',
+        vertical: 'bottom',
         horizontal: 'right',
       }}
       id={menuId}
@@ -186,6 +186,13 @@ const Header = () => {
       }}
       open={isMenuOpen}
       onClose={handleMenuClose}
+      disableScrollLock
+      BackdropProps={{
+        sx: {
+          backgroundColor: 'transparent',
+          zIndex: (theme) => theme.zIndex.drawer - 1,
+        },
+      }}
       PaperProps={{
         sx: (theme) => ({
           borderRadius: 1,
@@ -194,6 +201,33 @@ const Header = () => {
             : `0 8px 32px ${theme.palette.grey[400]}33`,
           border: `1px solid ${theme.palette.primary.main}22`,
           backgroundColor: theme.palette.background.paper,
+          minWidth: 200,
+          maxWidth: 250,
+          position: 'relative',
+          overflow: 'hidden',
+          mt: 1,
+          zIndex: (theme) => theme.zIndex.drawer,
+          ...(isPapirus ? {
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: `url(${papyrusVertical1})`,
+              backgroundSize: '125%',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: mode === 'dark' ? 0.12 : 0.15,
+              pointerEvents: 'none',
+              zIndex: 0,
+            },
+            '& > *': {
+              position: 'relative',
+              zIndex: 1,
+            },
+          } : {}),
         }),
       }}
     >
@@ -343,16 +377,22 @@ const Header = () => {
             : theme.palette.background.paper,
           borderBottom: `1px solid ${theme.palette.primary.main}33`,
           color: theme.palette.text.primary,
+          zIndex: (theme) => theme.zIndex.drawer + 1,
         })}
       >
-        <Toolbar sx={{ minHeight: 70 }}>
+        <Toolbar sx={{ 
+          minHeight: 70, 
+          position: 'relative',
+          width: '100%',
+          px: 0,
+        }}>
           {isMobile && (
             <IconButton
               color="inherit"
               aria-label="open drawer"
               edge="start"
               onClick={handleMobileDrawerToggle}
-              sx={{ mr: 2 }}
+              sx={{ mr: 2, ml: 2 }}
             >
               <MenuIcon />
             </IconButton>
@@ -363,7 +403,8 @@ const Header = () => {
             noWrap
             component="div"
             sx={{ 
-              flexGrow: 1, 
+              position: 'absolute',
+              left: isMobile ? 56 : 16,
               cursor: 'pointer',
               background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
               backgroundClip: 'text',
@@ -372,6 +413,7 @@ const Header = () => {
               fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
+              zIndex: 1,
             }}
             onClick={() => navigate('/')}
           >
@@ -379,38 +421,258 @@ const Header = () => {
             {t('qa_platform', currentLanguage)}
           </Typography>
 
-          {!isMobile && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {/* Search Bar */}
-              <form onSubmit={handleSearch}>
-                <Search>
-                  <SearchIconWrapper>
-                    <SearchIcon />
-                  </SearchIconWrapper>
-                  <StyledInputBase
-                    placeholder={t('search_placeholder', currentLanguage)}
-                    inputProps={{ 'aria-label': 'search' }}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </Search>
-              </form>
-
-              {/* Theme Toggle - Ampul */}
-              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                <ThemeToggle />
+          <Container 
+            maxWidth="lg" 
+            sx={{ 
+              position: 'relative',
+              width: '100%',
+              margin: '0 auto',
+            }}
+          >
+            {!isMobile && (
+              <Box sx={{ 
+                width: '100%',
+                display: 'grid',
+                gridTemplateColumns: '1fr auto 1fr',
+                alignItems: 'center',
+                gap: 2,
+                position: 'relative',
+                zIndex: 1,
+              }}>
+              {/* Sol taraf: Soruştur butonu */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/inquire')}
+                  startIcon={<HelpOutline sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 12,
+                    backgroundColor: (() => {
+                      if (themeName === 'magnefite') {
+                        return '#8B5CF6'; // Purple - fixed for both modes
+                      } else if (themeName === 'papirus') {
+                        return mode === 'dark' ? '#8B7355' : '#A0826D'; // Bronze brown
+                      } else if (themeName === 'molume') {
+                        return mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Grayish
+                      }
+                      return theme.palette.info.main; // Default: info
+                    })(),
+                    color: 'white',
+                    textTransform: 'none',
+                    py: 1.3,
+                    px: 2.5,
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    minWidth: '140px',
+                    boxShadow: (() => {
+                      let color = '#8B5CF6';
+                      if (themeName === 'magnefite') {
+                        color = '#8B5CF6';
+                      } else if (themeName === 'papirus') {
+                        color = mode === 'dark' ? '#8B7355' : '#A0826D';
+                      } else if (themeName === 'molume') {
+                        color = mode === 'dark' ? '#9CA3AF' : '#6B7280';
+                      } else {
+                        color = theme.palette.info.main;
+                      }
+                      return `0 2px 8px ${color}33`;
+                    })(),
+                    '&:hover': {
+                      backgroundColor: (() => {
+                        if (themeName === 'magnefite') {
+                          return '#7C3AED'; // Darker purple
+                        } else if (themeName === 'papirus') {
+                          return mode === 'dark' ? '#6B5B3D' : '#8B7355';
+                        } else if (themeName === 'molume') {
+                          return mode === 'dark' ? '#6B7280' : '#4B5563';
+                        }
+                        return theme.palette.info.dark;
+                      })(),
+                    },
+                  }}
+                >
+                  {t('inquire', currentLanguage)}
+                </Button>
               </Box>
 
-              {/* Theme Selector */}
-              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                <ThemeSelector />
+              {/* Orta: Arama Bar */}
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <form onSubmit={handleSearch} style={{ display: 'flex', minWidth: 0 }}>
+                  <Search
+                    sx={{
+                      width: '320px',
+                      backgroundColor: mode === 'dark' 
+                        ? alpha(theme.palette.common.white, 0.08)
+                        : alpha(theme.palette.common.black, 0.04),
+                      borderColor: mode === 'dark'
+                        ? alpha(theme.palette.common.white, 0.25)
+                        : alpha(theme.palette.common.black, 0.2),
+                      borderWidth: '1px',
+                      borderStyle: 'solid',
+                      py: 1.3,
+                      minWidth: 0,
+                      '&:hover': {
+                        backgroundColor: mode === 'dark'
+                          ? alpha(theme.palette.common.white, 0.12)
+                          : alpha(theme.palette.common.black, 0.06),
+                        borderColor: mode === 'dark'
+                          ? alpha(theme.palette.common.white, 0.35)
+                          : alpha(theme.palette.common.black, 0.3),
+                      },
+                    }}
+                  >
+                    <SearchIconWrapper>
+                      <SearchIcon sx={{ 
+                        color: mode === 'dark' 
+                          ? alpha(theme.palette.common.white, 0.75)
+                          : alpha(theme.palette.common.black, 0.65),
+                        fontSize: '1.15rem' 
+                      }} />
+                    </SearchIconWrapper>
+                    <StyledInputBase
+                      placeholder={t('search', currentLanguage)}
+                      inputProps={{ 'aria-label': 'search' }}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      sx={{
+                        '& .MuiInputBase-input': {
+                          color: mode === 'dark'
+                            ? alpha(theme.palette.common.white, 0.95)
+                            : alpha(theme.palette.common.black, 0.85),
+                          fontSize: '0.95rem',
+                          padding: '7px 14px 7px 0',
+                          fontWeight: 400,
+                          '&::placeholder': {
+                            color: mode === 'dark'
+                              ? alpha(theme.palette.common.white, 0.65)
+                              : alpha(theme.palette.common.black, 0.55),
+                            opacity: 1,
+                          },
+                        },
+                      }}
+                    />
+                  </Search>
+                </form>
               </Box>
 
-              {/* Language Selector */}
-              <Tooltip title={t('language_selection', currentLanguage)}>
+              {/* Sağ taraf: Sorgula butonu */}
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/query')}
+                  startIcon={<FindInPage sx={{ fontSize: '1.1rem' }} />}
+                  sx={{
+                    borderRadius: 12,
+                    backgroundColor: (() => {
+                      if (themeName === 'magnefite') {
+                        return mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Gray
+                      } else if (themeName === 'papirus') {
+                        return mode === 'dark' ? '#6B5B3D' : '#C4B5A0'; // Different bronze brown
+                      } else if (themeName === 'molume') {
+                        return mode === 'dark' ? '#0A1A23' : '#E8E4DC'; // Different color
+                      }
+                      return theme.palette.secondary.main; // Default: secondary
+                    })(),
+                    color: (() => {
+                      if (themeName === 'magnefite') {
+                        return 'white';
+                      } else if (themeName === 'papirus') {
+                        return 'white';
+                      } else if (themeName === 'molume') {
+                        return mode === 'dark' ? 'white' : '#2C2823';
+                      }
+                      return 'white';
+                    })(),
+                    textTransform: 'none',
+                    py: 1.3,
+                    px: 2.5,
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    minWidth: '140px',
+                    boxShadow: (() => {
+                      let color = theme.palette.secondary.main;
+                      if (themeName === 'magnefite') {
+                        color = mode === 'dark' ? '#9CA3AF' : '#6B7280';
+                      } else if (themeName === 'papirus') {
+                        color = mode === 'dark' ? '#6B5B3D' : '#C4B5A0';
+                      } else if (themeName === 'molume') {
+                        color = mode === 'dark' ? '#0A1A23' : '#E8E4DC';
+                      }
+                      return `0 2px 8px ${color}33`;
+                    })(),
+                    '&:hover': {
+                      backgroundColor: (() => {
+                        if (themeName === 'magnefite') {
+                          return mode === 'dark' ? '#6B7280' : '#4B5563';
+                        } else if (themeName === 'papirus') {
+                          return mode === 'dark' ? '#4A3E2F' : '#B8A895';
+                        } else if (themeName === 'molume') {
+                          return mode === 'dark' ? '#061218' : '#E0DCD4';
+                        }
+                        return theme.palette.secondary.dark;
+                      })(),
+                    },
+                  }}
+                >
+                  {t('query', currentLanguage)}
+                </Button>
+              </Box>
+            </Box>
+          )}
+          </Container>
+
+          {/* Right side controls - Container dışında */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: { xs: 2, sm: 3, md: 4 } }}>
+            {/* Theme Toggle - Ampul */}
+            <ThemeToggle />
+
+            {/* Theme Selector */}
+            <ThemeSelector />
+
+            {/* Language Selector */}
+            <Tooltip title={t('language_selection', currentLanguage)}>
+              <IconButton
+                color="inherit"
+                onClick={handleLanguageMenuOpen}
+                sx={{ 
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  '&:hover': {
+                    background: 'rgba(255,255,255,0.1)',
+                  }
+                }}
+              >
+                <img
+                  src={
+                    theme.palette.mode === 'dark'
+                      ? preferLanguageIconWhite
+                      : preferLanguageIconBlack
+                  }
+                  alt="Language"
+                  style={{ width: 24, height: 24 }}
+                />
+              </IconButton>
+            </Tooltip>
+
+            {/* Notifications */}
+            <Tooltip title={t('notifications', currentLanguage)}>
+              <IconButton color="inherit" sx={{ borderRadius: 2 }}>
+                <Badge badgeContent={3} color="error">
+                  <Notifications />
+                </Badge>
+              </IconButton>
+            </Tooltip>
+
+            {isAuthenticated ? (
+              <Tooltip title={t('profile', currentLanguage)}>
                 <IconButton
+                  size="large"
+                  edge="end"
+                  aria-label="account of current user"
+                  aria-controls={menuId}
+                  aria-haspopup="true"
+                  onClick={handleProfileMenuOpen}
                   color="inherit"
-                  onClick={handleLanguageMenuOpen}
                   sx={{ 
                     borderRadius: 2,
                     border: '1px solid rgba(255,255,255,0.2)',
@@ -419,92 +681,52 @@ const Header = () => {
                     }
                   }}
                 >
-                  <img
-                    src={
-                      theme.palette.mode === 'dark'
-                        ? preferLanguageIconWhite
-                        : preferLanguageIconBlack
+                  {user?.profile_image ? (
+                    <Avatar
+                      src={user.profile_image}
+                      sx={{ width: 32, height: 32 }}
+                    >
+                      {user.name.charAt(0).toUpperCase()}
+                    </Avatar>
+                  ) : (
+                    <Avatar sx={{ width: 32, height: 32 }}>
+                      {user?.name.charAt(0).toUpperCase() || '?'}
+                    </Avatar>
+                  )}
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <>
+                <Button 
+                  color="inherit" 
+                  onClick={() => navigate('/login')}
+                  sx={{ 
+                    borderRadius: 2,
+                    px: 2,
+                    '&:hover': {
+                      background: 'rgba(255,255,255,0.1)',
                     }
-                    alt="Language"
-                    style={{ width: 24, height: 24 }}
-                  />
-                </IconButton>
-              </Tooltip>
-
-              {/* Notifications */}
-              <Tooltip title={t('notifications', currentLanguage)}>
-                <IconButton color="inherit" sx={{ borderRadius: 2 }}>
-                  <Badge badgeContent={3} color="error">
-                    <Notifications />
-                  </Badge>
-                </IconButton>
-              </Tooltip>
-
-              {isAuthenticated ? (
-                <Tooltip title={t('profile', currentLanguage)}>
-                  <IconButton
-                    size="large"
-                    edge="end"
-                    aria-label="account of current user"
-                    aria-controls={menuId}
-                    aria-haspopup="true"
-                    onClick={handleProfileMenuOpen}
-                    color="inherit"
-                    sx={{ 
-                      borderRadius: 2,
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      '&:hover': {
-                        background: 'rgba(255,255,255,0.1)',
-                      }
-                    }}
-                  >
-                    {user?.profile_image ? (
-                      <Avatar
-                        src={user.profile_image}
-                        sx={{ width: 32, height: 32 }}
-                      >
-                        {user.name.charAt(0).toUpperCase()}
-                      </Avatar>
-                    ) : (
-                      <Avatar sx={{ width: 32, height: 32 }}>
-                        {user?.name.charAt(0).toUpperCase() || '?'}
-                      </Avatar>
-                    )}
-                  </IconButton>
-                </Tooltip>
-              ) : (
-                <>
-                  <Button 
-                    color="inherit" 
-                    onClick={() => navigate('/login')}
-                    sx={{ 
-                      borderRadius: 2,
-                      px: 2,
-                      '&:hover': {
-                        background: 'rgba(255,255,255,0.1)',
-                      }
-                    }}
-                  >
-                    {t('login', currentLanguage)}
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate('/register')}
-                    sx={{ 
-                      borderRadius: 2,
-                      px: 3,
-                      background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-                      '&:hover': {
-                        background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-                      }
-                    }}
-                  >
-                    {t('register', currentLanguage)}
-                  </Button>
-                </>
-              )}
-            </Box>
-          )}
+                  }}
+                >
+                  {t('login', currentLanguage)}
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate('/register')}
+                  sx={{ 
+                    borderRadius: 2,
+                    px: 3,
+                    background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
+                    '&:hover': {
+                      background: `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
+                    }
+                  }}
+                >
+                  {t('register', currentLanguage)}
+                </Button>
+              </>
+            )}
+          </Box>
         </Toolbar>
       </AppBar>
 
