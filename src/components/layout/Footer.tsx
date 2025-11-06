@@ -1,7 +1,13 @@
-import { Box, Container, Typography, Link, Grid, Divider } from '@mui/material';
+import { Box, Container, Typography, Link, Grid, Divider, useTheme } from '@mui/material';
 import { GitHub, LinkedIn, Email } from '@mui/icons-material';
+import { useAppSelector } from '../../store/hooks';
+import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 
 const Footer = () => {
+  const theme = useTheme();
+  const { name: themeName } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+  
   return (
     <Box
       component="footer"
@@ -9,16 +15,33 @@ const Footer = () => {
         py: 4,
         px: 2,
         mt: 'auto',
-        background: theme =>
-          theme.palette.mode === 'light'
-            ? 'linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%)'
-            : 'linear-gradient(135deg, #0F4054 0%, #1D5367 100%)',
-        borderTop: '1px solid rgba(255, 184, 0, 0.2)',
+        backgroundColor: theme.palette.background.paper,
+        borderTop: `1px solid ${theme.palette.divider}`,
         backdropFilter: 'blur(10px)',
-        color: theme =>
-          theme.palette.mode === 'light'
-            ? theme.palette.grey[800]
-            : 'white',
+        color: theme.palette.text.primary,
+        position: 'relative',
+        overflow: 'hidden',
+        ...(isPapirus ? {
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusVertical1})`,
+            backgroundSize: '115%',
+            backgroundPosition: 'center 15%',
+            backgroundRepeat: 'no-repeat',
+            opacity: theme.palette.mode === 'dark' ? 0.15 : 0.18,
+            pointerEvents: 'none',
+            zIndex: 0,
+          },
+          '& > *': {
+            position: 'relative',
+            zIndex: 1,
+          },
+        } : {}),
       }}
     >
       <Container maxWidth="lg">
@@ -28,7 +51,7 @@ const Footer = () => {
               variant="h6" 
               gutterBottom
               sx={{
-                background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
+                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
@@ -40,7 +63,7 @@ const Footer = () => {
             <Typography 
               variant="body2" 
               sx={{ 
-                color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+                color: theme.palette.text.primary,
                 lineHeight: 1.6,
               }}
             >
@@ -55,7 +78,7 @@ const Footer = () => {
               variant="h6" 
               gutterBottom
               sx={{
-                color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.9)' : 'white',
+                color: theme.palette.text.primary,
                 fontWeight: 600,
               }}
             >
@@ -65,10 +88,10 @@ const Footer = () => {
               <Link 
                 href="/questions" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   textDecoration: 'none',
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     textDecoration: 'underline',
                   }
                 }}
@@ -78,10 +101,10 @@ const Footer = () => {
               <Link 
                 href="/ask" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   textDecoration: 'none',
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     textDecoration: 'underline',
                   }
                 }}
@@ -91,10 +114,10 @@ const Footer = () => {
               <Link 
                 href="/about" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   textDecoration: 'none',
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     textDecoration: 'underline',
                   }
                 }}
@@ -104,10 +127,10 @@ const Footer = () => {
               <Link 
                 href="/contact" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   textDecoration: 'none',
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     textDecoration: 'underline',
                   }
                 }}
@@ -122,7 +145,7 @@ const Footer = () => {
               variant="h6" 
               gutterBottom
               sx={{
-                color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.9)' : 'white',
+                color: theme.palette.text.primary,
                 fontWeight: 600,
               }}
             >
@@ -132,9 +155,9 @@ const Footer = () => {
               <Link 
                 href="https://github.com" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     transform: 'scale(1.1)',
                   },
                   transition: 'all 0.3s ease',
@@ -145,9 +168,9 @@ const Footer = () => {
               <Link 
                 href="https://linkedin.com" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     transform: 'scale(1.1)',
                   },
                   transition: 'all 0.3s ease',
@@ -158,9 +181,9 @@ const Footer = () => {
               <Link 
                 href="mailto:contact@qaplatform.com" 
                 sx={{ 
-                  color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+                  color: theme.palette.text.secondary,
                   '&:hover': {
-                    color: '#FFB800',
+                    color: theme.palette.primary.main,
                     transform: 'scale(1.1)',
                   },
                   transition: 'all 0.3s ease',
@@ -174,7 +197,7 @@ const Footer = () => {
 
         <Divider sx={{ 
           my: 3, 
-          borderColor: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,184,0,0.3)',
+          borderColor: theme.palette.divider,
         }} />
 
         <Box
@@ -188,7 +211,7 @@ const Footer = () => {
           <Typography 
             variant="body2" 
             sx={{ 
-              color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)',
+              color: theme.palette.text.secondary,
             }}
           >
             © {new Date().getFullYear()} QA Platform. All rights reserved.
@@ -198,10 +221,10 @@ const Footer = () => {
               href="/privacy"
               variant="body2"
               sx={{ 
-                color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)',
+                color: theme.palette.text.secondary,
                 textDecoration: 'none',
                 '&:hover': {
-                  color: '#FFB800',
+                  color: theme.palette.primary.main,
                   textDecoration: 'underline',
                 }
               }}
@@ -212,10 +235,10 @@ const Footer = () => {
               href="/terms"
               variant="body2"
               sx={{ 
-                color: theme => theme.palette.mode === 'light' ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.8)',
+                color: theme.palette.text.secondary,
                 textDecoration: 'none',
                 '&:hover': {
-                  color: '#FFB800',
+                  color: theme.palette.primary.main,
                   textDecoration: 'underline',
                 }
               }}
