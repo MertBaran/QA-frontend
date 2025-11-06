@@ -1,7 +1,8 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { ThemeState } from '../../models/ThemeState';
 
 const initialState: ThemeState = {
+  name: 'molume', // molume, papirus, magnefite
   mode: 'light', // light, dark
   language: 'tr', // tr, en
   fontSize: 'medium', // small, medium, large
@@ -22,12 +23,12 @@ const themeSlice = createSlice({
   initialState,
   reducers: {
     setTheme: (state, action) => {
-      state.mode = action.payload;
+      state.name = action.payload;
     },
-    toggleTheme: state => {
+    toggleTheme: (state) => {
       state.mode = state.mode === 'light' ? 'dark' : 'light';
     },
-    resetTheme: state => {
+    resetTheme: (state) => {
       state.mode = 'light';
     },
     setLanguage: (state, action) => {
@@ -36,13 +37,19 @@ const themeSlice = createSlice({
     setFontSize: (state, action) => {
       state.fontSize = action.payload;
     },
-    toggleNotification: (state, action: { payload: { type: keyof ThemeState['notifications'] } }) => {
+    toggleNotification: (
+      state,
+      action: { payload: { type: keyof ThemeState['notifications'] } },
+    ) => {
       const { type } = action.payload;
       if (Object.prototype.hasOwnProperty.call(state.notifications, type)) {
         state.notifications[type] = !state.notifications[type];
       }
     },
-    setNotification: (state, action: { payload: { type: keyof ThemeState['notifications']; value: boolean } }) => {
+    setNotification: (
+      state,
+      action: { payload: { type: keyof ThemeState['notifications']; value: boolean } },
+    ) => {
       const { type, value } = action.payload;
       if (Object.prototype.hasOwnProperty.call(state.notifications, type)) {
         state.notifications[type] = value;
@@ -54,14 +61,21 @@ const themeSlice = createSlice({
         state.preferences[key] = !state.preferences[key];
       }
     },
-    setPreference: (state, action: { payload: { key: keyof ThemeState['preferences']; value: boolean } }) => {
+    setPreference: (
+      state,
+      action: { payload: { key: keyof ThemeState['preferences']; value: boolean } },
+    ) => {
       const { key, value } = action.payload;
       if (Object.prototype.hasOwnProperty.call(state.preferences, key)) {
         state.preferences[key] = value;
       }
     },
-    resetPreferences: state => {
-      Object.assign(state, initialState);
+    resetPreferences: (state) => {
+      // Sadece preferences'ı resetle, name ve mode'u koru
+      state.preferences = initialState.preferences;
+      state.notifications = initialState.notifications;
+      state.fontSize = initialState.fontSize;
+      state.language = initialState.language;
     },
   },
 });

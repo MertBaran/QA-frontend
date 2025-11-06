@@ -1,4 +1,5 @@
 export interface ThemeState {
+  name: 'molume' | 'papirus' | 'magnefite';
   mode: 'light' | 'dark';
   language: 'tr' | 'en';
   fontSize: 'small' | 'medium' | 'large';
