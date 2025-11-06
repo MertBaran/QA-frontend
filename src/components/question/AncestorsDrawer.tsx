@@ -13,7 +13,7 @@ import {
   Chip,
 } from '@mui/material';
 import { Close, QuestionAnswer, Help } from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
@@ -21,61 +21,160 @@ import { Question, AncestorReference } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
 
-const StyledDrawer = styled(Drawer)(({ theme }) => ({
+// Helper function to get theme-specific colors
+const getThemeColor = (themeName: string, theme: any, colorType: 'primary' | 'dark' = 'primary') => {
+  if (themeName === 'molume') {
+    return colorType === 'primary'
+      ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+      : (theme.palette.mode === 'dark' ? '#6D3B68' : '#4A2544'); // Brighter dark in dark mode
+  } else if (themeName === 'magnefite') {
+    return colorType === 'primary'
+      ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+      : (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563'); // Gray dark for Magnefite
+  }
+  return colorType === 'primary'
+    ? theme.palette.primary.main
+    : theme.palette.primary.dark;
+};
+
+const StyledDrawer = styled(Drawer, {
+  shouldForwardProp: (prop) => prop !== 'isPapirus',
+})<{ isPapirus?: boolean }>(({ theme, isPapirus }) => ({
   '& .MuiDrawer-paper': {
     width: 400,
-    background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
-    borderRight: '1px solid rgba(255, 184, 0, 0.2)',
-    color: 'white',
+    background: theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+    borderRight: `1px solid ${theme.palette.divider}`,
+    color: theme.palette.text.primary,
+    position: 'relative',
+    overflow: 'hidden',
+    ...(isPapirus ? {
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: `url(${papyrusHorizontal1})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center 10%',
+        backgroundRepeat: 'no-repeat',
+        opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+        pointerEvents: 'none',
+        zIndex: 0,
+      },
+      '& > *': {
+        position: 'relative',
+        zIndex: 1,
+      },
+    } : {}),
   },
 }));
 
-const HeaderBox = styled(Box)(({ theme }) => ({
+const HeaderBox = styled(Box)<{ isMolume?: boolean; isMagnefite?: boolean }>(({ theme, isMolume, isMagnefite }) => {
+  let parentColor: string, parentDark: string, parentLight: string;
+  if (isMolume) {
+    parentColor = theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A'; // Brighter purple in dark mode
+    parentDark = theme.palette.mode === 'dark' ? '#6D3B68' : '#4A2544';
+    parentLight = theme.palette.mode === 'dark' ? '#8B5A85' : '#6D3B68';
+  } else if (isMagnefite) {
+    parentColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Gray for Magnefite
+    parentDark = theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563';
+    parentLight = theme.palette.mode === 'dark' ? '#D1D5DB' : '#9CA3AF';
+  } else {
+    parentColor = theme.palette.primary.main;
+    parentDark = theme.palette.primary.dark;
+    parentLight = theme.palette.primary.light;
+  }
+  return {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   padding: theme.spacing(2),
-  borderBottom: '1px solid rgba(255, 184, 0, 0.2)',
-  background: 'linear-gradient(135deg, rgba(255, 184, 0, 0.1) 0%, rgba(255, 143, 0, 0.05) 100%)',
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    background: theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${parentColor}22 0%, ${parentDark}11 100%)`
+      : `linear-gradient(135deg, ${parentColor}11 0%, ${parentLight}05 100%)`,
   flexShrink: 0,
-}));
+  };
+});
 
 
-const QuestionItem = styled(ListItem)(({ theme }) => ({
+const QuestionItem = styled(ListItem)<{ isMolume?: boolean; isMagnefite?: boolean }>(({ theme, isMolume, isMagnefite }) => {
+  const parentColor = isMolume 
+    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+    : isMagnefite 
+    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+    : theme.palette.primary.main;
+  return {
   cursor: 'pointer',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+  borderBottom: `1px solid ${theme.palette.divider}`,
   padding: theme.spacing(2),
   transition: 'all 0.2s ease',
   '&:hover': {
-    backgroundColor: 'rgba(255, 184, 0, 0.05)',
-    borderLeft: '3px solid rgba(255, 184, 0, 0.5)',
+      backgroundColor: theme.palette.mode === 'dark'
+        ? `${parentColor}22`
+        : `${parentColor}11`,
+      borderLeft: `3px solid ${parentColor}`,
   },
-}));
+  };
+});
 
-const AnswerItem = styled(ListItem)(({ theme }) => ({
+const AnswerItem = styled(ListItem)<{ isMolume?: boolean; isMagnefite?: boolean }>(({ theme, isMolume, isMagnefite }) => {
+  const parentColor = isMolume 
+    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+    : isMagnefite 
+    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+    : theme.palette.primary.main;
+  const parentDark = isMolume 
+    ? (theme.palette.mode === 'dark' ? '#6D3B68' : '#4A2544') // Brighter dark in dark mode
+    : isMagnefite 
+    ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Gray dark for Magnefitetetete
+    : theme.palette.primary.dark;
+  return {
   cursor: 'pointer',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+  borderBottom: `1px solid ${theme.palette.divider}`,
   padding: theme.spacing(2),
   transition: 'all 0.2s ease',
-  backgroundColor: 'rgba(255, 184, 0, 0.02)',
+    backgroundColor: theme.palette.mode === 'dark'
+      ? `${parentColor}11`
+      : `${parentColor}08`,
   '&:hover': {
-    backgroundColor: 'rgba(255, 184, 0, 0.08)',
-    borderLeft: '3px solid rgba(255, 143, 0, 0.5)',
+      backgroundColor: theme.palette.mode === 'dark'
+        ? `${parentColor}33`
+        : `${parentColor}22`,
+      borderLeft: `3px solid ${parentDark}`,
   },
-}));
+  };
+});
 
-const DepthIndicator = styled(Box)(({ theme, depth }: { theme?: any; depth: number }) => ({
+const DepthIndicator = styled(Box)<{ isMolume?: boolean; isMagnefite?: boolean; depth: number }>(({ theme, isMolume, isMagnefite, depth }) => {
+  const parentColor = isMolume 
+    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+    : isMagnefite 
+    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+    : theme.palette.primary.main;
+  const parentDark = isMolume 
+    ? (theme.palette.mode === 'dark' ? '#6D3B68' : '#4A2544') // Brighter dark in dark mode
+    : isMagnefite 
+    ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Gray dark for Magnefitetete
+    : theme.palette.primary.dark;
+  return {
   position: 'absolute',
   left: 0,
   top: 0,
   bottom: 0,
   width: '4px',
   background: depth % 2 === 0 
-    ? 'linear-gradient(90deg, rgba(255, 184, 0, 0.3) 0%, rgba(255, 184, 0, 0) 100%)'
-    : 'linear-gradient(90deg, rgba(255, 143, 0, 0.3) 0%, rgba(255, 143, 0, 0) 100%)',
+      ? `linear-gradient(90deg, ${parentColor}66 0%, ${parentColor}00 100%)`
+      : `linear-gradient(90deg, ${parentDark}66 0%, ${parentDark}00 100%)`,
   transition: 'background 0.2s ease',
-}));
+  };
+});
 
 interface AncestorItem {
   id: string;
@@ -98,8 +197,11 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
   ancestors,
   currentQuestionId,
 }) => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName } = useAppSelector(state => state.theme);
+  const isPapirus: boolean = themeName === 'papirus';
   const [ancestorItems, setAncestorItems] = useState<AncestorItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -270,26 +372,29 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
       anchor="left"
       open={open}
       onClose={onClose}
+      isPapirus={isPapirus}
       PaperProps={{
         sx: {
-          top: 'auto',
-          height: '70%',
-          maxHeight: '800px',
+          top: 80, // Topbar'dan aşağıda açılması için
+          height: 'calc(100% - 80px)',
+          maxHeight: '1000px',
           display: 'flex',
           flexDirection: 'column',
         }
       }}
     >
-      <HeaderBox>
+      <HeaderBox isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <QuestionAnswer sx={{ color: 'rgba(255, 184, 0, 0.9)' }} />
-          <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+          <QuestionAnswer sx={{ 
+            color: getThemeColor(themeName, theme, 'primary')
+          }} />
+          <Typography variant="h6" sx={{ color: theme.palette.text.primary, fontWeight: 600 }}>
             {t('ancestors', currentLanguage)}
           </Typography>
         </Box>
         <IconButton 
           onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.7)' }}
+          sx={{ color: theme.palette.text.secondary }}
         >
           <Close />
         </IconButton>
@@ -308,25 +413,27 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
             width: '8px',
           },
           '&::-webkit-scrollbar-track': {
-            background: 'rgba(255, 255, 255, 0.05)',
+            background: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
           },
           '&::-webkit-scrollbar-thumb': {
-            background: 'rgba(255, 184, 0, 0.3)',
+            background: `${getThemeColor(themeName, theme, 'primary')}66`,
             borderRadius: '4px',
             '&:hover': {
-              background: 'rgba(255, 184, 0, 0.5)',
+              background: `${getThemeColor(themeName, theme, 'primary')}99`,
             },
           },
         }}
       >
         {loading && ancestorItems.length === 0 ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress sx={{ color: 'rgba(255, 184, 0, 0.8)' }} />
+            <CircularProgress sx={{ 
+              color: getThemeColor(themeName, theme, 'primary')
+            }} />
           </Box>
         ) : ancestorItems.length === 0 ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Help sx={{ fontSize: 48, color: 'rgba(255,255,255,0.3)', mb: 2 }} />
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+            <Help sx={{ fontSize: 48, color: theme.palette.text.disabled, mb: 2 }} />
+            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
               {t('no_ancestors', currentLanguage)}
             </Typography>
           </Box>
@@ -334,9 +441,9 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
           <List sx={{ p: 0, pb: 2, pr: 1 }}>
             {ancestorItems.map((item, index) => (
               <Box key={item.id} sx={{ position: 'relative' }}>
-                <DepthIndicator depth={item.depth} />
+                <DepthIndicator depth={item.depth} isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'} />
                 {item.type === 'question' && item.data ? (
-                  <QuestionItem
+                    <QuestionItem isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'}
                     onClick={(e) => handleQuestionClick(e, item.id)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -372,14 +479,18 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             <Chip 
                               label={`#${item.depth}`}
                               size="small" 
-                              sx={{ 
+                              sx={(theme) => {
+                                const parentColor = getThemeColor(themeName, theme, 'primary');
+                                const parentDark = getThemeColor(themeName, theme, 'dark');
+                                return { 
                                 bgcolor: item.depth % 2 === 0 
-                                  ? 'rgba(255, 184, 0, 0.3)' 
-                                  : 'rgba(255, 143, 0, 0.3)', 
-                                color: 'rgba(255,255,255,0.9)',
+                                    ? `${parentColor}66` 
+                                    : `${parentDark}66`, 
+                                color: theme.palette.text.primary,
                                 height: '20px',
                                 fontSize: '0.7rem',
                                 fontWeight: 700
+                                };
                               }} 
                             />
                             <Avatar 
@@ -400,13 +511,13 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             />
                             <Typography 
                               variant="caption" 
-                              sx={{ 
-                                color: 'rgba(255,184,0,0.9)', 
+                              sx={(theme) => ({ 
+                                color: getThemeColor(themeName, theme, 'primary'), 
                                 fontWeight: 600,
                                 cursor: 'pointer',
                                 '&:hover': { opacity: 0.7, textDecoration: 'underline' },
                                 transition: 'all 0.2s ease'
-                              }}
+                              })}
                               onClick={(e) => handleNameClick(e, (item.data as Question).author.id)}
                               onMouseDown={(e) => {
                                 if (e.button === 1) {
@@ -419,22 +530,25 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             <Chip 
                               label="Q" 
                               size="small" 
-                              sx={{ 
-                                bgcolor: 'rgba(255, 184, 0, 0.2)', 
-                                color: 'rgba(255, 184, 0, 0.9)',
+                              sx={(theme) => {
+                                const parentColor = getThemeColor(themeName, theme, 'primary');
+                                return { 
+                                  bgcolor: `${parentColor}33`, 
+                                  color: parentColor,
                                 height: '18px',
                                 fontSize: '0.7rem',
                                 fontWeight: 700
+                                };
                               }} 
                             />
                           </Box>
                           <Typography 
                             variant="body2" 
-                            sx={{ 
-                              color: 'white', 
+                            sx={(theme) => ({ 
+                              color: theme.palette.text.primary, 
                               fontWeight: 500,
                               wordBreak: 'break-word',
-                            }}
+                            })}
                           >
                             {(item.data as Question).title}
                           </Typography>
@@ -443,11 +557,11 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                       secondary={
                         <Typography 
                           variant="caption" 
-                          sx={{ 
-                            color: 'rgba(255,255,255,0.6)', 
+                          sx={(theme) => ({ 
+                            color: theme.palette.text.secondary, 
                             mt: 0.5,
                             wordBreak: 'break-word',
-                          }}
+                          })}
                         >
                           {(item.data as Question).content}
                         </Typography>
@@ -455,7 +569,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                     />
                   </QuestionItem>
                 ) : item.type === 'answer' && item.data ? (
-                  <AnswerItem
+                    <AnswerItem isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'}
                     onClick={(e) => handleAnswerClick(e, item.data as Answer)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -491,14 +605,18 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             <Chip 
                               label={`#${item.depth}`}
                               size="small" 
-                              sx={{ 
+                              sx={(theme) => {
+                                const parentColor = getThemeColor(themeName, theme, 'primary');
+                                const parentDark = getThemeColor(themeName, theme, 'dark');
+                                return { 
                                 bgcolor: item.depth % 2 === 0 
-                                  ? 'rgba(255, 184, 0, 0.3)' 
-                                  : 'rgba(255, 143, 0, 0.3)', 
-                                color: 'rgba(255,255,255,0.9)',
+                                    ? `${parentColor}66` 
+                                    : `${parentDark}66`, 
+                                color: theme.palette.text.primary,
                                 height: '20px',
                                 fontSize: '0.7rem',
                                 fontWeight: 700
+                                };
                               }} 
                             />
                             <Avatar 
@@ -519,13 +637,13 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             />
                             <Typography 
                               variant="caption" 
-                              sx={{ 
-                                color: 'rgba(255,184,0,0.9)', 
+                              sx={(theme) => ({ 
+                                color: getThemeColor(themeName, theme, 'primary'), 
                                 fontWeight: 600,
                                 cursor: 'pointer',
                                 '&:hover': { opacity: 0.7, textDecoration: 'underline' },
                                 transition: 'all 0.2s ease'
-                              }}
+                              })}
                               onClick={(e) => handleNameClick(e, (item.data as Answer).author.id)}
                               onMouseDown={(e) => {
                                 if (e.button === 1) {
@@ -538,34 +656,37 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             <Chip 
                               label="A" 
                               size="small" 
-                              sx={{ 
-                                bgcolor: 'rgba(255, 143, 0, 0.2)', 
-                                color: 'rgba(255, 143, 0, 0.9)',
+                              sx={(theme) => {
+                                const parentDark = getThemeColor(themeName, theme, 'dark');
+                                return { 
+                                  bgcolor: `${parentDark}33`, 
+                                  color: parentDark,
                                 height: '18px',
                                 fontSize: '0.7rem',
                                 fontWeight: 700
+                                };
                               }} 
                             />
                           </Box>
                           {(item.data as Answer).questionTitle && (
                             <Typography 
                               variant="caption" 
-                              sx={{ 
-                                color: 'rgba(255,184,0,0.6)', 
+                              sx={(theme) => ({ 
+                                color: theme.palette.text.secondary, 
                                 mb: 0.5,
                                 wordBreak: 'break-word',
-                              }}
+                              })}
                             >
                               {(item.data as Answer).questionTitle}
                             </Typography>
                           )}
                           <Typography 
                             variant="body2" 
-                            sx={{ 
-                              color: 'white', 
+                            sx={(theme) => ({ 
+                              color: theme.palette.text.primary, 
                               fontWeight: 500,
                               wordBreak: 'break-word',
-                            }}
+                            })}
                           >
                             {(item.data as Answer).content}
                           </Typography>
@@ -574,11 +695,11 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                       secondary={
                         <Typography 
                           variant="caption" 
-                          sx={{ 
-                            color: 'rgba(255,255,255,0.6)', 
+                          sx={(theme) => ({ 
+                            color: theme.palette.text.secondary, 
                             mt: 0.5,
                             wordBreak: 'break-word',
-                          }}
+                          })}
                         >
                           {(item.data as Answer).content}
                         </Typography>
@@ -593,7 +714,9 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
 
         {loading && ancestorItems.length > 0 && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-            <CircularProgress size={24} sx={{ color: 'rgba(255, 184, 0, 0.8)' }} />
+            <CircularProgress size={24} sx={{ 
+              color: getThemeColor(themeName, theme, 'primary')
+            }} />
           </Box>
         )}
       </Box>
@@ -602,4 +725,3 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
 };
 
 export default AncestorsDrawer;
-

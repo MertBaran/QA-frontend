@@ -17,6 +17,9 @@ import {
 import { categories } from '../../types/question';
 import { t } from '../../utils/translations';
 import RichTextEditor from '../ui/RichTextEditor';
+import { useAppSelector } from '../../store/hooks';
+import papyrusWhole from '../../asset/textures/papyrus_whole.png';
+import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 
 interface CreateQuestionModalProps {
   open: boolean;
@@ -49,6 +52,9 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   isSubmitting,
   currentLanguage,
 }) => {
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+
   return (
     <Dialog 
       open={open} 
@@ -62,23 +68,48 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
           maxHeight: '95vh',
           minWidth: 700,
           width: '100%',
+          position: 'relative',
+          overflow: 'hidden',
+          ...(isPapirus ? {
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: mode === 'dark' ? `url(${papyrusWholeDark})` : `url(${papyrusWhole})`,
+              backgroundSize: '110%', // Yakınlaştırılmış texture
+              backgroundPosition: 'center 25%',
+              backgroundRepeat: 'no-repeat',
+              opacity: mode === 'dark' ? 0.12 : 0.15,
+              pointerEvents: 'none',
+              zIndex: 0,
+            },
+            '& > *': {
+              position: 'relative',
+              zIndex: 1,
+            },
+          } : {}),
         }
       }}
       PaperProps={{
-        sx: {
-          background: 'linear-gradient(135deg, rgba(30, 58, 71, 0.95) 0%, rgba(21, 42, 53, 0.98) 100%)',
-          border: '1px solid rgba(255, 184, 0, 0.15)',
-          color: 'white',
-        }
+        sx: (theme) => ({
+          background: theme.palette.mode === 'dark'
+            ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+            : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+          border: `1px solid ${theme.palette.divider}`,
+          color: theme.palette.text.primary,
+        })
       }}
     >
       <DialogTitle sx={{ 
-        background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
+        background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
         backgroundClip: 'text',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         fontWeight: 700,
-        borderBottom: '1px solid rgba(255, 184, 0, 0.2)',
+        borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
         pb: 2,
         px: 3,
       }}>
@@ -86,7 +117,7 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
       </DialogTitle>
       <DialogContent sx={{ overflow: 'auto', maxHeight: '70vh', px: 3 }}>
         <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 1 }}>
+          <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary, mb: 1 }}>
             * {t('validation_title_min', currentLanguage)}, {t('validation_content_min', currentLanguage).toLowerCase()}
           </Typography>
           <TextField
@@ -96,32 +127,32 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
             onChange={(e) => onQuestionChange('title', e.target.value)}
             error={!!validationErrors.title}
             helperText={validationErrors.title}
-            sx={{
+            sx={(theme) => ({
               '& .MuiOutlinedInput-root': {
-                color: 'white',
+                color: theme.palette.text.primary,
                 '& fieldset': {
-                  borderColor: validationErrors.title ? '#f44336' : 'rgba(255, 255, 255, 0.3)',
+                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.divider,
                 },
                 '&:hover fieldset': {
-                  borderColor: validationErrors.title ? '#f44336' : 'rgba(255, 184, 0, 0.5)',
+                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: validationErrors.title ? '#f44336' : '#FFB800',
+                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
                 },
               },
               '& .MuiInputLabel-root': {
-                color: validationErrors.title ? '#f44336' : 'rgba(255, 255, 255, 0.7)',
+                color: validationErrors.title ? theme.palette.error.main : theme.palette.text.secondary,
                 '&.Mui-focused': {
-                  color: validationErrors.title ? '#f44336' : '#FFB800',
+                  color: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
                 },
               },
               '& .MuiFormHelperText-root': {
-                color: '#f44336',
+                color: theme.palette.error.main,
               },
-            }}
+            })}
           />
           <Box>
-            <Typography variant="body2" sx={{ mb: 1, color: 'rgba(255, 255, 255, 0.7)' }}>
+            <Typography variant="body2" sx={{ mb: 1, color: (theme) => theme.palette.text.secondary }}>
               {t('question_content', currentLanguage)}
             </Typography>
             <RichTextEditor
@@ -133,25 +164,25 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
             />
           </Box>
           <FormControl fullWidth error={!!validationErrors.category}>
-            <InputLabel sx={{ color: validationErrors.category ? '#f44336' : 'rgba(255, 255, 255, 0.7)' }}>{t('category', currentLanguage)}</InputLabel>
+            <InputLabel sx={(theme) => ({ color: validationErrors.category ? theme.palette.error.main : theme.palette.text.secondary })}>{t('category', currentLanguage)}</InputLabel>
             <Select
               value={question.category}
               onChange={(e) => onQuestionChange('category', e.target.value)}
-              sx={{
-                color: 'white',
+              sx={(theme) => ({
+                color: theme.palette.text.primary,
                 '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? '#f44336' : 'rgba(255, 255, 255, 0.3)',
+                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.divider,
                 },
                 '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? '#f44336' : 'rgba(255, 184, 0, 0.5)',
+                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.primary.main,
                 },
                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? '#f44336' : '#FFB800',
+                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.primary.main,
                 },
                 '& .MuiSvgIcon-root': {
-                  color: validationErrors.category ? '#f44336' : 'rgba(255, 255, 255, 0.7)',
+                  color: validationErrors.category ? theme.palette.error.main : theme.palette.text.secondary,
                 },
-              }}
+              })}
             >
               {categories.map((category) => (
                 <MenuItem key={category} value={category}>
@@ -168,41 +199,41 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
             placeholder={t('tags_placeholder', currentLanguage)}
             error={!!validationErrors.tags}
             helperText={validationErrors.tags}
-            sx={{
+            sx={(theme) => ({
               '& .MuiOutlinedInput-root': {
-                color: 'white',
+                color: theme.palette.text.primary,
                 '& fieldset': {
-                  borderColor: validationErrors.tags ? '#f44336' : 'rgba(255, 255, 255, 0.3)',
+                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.divider,
                 },
                 '&:hover fieldset': {
-                  borderColor: validationErrors.tags ? '#f44336' : 'rgba(255, 184, 0, 0.5)',
+                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
                 },
                 '&.Mui-focused fieldset': {
-                  borderColor: validationErrors.tags ? '#f44336' : '#FFB800',
+                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
                 },
               },
               '& .MuiInputLabel-root': {
-                color: validationErrors.tags ? '#f44336' : 'rgba(255, 255, 255, 0.7)',
+                color: validationErrors.tags ? theme.palette.error.main : theme.palette.text.secondary,
                 '&.Mui-focused': {
-                  color: validationErrors.tags ? '#f44336' : '#FFB800',
+                  color: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
                 },
               },
               '& .MuiFormHelperText-root': {
-                color: '#f44336',
+                color: theme.palette.error.main,
               },
-            }}
+            })}
           />
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, gap: 2, borderTop: '1px solid rgba(255, 184, 0, 0.2)' }}>
+      <DialogActions sx={(theme) => ({ px: 3, py: 2, gap: 2, borderTop: `1px solid ${theme.palette.divider}` })}>
         <Button 
           onClick={onClose}
-          sx={{ 
-            color: 'rgba(255, 255, 255, 0.7)',
+          sx={(theme) => ({ 
+            color: theme.palette.text.secondary,
             '&:hover': {
-              background: 'rgba(255, 255, 255, 0.1)',
+              background: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
             }
-          }}
+          })}
         >
           {t('cancel', currentLanguage)}
         </Button>
@@ -210,16 +241,20 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
           onClick={onSubmit}
           variant="contained"
           disabled={!question.title.trim() || !question.content.trim() || isSubmitting}
-          sx={{
-            background: 'linear-gradient(135deg, #00ED64 0%, #00C853 100%)',
+          sx={(theme) => ({
+            background: theme.palette.mode === 'dark'
+              ? `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`
+              : `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
             '&:hover': {
-              background: 'linear-gradient(135deg, #00FF6B 0%, #00ED64 100%)',
+              background: theme.palette.mode === 'dark'
+                ? `linear-gradient(135deg, ${theme.palette.success.dark} 0%, ${theme.palette.success.main} 100%)`
+                : `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
             },
             '&:disabled': {
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'rgba(255, 255, 255, 0.3)',
+              background: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+              color: theme.palette.text.disabled,
             }
-          }}
+          })}
         >
           {isSubmitting ? t('creating', currentLanguage) : t('create_question', currentLanguage)}
         </Button>

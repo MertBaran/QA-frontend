@@ -8,6 +8,7 @@ import {
   ListItemText,
   CircularProgress,
   Avatar,
+  useTheme,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -17,11 +18,13 @@ import { Question } from '../../types/question';
 
 const StyledPopover = styled(Popover)(({ theme }) => ({
   '& .MuiPopover-paper': {
-    background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
-    border: '1px solid rgba(255, 184, 0, 0.2)',
+    background: theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+    border: `1px solid ${theme.palette.divider}`,
     borderRadius: 12,
     backdropFilter: 'blur(10px)',
-    color: 'white',
+    color: theme.palette.text.primary,
     maxWidth: 400,
     maxHeight: 400,
     overflow: 'auto',
@@ -30,9 +33,11 @@ const StyledPopover = styled(Popover)(({ theme }) => ({
 
 const QuestionItem = styled(ListItem)(({ theme }) => ({
   cursor: 'pointer',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+  borderBottom: `1px solid ${theme.palette.divider}`,
   '&:hover': {
-    backgroundColor: 'rgba(255, 184, 0, 0.1)',
+    backgroundColor: theme.palette.mode === 'dark'
+      ? `${theme.palette.primary.main}22`
+      : `${theme.palette.primary.main}11`,
   },
   '&:last-child': {
     borderBottom: 'none',
@@ -54,6 +59,7 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
   loading = false,
   onQuestionClick,
 }) => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
   const open = Boolean(anchorEl);
@@ -118,16 +124,16 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
       }}
     >
       <Box sx={{ p: 2, minWidth: 300 }}>
-        <Typography variant="h6" sx={{ mb: 2, color: 'white', fontWeight: 600 }}>
+        <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary, fontWeight: 600 }}>
           {t('related_questions', currentLanguage)}
         </Typography>
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-            <CircularProgress size={24} />
+            <CircularProgress size={24} sx={{ color: theme.palette.primary.main }} />
           </Box>
         ) : questions.length === 0 ? (
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', py: 2 }}>
+          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, py: 2 }}>
             {t('no_related_questions', currentLanguage)}
           </Typography>
         ) : (
@@ -165,7 +171,7 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
                       <Typography 
                         variant="caption" 
                         sx={{ 
-                          color: 'rgba(255,184,0,0.9)', 
+                          color: theme.palette.primary.main, 
                           fontWeight: 600, 
                           display: 'block', 
                           mb: 0.5,
@@ -182,14 +188,14 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
                       >
                         {question.userInfo?.name || question.author.name}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: 'white', fontSize: '0.9rem' }}>
+                      <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.9rem' }}>
                         {question.title}
                       </Typography>
                     </Box>
                   }
                   secondary={question.content.substring(0, 60) + '...'}
                   secondaryTypographyProps={{ 
-                    color: 'rgba(255,255,255,0.6)',
+                    color: theme.palette.text.secondary,
                     sx: { fontSize: '0.75rem', mt: 0.5 }
                   }}
                 />
