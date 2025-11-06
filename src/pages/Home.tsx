@@ -15,8 +15,9 @@ import CreateQuestionModal from '../components/question/CreateQuestionModal';
 import { type Question } from '../types/question';
 import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
-import papyrusWholeLight from '../asset/textures/papyrus_whole.png';
-import papyrusWholeDark from '../asset/textures/papyrus_whole_dark.png';
+import papyrusGenis2Dark from '../asset/textures/papyrus_genis_2_dark.png';
+import papyrusGenis2Light from '../asset/textures/papyrus_genis_2.png';
+import papyrusVertical1 from '../asset/textures/papyrus_vertical_1.png';
 import {
   fetchHomeQuestions,
   createHomeQuestion,
@@ -37,7 +38,9 @@ import {
 import { likeQuestion, unlikeQuestion, deleteQuestion } from '../store/questions/questionThunks';
 import { fetchUserBookmarks } from '../store/bookmarks/bookmarkThunks';
 
-const PaginationContainer = styled(Box)(({ theme }) => ({
+const PaginationContainer = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isPapirus',
+})<{ isPapirus?: boolean }>(({ theme, isPapirus }) => ({
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
@@ -49,6 +52,29 @@ const PaginationContainer = styled(Box)(({ theme }) => ({
     : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
   borderRadius: 16,
   border: `1px solid ${theme.palette.primary.main}33`,
+  position: 'relative',
+  overflow: 'hidden',
+  ...(isPapirus ? {
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundImage: `url(${papyrusVertical1})`,
+      backgroundSize: '115%',
+      backgroundPosition: 'center 15%',
+      backgroundRepeat: 'no-repeat',
+      opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+      pointerEvents: 'none',
+      zIndex: 0,
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+    },
+  } : {}),
 }));
 
 const Home = () => {
@@ -234,9 +260,9 @@ const Home = () => {
     dispatch(setItemsPerPage(newItemsPerPage));
   };
 
-  const { themeName, mode } = useAppSelector(state => state.theme);
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
-  const papyrusTexture = mode === 'dark' ? papyrusWholeDark : papyrusWholeLight;
+  const papyrusTexture = papyrusGenis2Dark; // Papirüs temasında her zaman dark texture kullan
 
   return (
     <Layout>
@@ -309,13 +335,14 @@ const Home = () => {
                     onLike={handleLikeQuestion}
                     onUnlike={handleUnlikeQuestion}
                     onDelete={handleDeleteQuestion}
+                    isAlternateTexture={index % 2 === 1} // Çift sıralar için alternatif texture
                   />
                 </Fade>
               ))}
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <PaginationContainer>
+                <PaginationContainer isPapirus={isPapirus}>
                   <Pagination
                     count={totalPages}
                     page={currentPage}
@@ -354,7 +381,7 @@ const Home = () => {
             </>
           ) : (
             <Box sx={{ textAlign: 'center', py: 8 }}>
-              <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
+              <Typography variant="h6" sx={(theme) => ({ color: theme.palette.text.secondary, mb: 2 })}>
                 {totalQuestions === 0 ? t('no_questions', currentLanguage) : t('no_questions_found', currentLanguage)}
               </Typography>
               {totalQuestions === 0 && (
@@ -362,15 +389,23 @@ const Home = () => {
                   variant="contained"
                   onClick={handleOpenCreateQuestionModal}
                   startIcon={<Add />}
-                  sx={{
-                    background: 'linear-gradient(135deg, #00ED64 0%, #00C853 100%)',
+                  sx={(theme) => {
+                    const isMolume = themeName === 'molume';
+                    const buttonColors = isMolume 
+                      ? { main: '#00ED64', light: '#00FF6B', dark: '#00C853', contrastText: '#000000' }
+                      : { main: theme.palette.success.main, light: theme.palette.success.light, dark: theme.palette.success.dark, contrastText: theme.palette.success.contrastText || 'white' };
+                    
+                    return {
+                      background: `linear-gradient(135deg, ${buttonColors.main} 0%, ${buttonColors.dark} 100%)`,
+                      color: buttonColors.contrastText,
                     borderRadius: 12,
                     px: 3,
                     py: 1.5,
                     fontWeight: 600,
                     '&:hover': {
-                      background: 'linear-gradient(135deg, #00FF6B 0%, #00ED64 100%)',
+                        background: `linear-gradient(135deg, ${buttonColors.light} 0%, ${buttonColors.main} 100%)`,
                     },
+                    };
                   }}
                 >
                   {t('be_first_to_ask', currentLanguage)}

@@ -48,6 +48,9 @@ import Layout from '../../components/layout/Layout';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { useTheme } from '@mui/material/styles';
 import { authService } from '../../services/authService';
+import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
+import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
+import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
@@ -88,6 +91,8 @@ const Profile = () => {
   const theme = useTheme();
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
   const dispatch = useAppDispatch();
 
   // State
@@ -307,7 +312,24 @@ const Profile = () => {
   if (!isAuthenticated || !user) {
     return (
       <Layout>
-        <Container maxWidth="md" sx={{ mt: 4 }}>
+        {/* Admin Panel Texture Background */}
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusHorizontal2})`,
+            backgroundSize: '130%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.15 : 0.25,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+        <Container maxWidth="md" sx={{ mt: 4, position: 'relative', zIndex: 1 }}>
           <Alert severity="warning">
             {t('login_required', currentLanguage)}
           </Alert>
@@ -319,7 +341,24 @@ const Profile = () => {
   if (!profileUser) {
     return (
       <Layout>
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+        {/* Admin Panel Texture Background */}
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusHorizontal2})`,
+            backgroundSize: '120%',
+            backgroundPosition: 'center 15%',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.15 : 0.25,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, position: 'relative', zIndex: 1 }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
               <CircularProgress />
@@ -334,7 +373,24 @@ const Profile = () => {
 
   return (
     <Layout>
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+      {/* Admin Panel Texture Background */}
+      <Box
+        sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundImage: `url(${papyrusHorizontal2})`,
+          backgroundSize: '110%',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          opacity: mode === 'dark' ? 0.15 : 0.25,
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" sx={{ color: 'white', mb: 2 }}>
@@ -363,6 +419,29 @@ const Profile = () => {
               border: theme.palette.mode === 'dark' 
                 ? '1px solid rgba(255,255,255,0.1)' 
                 : '1px solid rgba(0,0,0,0.05)',
+              position: 'relative',
+              overflow: 'hidden',
+              ...(isPapirus ? {
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundImage: `url(${papyrusVertical1})`,
+                  backgroundSize: '140%',
+                  backgroundPosition: 'center 70%',
+                  backgroundRepeat: 'no-repeat',
+                  opacity: mode === 'dark' ? 0.12 : 0.15,
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                },
+                '& > *': {
+                  position: 'relative',
+                  zIndex: 1,
+                },
+              } : {}),
             }}>
               <CardContent sx={{ textAlign: 'center', p: 3 }}>
                 {/* Profil Fotoğrafı */}
@@ -505,6 +584,29 @@ const Profile = () => {
                   border: theme.palette.mode === 'dark' 
                     ? '1px solid rgba(255,255,255,0.1)' 
                     : '1px solid rgba(0,0,0,0.05)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  ...(isPapirus ? {
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundImage: `url(${papyrusHorizontal1})`,
+                      backgroundSize: '140%',
+                      backgroundPosition: 'center',
+                      backgroundRepeat: 'no-repeat',
+                      opacity: mode === 'dark' ? 0.12 : 0.15,
+                      pointerEvents: 'none',
+                      zIndex: 0,
+                    },
+                    '& > *': {
+                      position: 'relative',
+                      zIndex: 1,
+                    },
+                  } : {}),
                 }}>
                   <CardContent>
                     <Typography variant="h6" sx={{ 
@@ -615,6 +717,29 @@ const Profile = () => {
                   border: theme.palette.mode === 'dark' 
                     ? '1px solid rgba(255,255,255,0.1)' 
                     : '1px solid rgba(0,0,0,0.05)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  ...(isPapirus ? {
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundImage: `url(${papyrusVertical1})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center 15%',
+                      backgroundRepeat: 'no-repeat',
+                      opacity: mode === 'dark' ? 0.12 : 0.15,
+                      pointerEvents: 'none',
+                      zIndex: 0,
+                    },
+                    '& > *': {
+                      position: 'relative',
+                      zIndex: 1,
+                    },
+                  } : {}),
                 }}>
                   <CardContent>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
@@ -689,10 +814,14 @@ const Profile = () => {
                                     <Typography variant="body2" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568',
                                       mt: 0.5,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 3,
+                                      WebkitBoxOrient: 'vertical',
+                                      wordBreak: 'break-word',
                                     }}>
-                                      {question.content.length > 150 
-                                        ? `${question.content.substring(0, 150)}...` 
-                                        : question.content}
+                                      {question.content}
                                     </Typography>
                                   }
                                 />
@@ -781,7 +910,16 @@ const Profile = () => {
                                   primary={
                                     answer.questionTitle ? (
                                       <Typography variant="body2" sx={{ 
-                                        color: theme.palette.mode === 'dark' ? 'rgba(255,184,0,0.8)' : '#FFB800',
+                                        color: (() => {
+                                          if (themeName === 'molume') {
+                                            return theme.palette.mode === 'dark' ? '#FFB800' : '#FFB800';
+                                          } else if (themeName === 'magnefite') {
+                                            return theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280';
+                                          } else if (themeName === 'papirus') {
+                                            return theme.palette.mode === 'dark' ? '#A1887F' : '#8D6E63';
+                                          }
+                                          return theme.palette.primary.main;
+                                        })(),
                                         fontWeight: 600,
                                         mb: 0.5,
                                       }}>
@@ -792,10 +930,14 @@ const Profile = () => {
                                   secondary={
                                     <Typography variant="body2" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 3,
+                                      WebkitBoxOrient: 'vertical',
+                                      wordBreak: 'break-word',
                                     }}>
-                                      {answer.content.length > 150 
-                                        ? `${answer.content.substring(0, 150)}...` 
-                                        : answer.content}
+                                      {answer.content}
                                     </Typography>
                                   }
                                 />

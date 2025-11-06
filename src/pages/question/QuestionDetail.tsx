@@ -15,10 +15,16 @@ import {
   CardContent,
   Alert,
   Badge,
+  useTheme,
 } from '@mui/material';
-import papyrusGenisDark from '../../asset/textures/papyrus_genis_2_dark.png';
+import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
+import papyrusGenis2Light from '../../asset/textures/papyrus_genis_2.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
+import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
+import papyrusVertical2 from '../../asset/textures/papyrus_vertical_2.png';
+import papyrusWhole from '../../asset/textures/papyrus_whole.png';
+import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 import {
   ThumbUp,
   ThumbUpOutlined,
@@ -32,6 +38,7 @@ import {
   Delete,
   HelpOutline,
   KeyboardArrowRight,
+  AccountTree,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
@@ -50,12 +57,15 @@ import AskQuestionModal from '../../components/question/AskQuestionModal';
 import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
 import RichTextEditor from '../../components/ui/RichTextEditor';
 import MarkdownRenderer from '../../components/ui/MarkdownRenderer';
+import AncestorsDrawer from '../../components/question/AncestorsDrawer';
 import { openModal, closeModal } from '../../store/likes/likesSlice';
 import { fetchLikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
 import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
 
-const QuestionCard = styled(Paper)(({ theme }) => ({
+const QuestionCard = styled(Paper, {
+  shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isAnswerWriting',
+})<{ isPapirus?: boolean; isAnswerWriting?: boolean }>(({ theme, isPapirus, isAnswerWriting }) => ({
   position: 'relative',
   background: theme.palette.mode === 'dark'
     ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
@@ -70,27 +80,34 @@ const QuestionCard = styled(Paper)(({ theme }) => ({
     ? '0 8px 32px rgba(0, 0, 0, 0.3)'
     : '0 8px 32px rgba(0, 0, 0, 0.1)',
   overflow: 'hidden',
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    opacity: 0.15,
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
-  '& > *': {
-    position: 'relative',
-    zIndex: 1,
-  },
+  ...(isPapirus ? {
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundImage: isAnswerWriting 
+        ? (theme.palette.mode === 'dark' ? `url(${papyrusWholeDark})` : `url(${papyrusWhole})`)
+        : `url(${papyrusHorizontal1})`,
+      backgroundSize: isAnswerWriting ? '105%' : 'cover',
+      backgroundPosition: isAnswerWriting ? 'center 15%' : 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+      pointerEvents: 'none',
+      zIndex: 0,
+    },
+    '& > *': {
+      position: 'relative',
+      zIndex: 1,
+    },
+  } : {}),
 }));
 
-const AnswerCard = styled(Card)(({ theme }) => ({
+const AnswerCard = styled(Card, {
+  shouldForwardProp: (prop) => prop !== 'isPapirus',
+})<{ isPapirus?: boolean }>(({ theme, isPapirus }) => ({
   position: 'relative',
   background: theme.palette.mode === 'dark'
     ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
@@ -101,41 +118,68 @@ const AnswerCard = styled(Card)(({ theme }) => ({
   color: theme.palette.text.primary,
   backdropFilter: 'blur(8px)',
   overflow: 'hidden',
-  '&::before': {
-    content: '""',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    opacity: 0.12,
-    pointerEvents: 'none',
-    zIndex: 0,
-  },
+  ...(isPapirus ? {
+    '&::before': {
+      content: '""',
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundImage: `url(${papyrusVertical2})`,
+      backgroundSize: '105%',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+      pointerEvents: 'none',
+      zIndex: 0,
+    },
   '& .MuiCardContent-root': {
     padding: theme.spacing(3),
-    position: 'relative',
-    zIndex: 1,
-  },
+      position: 'relative',
+      zIndex: 1,
+    },
+  } : {
+    '& .MuiCardContent-root': {
+      padding: theme.spacing(3),
+    },
+  }),
 }));
 
 
 
-const ActionButton = styled(Button)(({ theme }) => ({
-  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-  color: theme.palette.primary.contrastText,
+const ActionButton = styled(Button, {
+  shouldForwardProp: (prop) => prop !== 'isMagnefite',
+})<{ isMagnefite?: boolean }>(({ theme, isMagnefite }) => {
+  // Magnefite'da primary color gri
+  const primaryColor = isMagnefite
+    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray
+    : theme.palette.primary.main;
+  const primaryDark = isMagnefite
+    ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Darker gray
+    : theme.palette.primary.dark;
+  const primaryLight = isMagnefite
+    ? (theme.palette.mode === 'dark' ? '#D1D5DB' : '#9CA3AF') // Lighter gray
+    : theme.palette.primary.light;
+  
+  return {
+    background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryDark} 100%)`,
+    color: 'white', // Always white text
   borderRadius: 8,
   textTransform: 'none',
   fontWeight: 600,
   '&:hover': {
-    background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.light} 100%)`,
+      background: `linear-gradient(135deg, ${primaryDark} 0%, ${primaryLight} 100%)`,
   },
-}));
+    '&:disabled': {
+      background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
+      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+    },
+  };
+});
 
 const QuestionDetail: React.FC = () => {
+  const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -144,8 +188,9 @@ const QuestionDetail: React.FC = () => {
   const { currentLanguage } = useAppSelector(state => state.language);
   const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
   const { answers, loading } = useAppSelector(state => state.answers);
-  const { themeName, mode } = useAppSelector(state => state.theme);
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
+  const isMagnefite = themeName === 'magnefite';
   
   const [question, setQuestion] = useState<Question | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +220,9 @@ const QuestionDetail: React.FC = () => {
   
   // Related questions count per answer
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
+  
+  // Ancestors drawer state
+  const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
 
   // Soru ve cevapları yükle
   useEffect(() => {
@@ -193,10 +241,14 @@ const QuestionDetail: React.FC = () => {
         
         if (questionData) {
           setQuestion(questionData);
+          setLoadingQuestion(false); // Ana soru yüklendi, loading'i kapat
           
-          // Parent question/answer yükle
+          // Parent question/answer yükle (background'da, blocking yapmadan)
           const parentId = questionData.parentQuestionId || questionData.parentAnswerId;
           if (parentId) {
+            // Parent yükleme işlemini async olarak yap, blocking yapmasın
+            Promise.resolve().then(async () => {
+              try {
             const parentQ = await questionService.getQuestionById(parentId);
             if (parentQ) {
               setParentQuestion(parentQ);
@@ -214,9 +266,15 @@ const QuestionDetail: React.FC = () => {
                 }
               }
             }
+              } catch (err) {
+                console.error('Parent content yüklenirken hata:', err);
+                // Parent yüklenemezse hata verme, sadece log
+              }
+            });
           }
         } else {
           setError('Soru bulunamadı');
+          setLoadingQuestion(false);
         }
         
         logger.user.action('question_detail_loaded', { questionId: id });
@@ -691,9 +749,28 @@ const QuestionDetail: React.FC = () => {
   if (loadingQuestion) {
     return (
       <Layout>
-        <Container maxWidth="lg" sx={{ pt: 4 }}>
+        {/* Papyrus Background for Loading State */}
+        {isPapirus && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: `url(${papyrusGenis2Dark})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: mode === 'dark' ? 0.2 : 0.3,
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+        )}
+        <Container maxWidth="lg" sx={{ pt: 4, position: 'relative', zIndex: 1 }}>
           <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" sx={{ color: 'white' }}>
+            <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
               {t('loading', currentLanguage)}
             </Typography>
           </Box>
@@ -713,7 +790,14 @@ const QuestionDetail: React.FC = () => {
             variant="outlined"
             startIcon={<ArrowBack />}
             onClick={() => navigate('/')}
-            sx={{ color: 'white', borderColor: 'white' }}
+            sx={{ 
+              color: theme.palette.text.primary, 
+              borderColor: theme.palette.divider,
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                background: `${theme.palette.primary.main}11`,
+              }
+            }}
           >
                       {t('back', currentLanguage)}
         </Button>
@@ -733,7 +817,7 @@ const QuestionDetail: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundImage: `url(${papyrusGenisDark})`,
+            backgroundImage: `url(${papyrusGenis2Dark})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -752,11 +836,11 @@ const QuestionDetail: React.FC = () => {
           onClick={() => navigate('/')}
           sx={{ 
             mb: 3, 
-            color: 'white', 
-            borderColor: 'rgba(255,255,255,0.3)',
+            color: theme.palette.text.primary, 
+            borderColor: theme.palette.divider,
             '&:hover': {
-              borderColor: 'white',
-              background: 'rgba(255,255,255,0.1)',
+              borderColor: theme.palette.primary.main,
+              background: `${theme.palette.primary.main}11`,
             }
           }}
         >
@@ -764,201 +848,29 @@ const QuestionDetail: React.FC = () => {
         </Button>
 
         {/* Soru Detayı */}
-        <QuestionCard
-          sx={isPapirus ? {
-            '&::before': {
-              backgroundImage: `url(${papyrusHorizontal1})`,
-            }
-          } : {}}
-        >
-          {/* Parent Question/Answer Info */}
-          {(question.parentQuestionId || question.parentAnswerId) && (() => {
-            const parentId = question.parentQuestionId || question.parentAnswerId;
-            
-            return (
-              <ParentInfoChip 
-                parentQuestion={parentQuestion}
-                parentAnswer={parentAnswer}
-                parentId={parentId!}
-                parentAnswerQuestion={parentAnswerQuestion}
-              />
-            );
-          })()}
-          
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Box sx={{ flex: 1 }}>
-              {/* Yazar Bilgisi */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Avatar 
-                  src={question.userInfo?.profile_image || question.author.avatar} 
-                  sx={{ 
-                    width: 40, 
-                    height: 40,
-                    cursor: 'pointer',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                  onClick={() => navigate(`/profile/${question.author.id}`)}
-                />
-                <Box>
-                  <Typography 
-                    variant="subtitle1" 
-                    sx={{ 
-                      color: 'white', 
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      '&:hover': { color: 'rgba(255,184,0,0.8)' }
-                    }}
-                    onClick={() => navigate(`/profile/${question.author.id}`)}
-                  >
-                    {question.userInfo?.name || question.author.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    {question.timeAgo}
-                  </Typography>
-              </Box>
-            </Box>
-
-              {/* Kategori */}
-              <Box sx={{ mb: 2 }}>
-                <Chip 
-                  label={question.category} 
-                  size="small" 
-                  sx={{ 
-                    bgcolor: 'rgba(255,184,0,0.2)', 
-                    color: 'rgba(255,184,0,0.9)',
-                    fontSize: '0.75rem',
-                  }} 
-                />
-              </Box>
-
-              <Box sx={{ 
-                display: 'flex',
-                gap: 2,
-                alignItems: 'flex-start',
-                mb: 3,
-              }}>
-                <Box sx={{ 
-                  flex: 1,
-                  minWidth: 0,
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                }}>
-              {/* Soru Başlığı */}
-              <Typography 
-                variant="h4" 
-                sx={{ 
-                  fontWeight: 700, 
-                  color: 'white',
-                  mb: 3,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      wordBreak: 'break-word',
-                      maxWidth: '100%',
-                }}
-              >
-                {question.title}
-              </Typography>
-
-              {/* Soru İçeriği */}
-                  <Box sx={{ 
-                  mb: 4, 
-                    overflow: 'hidden',
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word',
-                    maxWidth: '100%',
-                  }}>
-                    <MarkdownRenderer content={question.content} />
-                  </Box>
-                </Box>
-                
-                {/* Right side buttons */}
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: 'column',
-                  gap: 1, 
-                  alignItems: 'flex-start',
-                  flexShrink: 0,
-                }}>
-
-                </Box>
-              </Box>
-
-              {/* Tag'ler */}
-              {question.tags.length > 0 && (
-                <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-                  {question.tags.map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={tag}
-                      size="small"
-                      variant="outlined"
-                      sx={{ 
-                        borderRadius: 2,
-                        borderColor: 'primary.main',
-                        color: 'primary.main',
-                        bgcolor: 'rgba(255,255,255,0.08)',
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
-
-              {/* İstatistikler */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
-                <Box 
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  onClick={async () => {
-                    if (question.likesCount > 0 && question.likedByUsers.length > 0) {
-                      try {
-                        await dispatch(fetchLikedUsers(question.likedByUsers));
-                        dispatch(openModal());
-                      } catch (err) {
-                        console.error('Kullanıcılar yüklenirken hata:', err);
-                      }
-                    }
-                  }}
-                >
-                  <ThumbUp sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', cursor: question.likesCount > 0 ? 'pointer' : 'default' }} />
-                  <span 
-                    style={{ 
-                      color: 'rgba(255,255,255,0.8)', 
-                      fontSize: 14,
-                      cursor: question.likesCount > 0 ? 'pointer' : 'default'
-                    }}
-                  >
-                    {question.likesCount}
-                  </span>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Comment sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>
-                    {answers.length}
-                  </span>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Visibility sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14 }}>
-                    {question.views}
-                  </span>
-                </Box>
-              </Box>
-            </Box>
-
-            {/* Aksiyon Butonları */}
+        <Box sx={{ position: 'relative' }}>
+        <QuestionCard isPapirus={isPapirus}>
+          {/* Action Butons - Sağ Üst Köşe (Ana sayfadaki gibi) */}
+          <Box sx={{ 
+            position: 'absolute',
+            top: theme => theme.spacing(2),
+            right: theme => theme.spacing(2),
+            display: 'flex',
+            gap: 0.5,
+            alignItems: 'center',
+            zIndex: 20,
+          }}>
             <ActionButtons
               targetType="question"
-                targetId={question.id}
-                targetData={{
-                  title: question.title,
-                  content: question.content,
-                  author: question.author?.name,
-                  authorId: question.author?.id,
-                  created_at: question.createdAt,
-                  url: window.location.origin + '/questions/' + question.id,
-                }}
+              targetId={question.id}
+              targetData={{
+                title: question.title,
+                content: question.content,
+                author: question.author?.name,
+                authorId: question.author?.id,
+                created_at: question.createdAt,
+                url: window.location.origin + '/questions/' + question.id,
+              }}
               position="relative"
               showBookmark={true}
               showLike={true}
@@ -983,48 +895,227 @@ const QuestionDetail: React.FC = () => {
                 handleAskQuestionAboutQuestion();
               }}
             />
-            <Box sx={{ display: 'none' }}>
-              {/* Eski butonlar - silinebilir */}
-              <IconButton 
-                onClick={question.dislikedByUsers.includes(user?.id || '') ? handleUndoDislikeQuestion : handleDislikeQuestion}
+          </Box>
+
+          {/* Parent Question/Answer Info with Ancestors Button */}
+          {(question.parentQuestionId || question.parentAnswerId) && (() => {
+            const parentId = question.parentQuestionId || question.parentAnswerId;
+            
+            return (
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 500px)' }}>
+                {question.ancestors && question.ancestors.length > 1 && (
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAncestorsDrawerOpen(true);
+                    }}
+                    sx={{
+                      color: themeName === 'molume' 
+                        ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+                        : themeName === 'magnefite'
+                        ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                        : `${theme.palette.primary.main}CC`,
+                      '&:hover': {
+                        color: themeName === 'molume' 
+                          ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+                          : themeName === 'magnefite'
+                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                          : theme.palette.primary.main,
+                        bgcolor: themeName === 'molume' 
+                          ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') + '22' // Brighter purple in dark mode
+                          : themeName === 'magnefite'
+                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') + '22' // Gray for Magnefite
+                          : `${theme.palette.primary.main}22`,
+                      }
+                    }}
+                    title={t('show_all_ancestors', currentLanguage)}
+                  >
+                    <AccountTree />
+                  </IconButton>
+                )}
+              <ParentInfoChip 
+                parentQuestion={parentQuestion}
+                parentAnswer={parentAnswer}
+                parentId={parentId!}
+                parentAnswerQuestion={parentAnswerQuestion}
+              />
+              </Box>
+            );
+          })()}
+          
+          <Box sx={{ position: 'relative', mb: 3 }}>
+            <Box sx={{ width: '100%' }}>
+              {/* Yazar Bilgisi */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                <Avatar 
+                  src={question.userInfo?.profile_image || question.author.avatar} 
+                  sx={{ 
+                    width: 40, 
+                    height: 40,
+                    cursor: 'pointer',
+                    '&:hover': { opacity: 0.8 }
+                  }}
+                  onClick={() => navigate(`/profile/${question.author.id}`)}
+                />
+                <Box>
+                  <Typography 
+                    variant="subtitle1" 
+                    sx={{ 
+                      color: isMagnefite 
+                        ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                        : theme.palette.text.primary, 
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      '&:hover': { 
+                        color: isMagnefite 
+                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                          : theme.palette.primary.main 
+                      }
+                    }}
+                    onClick={() => navigate(`/profile/${question.author.id}`)}
+                  >
+                    {question.userInfo?.name || question.author.name}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                    {question.timeAgo}
+                  </Typography>
+              </Box>
+            </Box>
+
+              {/* Kategori */}
+              <Box sx={{ mb: 2 }}>
+                <Chip 
+                  label={question.category} 
+                  size="small" 
+                  sx={(theme) => {
+                    const chipColor = isMagnefite 
+                      ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                      : theme.palette.primary.main;
+                    return {
+                      bgcolor: `${chipColor}33`, 
+                      color: chipColor,
+                    fontSize: '0.75rem',
+                    };
+                  }} 
+                />
+              </Box>
+
+              {/* Soru Başlığı */}
+              <Typography 
+                variant="h4" 
                 sx={{ 
-                  color: question.dislikedByUsers.includes(user?.id || '') ? '#FF6B6B' : 'rgba(255,255,255,0.7)',
-                  '&:hover': {
-                    color: question.dislikedByUsers.includes(user?.id || '') ? '#FF5252' : '#FF6B6B',
-                  }
+                  fontWeight: 700, 
+                  color: theme.palette.text.primary,
+                  mb: 3,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 3,
+                      WebkitBoxOrient: 'vertical',
+                      wordBreak: 'break-word',
+                  width: '100%',
+                  pr: 10, // ActionButtons için sağdan boşluk bırak
                 }}
               >
-                {question.dislikedByUsers.includes(user?.id || '') ? <ThumbDown /> : <ThumbDownOutlined />}
-              </IconButton>
-              {user && (
-                question.author.id === user.id || 
-                question.userInfo?._id === user.id ||
-                question.author.id === user.id?.toString()
-              ) && (
-                <IconButton 
-                  sx={{ 
-                    color: 'rgba(255,80,80,0.8)',
-                    '&:hover': {
-                      color: 'rgba(255,80,80,1)',
+                {question.title}
+              </Typography>
+
+              {/* Soru İçeriği */}
+                  <Box sx={{ 
+                  mb: 4, 
+                    overflow: 'hidden',
+                    wordWrap: 'break-word',
+                    wordBreak: 'break-word',
+                width: '100%',
+                pr: 10, // ActionButtons için sağdan boşluk bırak
+                  }}>
+                    <MarkdownRenderer content={question.content} />
+              </Box>
+
+              {/* Tag'ler */}
+              {question.tags.length > 0 && (
+                <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+                  {question.tags.map((tag) => (
+                    <Chip
+                      key={tag}
+                      label={tag}
+                      size="small"
+                      variant="outlined"
+                      sx={(theme) => {
+                        const tagColor = isMagnefite 
+                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                          : theme.palette.primary.main;
+                        const tagDark = isMagnefite 
+                          ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Darker gray for Magnefite
+                          : theme.palette.primary.dark;
+                        return {
+                        borderRadius: 2,
+                          borderColor: tagColor,
+                          color: tagColor,
+                          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
+                          '&:hover': {
+                            background: `${tagColor}22`,
+                            borderColor: tagDark,
+                          }
+                        };
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              {/* İstatistikler */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
+                <Box 
+                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
+                  onClick={async () => {
+                    if (question.likesCount > 0 && question.likedByUsers.length > 0) {
+                      try {
+                        await dispatch(fetchLikedUsers(question.likedByUsers));
+                        dispatch(openModal());
+                      } catch (err) {
+                        console.error('Kullanıcılar yüklenirken hata:', err);
+                      }
                     }
                   }}
-                  onClick={handleDeleteQuestion}
-                  title={t('delete', currentLanguage)}
                 >
-                  <Delete />
-                </IconButton>
-              )}
+                  <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary, cursor: question.likesCount > 0 ? 'pointer' : 'default' }} />
+                  <span 
+                    style={{ 
+                      color: theme.palette.text.secondary, 
+                      fontSize: 14,
+                      cursor: question.likesCount > 0 ? 'pointer' : 'default'
+                    }}
+                  >
+                    {question.likesCount}
+                  </span>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Comment sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF8C42' : themeName === 'papirus' ? '#D2691E' : '#FF9500' }} />
+                  <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>
+                    {answers.length}
+                  </span>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Visibility sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF6B35' : themeName === 'papirus' ? '#CD853F' : '#FF7F50' }} />
+                  <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>
+                    {question.views}
+                  </span>
+                </Box>
+              </Box>
             </Box>
           </Box>
         </QuestionCard>
+        </Box>
 
         {/* Cevap Yazma Bölümü */}
         {user && (
-          <QuestionCard>
-            <Typography variant="h6" sx={{ mb: 2, color: 'white' }}>
+          <QuestionCard isPapirus={isPapirus} isAnswerWriting={true}>
+            <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
               {t('write_answer', currentLanguage)}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 2 }}>
+            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
               * {t('validation_answer_min', currentLanguage)}
             </Typography>
             <Box sx={{ mb: 2 }}>
@@ -1040,6 +1131,7 @@ const QuestionDetail: React.FC = () => {
               onClick={handleSubmitAnswer}
               disabled={!newAnswer.trim() || submittingAnswer}
               endIcon={<Send />}
+              isMagnefite={isMagnefite}
             >
               {submittingAnswer ? t('sending', currentLanguage) : t('send_answer', currentLanguage)}
             </ActionButton>
@@ -1053,13 +1145,7 @@ const QuestionDetail: React.FC = () => {
           </Typography>
           
           {answers.length === 0 ? (
-            <QuestionCard
-              sx={isPapirus ? {
-                '&::before': {
-                  backgroundImage: `url(${papyrusHorizontal1})`,
-                }
-              } : {}}
-            >
+            <QuestionCard isPapirus={isPapirus}>
               <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
                 {t('no_answers', currentLanguage)}
               </Typography>
@@ -1069,6 +1155,7 @@ const QuestionDetail: React.FC = () => {
               <AnswerCard 
                 key={answer.id}
                 id={`answer-${answer.id}`}
+                isPapirus={isPapirus}
                 sx={(theme) => ({
                   border: highlightedAnswerId === answer.id ? `2px solid ${theme.palette.primary.main}` : `1px solid ${theme.palette.divider}`,
                   boxShadow: highlightedAnswerId === answer.id ? `0 0 20px ${theme.palette.primary.main}80` : 'none',
@@ -1079,11 +1166,6 @@ const QuestionDetail: React.FC = () => {
                     '50%': { transform: 'scale(1.02)' },
                     '100%': { transform: 'scale(1)' },
                   },
-                  ...(isPapirus ? {
-                    '&::before': {
-                      backgroundImage: `url(${papyrusVertical1})`,
-                    }
-                  } : {}),
                 })}
               >
                 <CardContent>
@@ -1103,16 +1185,22 @@ const QuestionDetail: React.FC = () => {
                         <Typography 
                           variant="subtitle2" 
                           sx={{ 
-                            color: 'white', 
+                            color: isMagnefite 
+                              ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                              : theme.palette.text.primary, 
                             fontWeight: 600,
                             cursor: 'pointer',
-                            '&:hover': { color: 'rgba(255,184,0,0.8)' }
+                            '&:hover': { 
+                              color: isMagnefite 
+                                ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                                : theme.palette.primary.main 
+                            }
                           }}
                           onClick={() => navigate(`/profile/${answer.author.id}`)}
                         >
                           {answer.userInfo?.name || answer.author.name}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
                           {answer.timeAgo}
                         </Typography>
                       </Box>
@@ -1185,8 +1273,19 @@ const QuestionDetail: React.FC = () => {
                             <IconButton
                               onClick={(e) => handleShowRelatedQuestions(e, answer.id, 'answer')}
                               sx={{
-                                color: 'rgba(255,255,255,0.7)',
-                                '&:hover': { color: '#FFB800' },
+                                color: theme.palette.text.secondary,
+                                width: '40px',
+                                height: '40px',
+                                padding: 0,
+                                border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+                                backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+                                '&:hover': {
+                                  color: theme.palette.primary.main,
+                                  backgroundColor: theme.palette.mode === 'dark' 
+                                    ? `${theme.palette.primary.main}22` 
+                                    : `${theme.palette.primary.main}11`,
+                                  borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
+                                },
                               }}
                               title={t('related_questions', currentLanguage)}
                             >
@@ -1215,10 +1314,19 @@ const QuestionDetail: React.FC = () => {
                       }
                     }}
                   >
-                    <ThumbUp sx={{ fontSize: 16, color: 'rgba(255,255,255,0.7)', cursor: answer.likesCount > 0 ? 'pointer' : 'default' }} />
+                    <ThumbUp sx={{ fontSize: 16, color: (() => {
+                      if (themeName === 'molume') {
+                        return '#00ED64'; // Green for Molume
+                      } else if (themeName === 'magnefite') {
+                        return '#7A9470'; // Brighter greenish-gray for Magnefite
+                      } else if (themeName === 'papirus') {
+                        return (theme.palette as any).custom?.positive || '#8D6E63';
+                      }
+                      return theme.palette.text.secondary;
+                    })(), cursor: answer.likesCount > 0 ? 'pointer' : 'default' }} />
                     <span 
                       style={{ 
-                        color: 'rgba(255,255,255,0.8)', 
+                        color: theme.palette.text.secondary, 
                         fontSize: 12,
                         cursor: answer.likesCount > 0 ? 'pointer' : 'default'
                       }}
@@ -1258,6 +1366,16 @@ const QuestionDetail: React.FC = () => {
         loading={loadingRelatedQuestions}
         onQuestionClick={handleRelatedQuestionClick}
       />
+
+      {/* Ancestors Drawer */}
+      {question && question.ancestors && question.ancestors.length > 1 && (
+        <AncestorsDrawer
+          open={ancestorsDrawerOpen}
+          onClose={() => setAncestorsDrawerOpen(false)}
+          ancestors={question.ancestors || []}
+          currentQuestionId={question.id}
+        />
+      )}
     </Layout>
   );
 };
