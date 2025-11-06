@@ -6,6 +6,7 @@ import { Question, ParentContentInfo } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
+import { useTheme } from '@mui/material/styles';
 
 interface ParentInfoChipProps {
   parentQuestion?: Question | null;
@@ -23,7 +24,9 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   parentContentInfo,
 }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName } = useAppSelector(state => state.theme);
 
   if (!parentId) return null;
 
@@ -68,18 +71,31 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
     navigate(url);
   };
 
-  const chipSx = (theme: any) => ({
-    mb: 2,
-    bgcolor: `${theme.palette.primary.main}22`,
-    color: theme.palette.primary.main,
-    border: `1px solid ${theme.palette.primary.main}55`,
-    cursor: 'pointer',
-    height: 'auto',
-    py: 0.5,
-    '&:hover': {
-      bgcolor: `${theme.palette.primary.main}33`,
-    },
-  });
+  const chipSx = (theme: any) => {
+    const isMolume = themeName === 'molume';
+    const isMagnefite = themeName === 'magnefite';
+    // Molume uses #5E315A (brighter #7A4A75 in dark mode), Magnefite uses gray, others use primary
+    let parentColor: string;
+    if (isMolume) {
+      parentColor = theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A'; // Brighter purple in dark mode
+    } else if (isMagnefite) {
+      parentColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Gray for Magnefite
+    } else {
+      parentColor = theme.palette.primary.main;
+    }
+    return {
+      mb: 2,
+      bgcolor: `${parentColor}22`,
+      color: parentColor,
+      border: `1px solid ${parentColor}55`,
+      cursor: 'pointer',
+      height: 'auto',
+      py: 0.5,
+      '&:hover': {
+        bgcolor: `${parentColor}33`,
+      },
+    };
+  };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content', maxWidth: '100%' }}>

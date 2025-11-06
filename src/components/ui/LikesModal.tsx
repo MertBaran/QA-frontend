@@ -12,17 +12,44 @@ import {
   Avatar,
 } from '@mui/material';
 import { Close } from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
 import { t } from '../../utils/translations';
+import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 
-const StyledDialog = styled(Dialog)(({ theme }) => ({
+const StyledDialog = styled(Dialog, {
+  shouldForwardProp: (prop) => prop !== 'isPapirus',
+})<{ isPapirus?: boolean }>(({ theme, isPapirus }) => ({
   '& .MuiDialog-paper': {
-    backgroundColor: 'rgba(15, 31, 40, 0.98)',
-    color: 'white',
+    backgroundColor: theme.palette.background.paper,
+    color: theme.palette.text.primary,
     borderRadius: 16,
-    backdropFilter: 'blur(10px)',
+    backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
+    border: `1px solid ${theme.palette.divider}`,
+    position: 'relative',
+    overflow: 'hidden',
+    ...(isPapirus ? {
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: `url(${papyrusVertical1})`,
+        backgroundSize: '125%',
+        backgroundPosition: 'center 3%',
+        backgroundRepeat: 'no-repeat',
+        opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+        pointerEvents: 'none',
+        zIndex: 0,
+      },
+      '& > *': {
+        position: 'relative',
+        zIndex: 1,
+      },
+    } : {}),
   },
 }));
 
@@ -48,7 +75,44 @@ const LikesModal: React.FC<LikesModalProps> = ({
   title 
 }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+
+  // Get theme-specific colors for border and hover
+  const getThemeColors = () => {
+    if (themeName === 'molume') {
+      const primaryColor = theme.palette.mode === 'dark' ? '#FFB800' : '#FFB800';
+      return {
+        border: `${primaryColor}33`,
+        hoverBg: `${primaryColor}22`,
+        hoverBorder: `${primaryColor}66`,
+      };
+    } else if (themeName === 'magnefite') {
+      const primaryColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280';
+      return {
+        border: `${primaryColor}33`,
+        hoverBg: `${primaryColor}22`,
+        hoverBorder: `${primaryColor}66`,
+      };
+    } else if (themeName === 'papirus') {
+      const primaryColor = theme.palette.mode === 'dark' ? '#8D6E63' : '#A1887F';
+      return {
+        border: `${primaryColor}33`,
+        hoverBg: `${primaryColor}22`,
+        hoverBorder: `${primaryColor}66`,
+      };
+    }
+    const primaryColor = theme.palette.primary.main;
+    return {
+      border: `${primaryColor}33`,
+      hoverBg: `${primaryColor}22`,
+      hoverBorder: `${primaryColor}66`,
+    };
+  };
+
+  const themeColors = getThemeColors();
 
   return (
     <StyledDialog 
@@ -56,14 +120,15 @@ const LikesModal: React.FC<LikesModalProps> = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      isPapirus={isPapirus}
     >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h6" sx={{ color: 'white' }}>
+        <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
           {title || t('users_who_liked', currentLanguage)}
         </Typography>
         <IconButton 
           onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.7)' }}
+          sx={{ color: theme.palette.text.secondary }}
         >
           <Close />
         </IconButton>
@@ -76,14 +141,14 @@ const LikesModal: React.FC<LikesModalProps> = ({
                 key={user.id}
                 sx={{
                   cursor: 'pointer',
-                  border: '1px solid rgba(255, 184, 0, 0.2)',
+                  border: `1px solid ${themeColors.border}`,
                   borderRadius: 2,
                   mb: 1,
                   padding: 2,
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 184, 0, 0.1)',
-                    borderColor: 'rgba(255, 184, 0, 0.4)',
+                    backgroundColor: themeColors.hoverBg,
+                    borderColor: themeColors.hoverBorder,
                   }
                 }}
                 onClick={() => {
@@ -103,14 +168,14 @@ const LikesModal: React.FC<LikesModalProps> = ({
                 <ListItemText 
                   primary={user.name}
                   secondary={user.title || user.email}
-                  primaryTypographyProps={{ color: 'white' }}
-                  secondaryTypographyProps={{ color: 'rgba(255,255,255,0.6)' }}
+                  primaryTypographyProps={{ color: theme.palette.text.primary }}
+                  secondaryTypographyProps={{ color: theme.palette.text.secondary }}
                 />
               </ListItem>
             ))}
           </List>
         ) : (
-          <Typography sx={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', py: 2 }}>
+          <Typography sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
             {t('no_likes_yet', currentLanguage)}
           </Typography>
         )}

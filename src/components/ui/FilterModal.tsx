@@ -29,6 +29,7 @@ import { styled } from '@mui/material/styles';
 import { categories, sortOptions } from '../../types/question';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
+import { useTheme } from '@mui/material/styles';
 
 const FilterModalContainer = styled(Modal)(({ theme }) => ({
   display: 'flex',
@@ -37,20 +38,44 @@ const FilterModalContainer = styled(Modal)(({ theme }) => ({
   paddingTop: theme.spacing(8),
 }));
 
-const FilterModalContent = styled(Paper)(({ theme }) => ({
-  position: 'relative',
-  width: '90%',
-  maxWidth: 1200,
-  maxHeight: '80vh',
-  background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
-  border: '1px solid rgba(255, 184, 0, 0.2)',
-  borderRadius: 16,
-  backdropFilter: 'blur(10px)',
-  color: 'white',
-  padding: theme.spacing(4),
-  overflow: 'auto',
-  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-}));
+const FilterModalContent = styled(Paper, {
+  shouldForwardProp: (prop) => prop !== 'themeName',
+})<{ themeName?: string }>(({ theme, themeName }) => {
+  const isMolume = themeName === 'molume';
+  const isMagnefite = themeName === 'magnefite';
+  const isPapirus = themeName === 'papirus';
+  
+  // Tema bazlı renkler
+  let borderColor = theme.palette.primary.main;
+  let bgGradient = theme.palette.mode === 'dark'
+    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  
+  if (isMolume) {
+    borderColor = theme.palette.primary.main;
+  } else if (isMagnefite) {
+    borderColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280';
+  } else if (isPapirus) {
+    borderColor = theme.palette.mode === 'dark' ? '#8B6F47' : '#A0826D';
+  }
+  
+  return {
+    position: 'relative',
+    width: '90%',
+    maxWidth: 1200,
+    maxHeight: '80vh',
+    background: bgGradient,
+    border: `1px solid ${borderColor}33`,
+    borderRadius: 16,
+    backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
+    color: theme.palette.text.primary,
+    padding: theme.spacing(4),
+    overflow: 'auto',
+    boxShadow: theme.palette.mode === 'dark'
+      ? `0 8px 32px ${theme.palette.primary.main}22`
+      : `0 8px 32px ${theme.palette.grey[400]}33`,
+  };
+});
 
 const FilterSection = styled(Box)(({ theme }) => ({
   marginBottom: theme.spacing(3),
@@ -61,15 +86,32 @@ const FilterRow = styled(Grid)(({ theme }) => ({
   gap: theme.spacing(2),
 }));
 
-const ActiveFilterChip = styled(Chip)(({ theme }) => ({
-  background: 'linear-gradient(135deg, rgba(255, 184, 0, 0.2) 0%, rgba(255, 143, 0, 0.3) 100%)',
-  color: 'white',
-  border: '1px solid rgba(255, 184, 0, 0.4)',
-  borderRadius: 8,
-  '&:hover': {
-    background: 'linear-gradient(135deg, rgba(255, 184, 0, 0.3) 0%, rgba(255, 143, 0, 0.4) 100%)',
-  },
-}));
+const ActiveFilterChip = styled(Chip, {
+  shouldForwardProp: (prop) => prop !== 'themeName',
+})<{ themeName?: string }>(({ theme, themeName }) => {
+  const isMolume = themeName === 'molume';
+  const isMagnefite = themeName === 'magnefite';
+  const isPapirus = themeName === 'papirus';
+  
+  let chipColor = theme.palette.primary.main;
+  if (isMolume) {
+    chipColor = theme.palette.primary.main;
+  } else if (isMagnefite) {
+    chipColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280';
+  } else if (isPapirus) {
+    chipColor = theme.palette.mode === 'dark' ? '#8B6F47' : '#A0826D';
+  }
+  
+  return {
+    background: `linear-gradient(135deg, ${chipColor}33 0%, ${chipColor}44 100%)`,
+    color: theme.palette.text.primary,
+    border: `1px solid ${chipColor}66`,
+    borderRadius: 8,
+    '&:hover': {
+      background: `linear-gradient(135deg, ${chipColor}44 0%, ${chipColor}55 100%)`,
+    },
+  };
+});
 
 interface FilterModalProps {
   open: boolean;
@@ -99,7 +141,32 @@ const FilterModal: React.FC<FilterModalProps> = ({
   onRemoveFilter,
 }) => {
   const [localFilters, setLocalFilters] = useState(filters);
+  const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const { name: themeName } = useAppSelector(state => state.theme);
+  
+  const isMolume = themeName === 'molume';
+  const isMagnefite = themeName === 'magnefite';
+  const isPapirus = themeName === 'papirus';
+  
+  // Tema bazlı renkler
+  let primaryColor = theme.palette.primary.main;
+  let primaryLight = theme.palette.primary.light;
+  let primaryDark = theme.palette.primary.dark;
+  
+  if (isMolume) {
+    primaryColor = theme.palette.primary.main;
+    primaryLight = theme.palette.primary.light;
+    primaryDark = theme.palette.primary.dark;
+  } else if (isMagnefite) {
+    primaryColor = theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280';
+    primaryLight = theme.palette.mode === 'dark' ? '#D1D5DB' : '#9CA3AF';
+    primaryDark = theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563';
+  } else if (isPapirus) {
+    primaryColor = theme.palette.mode === 'dark' ? '#8B6F47' : '#A0826D';
+    primaryLight = theme.palette.mode === 'dark' ? '#A0826D' : '#B8956F';
+    primaryDark = theme.palette.mode === 'dark' ? '#6B5739' : '#8B6F47';
+  }
 
   const handleLocalFilterChange = (field: string, value: string) => {
     setLocalFilters(prev => ({ ...prev, [field]: value }));
@@ -139,19 +206,19 @@ const FilterModal: React.FC<FilterModalProps> = ({
       aria-describedby="filter-modal-description"
     >
       <Fade in={open}>
-        <FilterModalContent>
+        <FilterModalContent themeName={themeName}>
           {/* Header */}
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
-              <FilterList sx={{ mr: 1, color: '#FFB800' }} />
+            <Typography variant="h5" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', color: theme.palette.text.primary }}>
+              <FilterList sx={{ mr: 1, color: primaryColor }} />
               {t('advanced_filters', currentLanguage)}
             </Typography>
             <IconButton 
               onClick={handleClose}
               sx={{ 
-                color: 'rgba(255,255,255,0.8)',
+                color: theme.palette.text.secondary,
                 '&:hover': {
-                  background: 'rgba(255,255,255,0.1)',
+                  background: theme.palette.action.hover,
                 }
               }}
             >
@@ -159,12 +226,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </IconButton>
           </Box>
 
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 3 }} />
+          <Divider sx={{ borderColor: theme.palette.divider, mb: 3 }} />
 
           {/* Active Filters */}
           {activeFilters.length > 0 && (
             <FilterSection>
-              <Typography variant="h6" sx={{ mb: 2, color: 'rgba(255,255,255,0.9)' }}>
+              <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
                 {t('active_filters', currentLanguage)}
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
@@ -174,6 +241,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
                     label={filter}
                     onDelete={() => onRemoveFilter(filter)}
                     size="small"
+                    themeName={themeName}
                   />
                 ))}
               </Box>
@@ -182,7 +250,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
           {/* Filter Options */}
           <FilterSection>
-            <Typography variant="h6" sx={{ mb: 3, color: 'rgba(255,255,255,0.9)' }}>
+            <Typography variant="h6" sx={{ mb: 3, color: theme.palette.text.primary }}>
               {t('filter_options', currentLanguage)}
             </Typography>
             
@@ -198,13 +266,13 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   placeholder={t('search_placeholder', currentLanguage)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      color: 'white',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '&:hover fieldset': { borderColor: 'rgba(255,184,0,0.5)' },
-                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,184,0,0.8)' },
+                      color: theme.palette.text.primary,
+                      '& fieldset': { borderColor: theme.palette.divider },
+                      '&:hover fieldset': { borderColor: `${primaryColor}80` },
+                      '&.Mui-focused fieldset': { borderColor: primaryColor },
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,184,0,0.8)' },
+                    '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+                    '& .MuiInputLabel-root.Mui-focused': { color: primaryColor },
                   }}
                 />
               </Grid>
@@ -212,17 +280,17 @@ const FilterModal: React.FC<FilterModalProps> = ({
               {/* Category */}
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>{t('category', currentLanguage)}</InputLabel>
+                  <InputLabel sx={{ color: theme.palette.text.secondary }}>{t('category', currentLanguage)}</InputLabel>
                   <Select
                     value={localFilters.category}
                     onChange={(e) => handleLocalFilterChange('category', e.target.value)}
                     label={t('category', currentLanguage)}
                     sx={{
-                      color: 'white',
-                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,184,0,0.5)' },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,184,0,0.8)' },
-                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                      color: theme.palette.text.primary,
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${primaryColor}80` },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+                      '& .MuiSvgIcon-root': { color: theme.palette.text.secondary },
                     }}
                   >
                     <MenuItem value="">{t('all_categories', currentLanguage)}</MenuItem>
@@ -238,17 +306,17 @@ const FilterModal: React.FC<FilterModalProps> = ({
               {/* Sorting */}
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>{t('sorting', currentLanguage)}</InputLabel>
+                  <InputLabel sx={{ color: theme.palette.text.secondary }}>{t('sorting', currentLanguage)}</InputLabel>
                   <Select
                     value={localFilters.sortBy}
                     onChange={(e) => handleLocalFilterChange('sortBy', e.target.value)}
                     label={t('sorting', currentLanguage)}
                     sx={{
-                      color: 'white',
-                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,184,0,0.5)' },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,184,0,0.8)' },
-                      '& .MuiSvgIcon-root': { color: 'rgba(255,255,255,0.7)' },
+                      color: theme.palette.text.primary,
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${primaryColor}80` },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
+                      '& .MuiSvgIcon-root': { color: theme.palette.text.secondary },
                     }}
                   >
                     {sortOptions.map((option) => (
@@ -269,13 +337,13 @@ const FilterModal: React.FC<FilterModalProps> = ({
                   placeholder={t('tags_placeholder', currentLanguage)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      color: 'white',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '&:hover fieldset': { borderColor: 'rgba(255,184,0,0.5)' },
-                      '&.Mui-focused fieldset': { borderColor: 'rgba(255,184,0,0.8)' },
+                      color: theme.palette.text.primary,
+                      '& fieldset': { borderColor: theme.palette.divider },
+                      '&:hover fieldset': { borderColor: `${primaryColor}80` },
+                      '&.Mui-focused fieldset': { borderColor: primaryColor },
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                    '& .MuiInputLabel-root.Mui-focused': { color: 'rgba(255,184,0,0.8)' },
+                    '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+                    '& .MuiInputLabel-root.Mui-focused': { color: primaryColor },
                   }}
                 />
               </Grid>
@@ -298,7 +366,7 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </FilterRow>
           </FilterSection>
 
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', my: 3 }} />
+          <Divider sx={{ borderColor: theme.palette.divider, my: 3 }} />
 
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -307,11 +375,11 @@ const FilterModal: React.FC<FilterModalProps> = ({
               onClick={handleClear}
               startIcon={<Clear />}
               sx={{
-                color: 'rgba(255,255,255,0.8)',
-                borderColor: 'rgba(255,255,255,0.3)',
+                color: theme.palette.text.secondary,
+                borderColor: theme.palette.divider,
                 '&:hover': {
-                  borderColor: 'rgba(255,255,255,0.5)',
-                  background: 'rgba(255,255,255,0.1)',
+                  borderColor: primaryColor,
+                  background: theme.palette.action.hover,
                 },
               }}
             >
@@ -322,12 +390,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
               onClick={handleApply}
               startIcon={<FilterList />}
               sx={{
-                background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
-                color: 'white',
+                background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryDark} 100%)`,
+                color: theme.palette.getContrastText(primaryColor),
                 fontWeight: 600,
                 px: 4,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #FFD54F 0%, #FFB800 100%)',
+                  background: `linear-gradient(135deg, ${primaryLight} 0%, ${primaryColor} 100%)`,
                 },
               }}
             >

@@ -4,10 +4,17 @@ import {
   Typography,
   Backdrop,
   Fade,
+  useTheme,
 } from '@mui/material';
+import { useAppSelector } from '../../store/hooks';
+import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 
 // Basic Loading Component
 const Loading = ({ message = 'Loading...', size = 'medium' }) => {
+  const theme = useTheme();
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+  
   const getSize = () => {
     switch (size) {
       case 'small':
@@ -22,27 +29,7 @@ const Loading = ({ message = 'Loading...', size = 'medium' }) => {
   return (
     <Box
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '200px',
-        gap: 2,
-      }}
-    >
-      <CircularProgress size={getSize()} />
-      <Typography variant="body2" color="text.secondary">
-        {message}
-      </Typography>
-    </Box>
-  );
-};
-
-// Full Screen Loading
-export const FullScreenLoading = ({ message = 'Loading application...' }) => {
-  return (
-    <Box
-      sx={{
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -51,10 +38,78 @@ export const FullScreenLoading = ({ message = 'Loading application...' }) => {
         gap: 2,
       }}
     >
-      <CircularProgress size={60} />
-      <Typography variant="h6" color="text.secondary">
-        {message}
-      </Typography>
+      {/* Papyrus Background for Loading */}
+      {isPapirus && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusGenis2Dark})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.2 : 0.3,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+        <CircularProgress size={getSize()} />
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          {message}
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
+// Full Screen Loading
+export const FullScreenLoading = ({ message = 'Loading application...' }) => {
+  const theme = useTheme();
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isPapirus = themeName === 'papirus';
+  
+  return (
+    <Box
+      sx={{
+        position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        gap: 2,
+      }}
+    >
+      {/* Papyrus Background for Full Screen Loading */}
+      {isPapirus && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusGenis2Dark})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.2 : 0.3,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
+      <Box sx={{ position: 'relative', zIndex: 1 }}>
+        <CircularProgress size={60} />
+        <Typography variant="h6" color="text.secondary" sx={{ mt: 2 }}>
+          {message}
+        </Typography>
+      </Box>
     </Box>
   );
 };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { IconButton, Tooltip } from '@mui/material';
+import { IconButton, Tooltip, useTheme } from '@mui/material';
 import { Bookmark as BookmarkIcon, BookmarkBorder } from '@mui/icons-material';
 import type { AddBookmarkRequest, BookmarkResponse } from '../../types/bookmark';
 import { showErrorToast } from '../../utils/notificationUtils';
@@ -18,11 +18,24 @@ interface Props {
 }
 
 export default function BookmarkButton({ targetType, targetId, targetData, onChange, isBookmarked: initialBookmarked, bookmarkId: initialBookmarkId }: Props) {
+  const theme = useTheme();
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
+  const { name: themeName } = useAppSelector(state => state.theme);
   const [loading, setLoading] = useState(false);
+  
+  // Get bookmark color - Molume uses yellow (#FFB800), Magnefite uses orange, others use positive color
+  const getBookmarkColor = () => {
+    if (themeName === 'molume') {
+      return '#FFB800'; // Eski sarı renk
+    } else if (themeName === 'magnefite') {
+      return '#F97316'; // Turuncumsu renk
+    }
+    return (theme.palette as any).custom?.positive || theme.palette.success.main;
+  };
+  const bookmarkColor = getBookmarkColor();
 
   // Determine bookmark state: prefer prop, fallback to Redux
   const bookmark = bookmarks.find(
@@ -96,12 +109,25 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
             padding: 0,
             minWidth: '40px',
             minHeight: '40px',
+            color: bookmarked ? bookmarkColor : theme.palette.text.secondary,
+            border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+            backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+            '&:hover': {
+              color: bookmarkColor,
+              backgroundColor: theme.palette.mode === 'dark' 
+                ? `${bookmarkColor}22` 
+                : `${bookmarkColor}11`,
+              borderColor: theme.palette.mode === 'light' ? bookmarkColor : undefined,
+            },
+            '&:disabled': {
+              opacity: 0.5,
+            },
           }}
         >
           {bookmarked ? (
-            <BookmarkIcon sx={{ color: '#FFB800' }} />
+            <BookmarkIcon />
           ) : (
-            <BookmarkBorder sx={{ color: 'rgba(255,255,255,0.7)' }} />
+            <BookmarkBorder />
           )}
         </IconButton>
       </span>

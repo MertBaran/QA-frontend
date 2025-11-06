@@ -12,6 +12,7 @@ import { styled } from '@mui/material/styles';
 import BookmarkButton from './BookmarkButton';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
+import { useTheme } from '@mui/material/styles';
 import type { AddBookmarkRequest } from '../../types/bookmark';
 
 const AskButtonWrapperStyled = styled(Box)(({ theme }) => ({
@@ -147,14 +148,43 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onDelete,
   onHelp,
 }) => {
+  const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
+  const { name: themeName } = useAppSelector(state => state.theme);
+  
+  // Get negative and positive colors from theme
+  const negativeColor = (theme.palette as any).custom?.negative || theme.palette.error.main;
+  const positiveColor = (theme.palette as any).custom?.positive || theme.palette.success.main;
+  
+  // Theme-specific negative colors
+  const getNegativeColor = () => {
+    if (themeName === 'molume') {
+      return '#FF3B30'; // Red
+    } else if (themeName === 'papirus') {
+      return theme.palette.mode === 'dark' ? '#A0522D' : '#8B4513'; // Sienna brown
+    } else {
+      return '#DB7093'; // Pink-red
+    }
+  };
+  
+  // Theme-specific positive colors for like button
+  const getPositiveColor = () => {
+    if (themeName === 'magnefite') {
+      // Magnefite uses #7A9470 (brighter greenish-gray) for like button
+      return '#7A9470';
+    }
+    return positiveColor;
+  };
+  
+  const negativeColorFinal = getNegativeColor();
+  const positiveColorFinal = getPositiveColor();
   
   return (
     <Box sx={(theme) => {
       const baseStyles = {
         display: 'flex',
-        gap: 0.5,
+        gap: 1.5, // Gap'i 0.5'ten 1'e çıkardık
         alignItems: 'center',
         flexShrink: 0,
         flexDirection: 'row' as const,
@@ -174,25 +204,34 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     }}>
       {showHelp && user && onHelp && (
         <AskButtonWrapperStyled
-          ref={(el: HTMLDivElement | null) => {
-            if (el) {
-              const textEl = el.querySelector('.hover-text') as HTMLElement;
-              if (textEl) {
-                const width = textEl.offsetWidth;
-                el.style.setProperty('--text-width', `${width}px`);
+            ref={(el: HTMLDivElement | null) => {
+              if (el) {
+                const textEl = el.querySelector('.hover-text') as HTMLElement;
+                if (textEl) {
+                  const width = textEl.offsetWidth;
+                  el.style.setProperty('--text-width', `${width}px`);
+                }
               }
-            }
-          }}
-          onClick={onHelp}
-        >
+            }}
+            onClick={onHelp}
+          >
           <Box className="hover-icon-box">
             <IconButton
               size="small"
               sx={{
-                color: 'rgba(255,255,255,0.7)',
+                color: theme.palette.text.secondary,
                 width: '40px',
                 height: '40px',
                 padding: 0,
+                border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+                backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+                '&:hover': {
+                  color: theme.palette.primary.main,
+                  backgroundColor: theme.palette.mode === 'dark' 
+                    ? `${theme.palette.primary.main}22` 
+                    : `${theme.palette.primary.main}11`,
+                  borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
+                },
               }}
             >
               <HelpOutline />
@@ -267,12 +306,18 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             size="small"
             onClick={isLiked ? onUnlike : onLike}
             sx={{
-              color: isLiked ? '#FFB800' : 'rgba(255,255,255,0.7)',
+              color: isLiked ? positiveColorFinal : theme.palette.text.secondary,
               width: '40px',
               height: '40px',
               padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
               '&:hover': {
-                color: isLiked ? '#FF8F00' : '#FFB800',
+                color: isLiked ? positiveColorFinal : positiveColorFinal,
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? `${positiveColorFinal}22` 
+                  : `${positiveColorFinal}11`,
+                borderColor: theme.palette.mode === 'light' ? positiveColorFinal : undefined,
               },
             }}
           >
@@ -287,12 +332,18 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             size="small"
             onClick={isDisliked ? onUndislike : onDislike}
             sx={{
-              color: isDisliked ? '#FF6B6B' : 'rgba(255,255,255,0.7)',
+              color: isDisliked ? negativeColorFinal : theme.palette.text.secondary,
               width: '40px',
               height: '40px',
               padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
               '&:hover': {
-                color: isDisliked ? '#FF5252' : '#FF6B6B',
+                color: negativeColorFinal,
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? `${negativeColorFinal}22` 
+                  : `${negativeColorFinal}11`,
+                borderColor: theme.palette.mode === 'light' ? negativeColorFinal : undefined,
               },
             }}
           >
@@ -307,13 +358,19 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             size="small"
             onClick={onDelete}
             sx={{
-              color: 'rgba(255,80,80,0.8)',
+              color: negativeColorFinal,
               cursor: 'pointer',
               width: '40px',
               height: '40px',
               padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
               '&:hover': {
-                color: 'rgba(255,80,80,1)',
+                color: negativeColorFinal,
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? `${negativeColorFinal}22` 
+                  : `${negativeColorFinal}11`,
+                borderColor: theme.palette.mode === 'light' ? negativeColorFinal : undefined,
               },
             }}
           >
