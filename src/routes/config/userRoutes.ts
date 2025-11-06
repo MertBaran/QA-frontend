@@ -10,6 +10,16 @@ export const userRoutes = [
     component: 'Profile',
     exact: true,
   },
+  {
+    path: '/inquire',
+    component: 'Inquire',
+    exact: true,
+  },
+  {
+    path: '/query',
+    component: 'Query',
+    exact: true,
+  },
 ];
 
 // Home route (protected)
