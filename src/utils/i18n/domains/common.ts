@@ -129,4 +129,34 @@ export const common = {
     en: 'Show all ancestors',
     de: 'Alle Vorfahren anzeigen',
   },
+  molume: {
+    tr: 'Molume',
+    en: 'Molume',
+    de: 'Molume',
+  },
+  papirus: {
+    tr: 'Papirus',
+    en: 'Papyrus',
+    de: 'Papyrus',
+  },
+  magnefite: {
+    tr: 'Magnefite',
+    en: 'Magnefite',
+    de: 'Magnefite',
+  },
+  inquire: {
+    tr: 'Soruştur',
+    en: 'Inquire',
+    de: 'Nachfragen',
+  },
+  query: {
+    tr: 'Sorgula',
+    en: 'Query',
+    de: 'Abfragen',
+  },
+  search: {
+    tr: 'Ara',
+    en: 'Search',
+    de: 'Suchen',
+  },
 } as const;
