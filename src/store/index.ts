@@ -26,7 +26,8 @@ const authPersistConfig = {
 const themePersistConfig = {
   key: 'theme',
   storage,
-  whitelist: ['mode', 'language', 'fontSize', 'notifications', 'preferences'], // Tüm theme state'ini persist et
+  version: 2, // Version'ı artırdık - name field'ı eklendi
+  whitelist: ['name', 'mode', 'language', 'fontSize', 'notifications', 'preferences'], // Tüm theme state'ini persist et (name dahil)
 };
 
 // Persist configuration for form slice

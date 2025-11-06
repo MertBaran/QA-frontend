@@ -1,11 +1,11 @@
 import { BrowserRouter as Router } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline } from '@mui/material';
+import { CssBaseline, GlobalStyles } from '@mui/material';
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { store, persistor } from './store';
 import AppRoutes from './routes/AppRoutes';
-import { lightTheme, darkTheme } from './theme/theme';
+import { getTheme } from './theme/theme';
 import ErrorBoundary from './components/error/ErrorBoundary';
 import Loading from './components/ui/Loading';
 import ConfirmDialog from './components/ui/ConfirmDialog';
@@ -20,10 +20,10 @@ import { getStoredToken } from './utils/tokenUtils';
 initSentry();
 
 function AppContent() {
-  const currentTheme = useAppSelector((state) => state.theme.mode);
+  const { name: themeName, mode } = useAppSelector((state) => state.theme);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
-  const theme = currentTheme === 'dark' ? darkTheme : lightTheme;
+  const theme = getTheme(themeName, mode);
   
   // Tarayıcı dilini algıla
   useLanguageDetection();
@@ -36,11 +36,24 @@ function AppContent() {
     }
   }, [dispatch, isAuthenticated]);
 
-
-
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      <GlobalStyles
+        styles={{
+          '@global': {
+            'html, body, #root': {
+              fontFamily: `${theme.typography.fontFamily} !important`,
+            },
+            '*, *::before, *::after': {
+              fontFamily: `${theme.typography.fontFamily} !important`,
+            },
+            'body *, html *, #root *': {
+              fontFamily: `${theme.typography.fontFamily} !important`,
+            },
+          },
+        }}
+      />
       <ConfirmDialog />
       <Router
         future={{
