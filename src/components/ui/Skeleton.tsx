@@ -7,10 +7,6 @@ import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 const StyledPaper = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isMagnefite' && prop !== 'isAlternateTexture',
 })<{ isPapirus?: boolean; isMagnefite?: boolean; isAlternateTexture?: boolean }>(({ theme, isPapirus, isMagnefite }) => {
-  const hoverColor = isMagnefite 
-    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
-    : theme.palette.primary.main;
-  
   return {
     background: theme.palette.mode === 'dark'
       ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
@@ -50,14 +46,14 @@ const StyledPaper = styled(Box, {
 // Question Skeleton
 export const QuestionSkeleton = ({ isAlternateTexture = false }: { isAlternateTexture?: boolean }) => {
   const theme = useTheme();
-  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
 
   return (
     <StyledPaper isPapirus={isPapirus} isMagnefite={isMagnefite} isAlternateTexture={isAlternateTexture}>
       {/* Action Buttons - Sağ Üst Köşe */}
-      <Box sx={{ 
+      <Box sx={(theme) => ({ 
         position: 'absolute',
         top: theme.spacing(2),
         right: theme.spacing(2),
@@ -65,7 +61,7 @@ export const QuestionSkeleton = ({ isAlternateTexture = false }: { isAlternateTe
         gap: 0.5,
         alignItems: 'center',
         zIndex: 20,
-      }}>
+      })}>
         <MuiSkeleton variant="circular" width={40} height={40} />
         <MuiSkeleton variant="circular" width={40} height={40} />
       </Box>

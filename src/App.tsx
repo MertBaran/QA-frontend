@@ -21,7 +21,7 @@ initSentry();
 
 function AppContent() {
   const { name: themeName, mode } = useAppSelector((state) => state.theme);
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const theme = getTheme(themeName, mode);
   
@@ -32,7 +32,7 @@ function AppContent() {
   useEffect(() => {
     const token = getStoredToken();
     if (token && !isAuthenticated) {
-      dispatch(getCurrentUser());
+      void dispatch(getCurrentUser());
     }
   }, [dispatch, isAuthenticated]);
 

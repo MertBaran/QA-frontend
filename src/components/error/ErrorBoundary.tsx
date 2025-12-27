@@ -98,7 +98,7 @@ const ErrorFallback = ({ error, resetError }: ErrorFallbackProps) => {
 
 interface ErrorBoundaryProps {
   children: ReactNode;
-  fallback?: (props: ErrorFallbackProps) => JSX.Element;
+  fallback?: (props: ErrorFallbackProps) => React.ReactElement;
 }
 
 // Main Error Boundary Component

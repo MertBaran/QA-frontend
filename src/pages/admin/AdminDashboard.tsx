@@ -11,7 +11,6 @@ import {
   ListItemText,
   ListItemIcon,
   Chip,
-  Button,
 } from '@mui/material';
 import {
   People,
@@ -20,8 +19,6 @@ import {
   TrendingUp,
   Notifications,
   Warning,
-  Dashboard as DashboardIcon,
-  Home,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
@@ -100,10 +97,6 @@ const AdminDashboard: React.FC = () => {
       default:
         return <Notifications fontSize="small" />;
     }
-  };
-
-  const handleGoToUserInterface = () => {
-    navigate('/dashboard');
   };
 
   return (

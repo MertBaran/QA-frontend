@@ -12,11 +12,9 @@ import HomeHeader from '../components/home/HomeHeader';
 import ActiveFilters from '../components/home/ActiveFilters';
 import ItemsPerPageSelector from '../components/home/ItemsPerPageSelector';
 import CreateQuestionModal from '../components/question/CreateQuestionModal';
-import { type Question } from '../types/question';
 import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import papyrusGenis2Dark from '../asset/textures/papyrus_genis_2_dark.png';
-import papyrusGenis2Light from '../asset/textures/papyrus_genis_2.png';
 import papyrusVertical1 from '../asset/textures/papyrus_vertical_1.png';
 import {
   fetchHomeQuestions,

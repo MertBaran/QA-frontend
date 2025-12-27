@@ -9,7 +9,6 @@ const container = document.getElementById('root');
 if (container) {
   const root = ReactDOM.createRoot(container);
   const clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
-  const isDevelopment = process.env.NODE_ENV === 'development';
   
   const app = (
     <GoogleOAuthProvider clientId={clientId}>

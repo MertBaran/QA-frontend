@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Container, Typography, Paper } from '@mui/material';
+import { Container, Typography, Paper } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { useAppSelector } from '../store/hooks';
 import { t } from '../utils/translations';

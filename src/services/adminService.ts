@@ -1,4 +1,4 @@
-import { User, UserData } from '../types/user';
+import { User } from '../types/user';
 import { ApiResponse } from '../types/api';
 import api from './api';
 import logger from '../utils/logger';

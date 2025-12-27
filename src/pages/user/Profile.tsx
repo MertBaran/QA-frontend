@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -9,8 +9,6 @@ import {
   Avatar,
   Button,
   Grid,
-  Chip,
-  Divider,
   IconButton,
   Dialog,
   DialogTitle,
@@ -19,7 +17,6 @@ import {
   TextField,
   Alert,
   CircularProgress,
-  Paper,
   List,
   ListItem,
   ListItemText,
@@ -30,19 +27,13 @@ import {
 } from '@mui/material';
 import {
   Edit,
-  Save,
-  Cancel,
   PhotoCamera,
   Person,
   Email,
-  Language,
-  LocationOn,
-  Work,
   Description,
   Link,
   CalendarToday,
-  Visibility,
-  VisibilityOff,
+  LocationOn,
 } from '@mui/icons-material';
 import Layout from '../../components/layout/Layout';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -76,16 +67,6 @@ interface UserActivity {
   likes: number;
 }
 
-interface ActivityItem {
-  id: string;
-  type: 'question' | 'answer';
-  title: string;
-  content: string;
-  createdAt: Date;
-  likes: number;
-  questionId?: string;
-}
-
 const Profile = () => {
   const { userId } = useParams<{ userId?: string }>();
   const navigate = useNavigate();
@@ -96,7 +77,6 @@ const Profile = () => {
   // TODO: Kullanıcı bazlı tema yükleme tamamlandığında themeName yerine kullanıcı verisinden gelen tema tercihleri kullanılacak.
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
-  const dispatch = useAppDispatch();
 
   // State
   const [profileUser, setProfileUser] = useState<User | null>(null);
@@ -110,11 +90,9 @@ const Profile = () => {
     totalLikes: 0,
     profileViews: 0,
   });
-  const [recentActivity, setRecentActivity] = useState<UserActivity[]>([]);
   const [userQuestions, setUserQuestions] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Answer[]>([]);
   const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
-  const [showPassword, setShowPassword] = useState(false);
   const [questionsPage, setQuestionsPage] = useState(1);
   const [answersPage, setAnswersPage] = useState(1);
   const itemsPerPage = 10;
@@ -134,6 +112,38 @@ const Profile = () => {
 
   // Determine if viewing own profile
   const isOwnProfile = !userId || userId === user?.id;
+
+  const loadUserData = useCallback(async (targetUserId: string) => {
+    try {
+      setLoading(true);
+      
+      // Load questions and answers
+      const [questions, answers] = await Promise.all([
+        questionService.getQuestionsByUser(targetUserId),
+        answerService.getAnswersByUser(targetUserId),
+      ]);
+      
+      setUserQuestions(questions);
+      setUserAnswers(answers);
+      
+      // Calculate stats
+      const totalQuestions = questions.length;
+      const totalAnswers = answers.length;
+          const totalLikes = questions.reduce((sum, q) => sum + q.likesCount, 0) + answers.reduce((sum, a) => sum + a.likesCount, 0);
+          
+          setStats({
+            totalQuestions,
+            totalAnswers,
+            totalLikes,
+            profileViews: 0,
+          });
+    } catch (error) {
+      console.error('Kullanıcı verileri yüklenirken hata:', error);
+      setError(t('error_loading_profile', currentLanguage));
+    } finally {
+      setLoading(false);
+    }
+  }, [currentLanguage]);
 
   // Load user data
   useEffect(() => {
@@ -178,62 +188,7 @@ const Profile = () => {
     };
 
     loadProfileUser();
-  }, [userId, isAuthenticated, user]);
-
-  const loadUserData = async (targetUserId: string) => {
-    try {
-      setLoading(true);
-      
-      // Load questions and answers
-      const [questions, answers] = await Promise.all([
-        questionService.getQuestionsByUser(targetUserId),
-        answerService.getAnswersByUser(targetUserId),
-      ]);
-      
-      setUserQuestions(questions);
-      setUserAnswers(answers);
-      
-      // Calculate stats
-      const totalQuestions = questions.length;
-      const totalAnswers = answers.length;
-      const totalLikes = questions.reduce((sum, q) => sum + q.likesCount, 0) + answers.reduce((sum, a) => sum + a.likesCount, 0);
-      
-      setStats({
-        totalQuestions,
-        totalAnswers,
-        totalLikes,
-        profileViews: 0, // TODO: Backend'de profil görüntüleme sayacı yok
-      });
-      
-      // Create recent activity list
-      const activities: UserActivity[] = [
-        ...questions.slice(0, 5).map(q => ({
-          id: q.id,
-          type: 'question' as const,
-          title: q.title,
-          content: q.content,
-          createdAt: q.createdAt?.toString() || new Date().toISOString(),
-          likes: q.likesCount,
-        })),
-        ...answers.slice(0, 5).map(a => ({
-          id: a.id,
-          type: 'answer' as const,
-          title: '', // Answers don't have titles
-          content: a.content,
-          createdAt: a.createdAt?.toString() || new Date().toISOString(),
-          likes: a.likesCount,
-        })),
-      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-       .slice(0, 10);
-      
-      setRecentActivity(activities);
-    } catch (error) {
-      console.error('Kullanıcı verileri yüklenirken hata:', error);
-      setError(t('error_loading_profile', currentLanguage));
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [userId, isAuthenticated, user, currentLanguage, loadUserData]);
 
   const handleEditProfile = async () => {
     try {
@@ -259,37 +214,6 @@ const Profile = () => {
       }
     } catch (error: any) {
       setError(error.message || t('profile_update_error', currentLanguage));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChangePassword = async () => {
-    if (formData.newPassword !== formData.confirmPassword) {
-      setError(t('passwords_not_match', currentLanguage));
-      return;
-    }
-
-    if (formData.newPassword.length < 6) {
-      setError(t('password_too_short', currentLanguage));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      setSuccess(null);
-
-      // TODO: Backend'de şifre değiştirme endpoint'i yok
-      setSuccess(t('password_changed_success', currentLanguage));
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      }));
-    } catch (error: any) {
-      setError(error.message || t('password_change_error', currentLanguage));
     } finally {
       setLoading(false);
     }

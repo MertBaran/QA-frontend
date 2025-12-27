@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Box } from '@mui/material';
 import { styled, keyframes } from '@mui/material/styles';
-import { useTheme } from '@mui/material/styles';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { toggleTheme } from '../../store/theme/themeSlice';
 
@@ -340,7 +339,6 @@ const LightBeam = styled(Box, {
 });
 
 const ThemeToggle = () => {
-  const theme = useTheme();
   const dispatch = useAppDispatch();
   const { mode: currentMode, name: themeName } = useAppSelector((state) => state.theme);
   const [isPulling, setIsPulling] = useState(false);
@@ -355,6 +353,33 @@ const ThemeToggle = () => {
   useEffect(() => {
     setIsOn(currentMode === 'dark');
   }, [currentMode]);
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      // Salınım şiddetine göre süre hesapla
+      const currentDistance = Math.sqrt(mouseX * mouseX + mouseY * mouseY);
+      const swingDuration = Math.min(2500, Math.max(1200, currentDistance * 4));
+      
+      // CSS custom property'yi set et
+      if (containerRef.current) {
+        containerRef.current.style.setProperty('--swing-duration', `${swingDuration}ms`);
+      }
+      
+      setIsDragging(false);
+      setIsReleased(true);
+      
+      // Tema değiştir
+      dispatch(toggleTheme());
+      setIsOn((prev) => !prev);
+      
+      // Salınım animasyonu bittikten sonra released state'ini sıfırla
+      setTimeout(() => {
+        setIsReleased(false);
+        setMouseX(0);
+        setMouseY(0);
+      }, swingDuration);
+    }
+  }, [isDragging, mouseX, mouseY, dispatch]);
 
   // Mouse pozisyonunu takip et
   useEffect(() => {
@@ -379,34 +404,7 @@ const ThemeToggle = () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging]);
-
-  const handleMouseUp = () => {
-    if (isDragging) {
-      // Salınım şiddetine göre süre hesapla
-      const currentDistance = Math.sqrt(mouseX * mouseX + mouseY * mouseY);
-      const swingDuration = Math.min(2500, Math.max(1200, currentDistance * 4));
-      
-      // CSS custom property'yi set et
-      if (containerRef.current) {
-        containerRef.current.style.setProperty('--swing-duration', `${swingDuration}ms`);
-      }
-      
-      setIsDragging(false);
-      setIsReleased(true);
-      
-      // Tema değiştir
-      dispatch(toggleTheme());
-      setIsOn(!isOn);
-      
-      // Salınım animasyonu bittikten sonra released state'ini sıfırla
-      setTimeout(() => {
-        setIsReleased(false);
-        setMouseX(0);
-        setMouseY(0);
-      }, swingDuration);
-    }
-  };
+  }, [isDragging, handleMouseUp]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();

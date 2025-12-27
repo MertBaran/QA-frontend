@@ -6,7 +6,6 @@ import { Question, ParentContentInfo } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
-import { useTheme } from '@mui/material/styles';
 
 interface ParentInfoChipProps {
   parentQuestion?: Question | null;
@@ -24,7 +23,6 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   parentContentInfo,
 }) => {
   const navigate = useNavigate();
-  const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName } = useAppSelector(state => state.theme);
 

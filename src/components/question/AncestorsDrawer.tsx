@@ -9,7 +9,6 @@ import {
   ListItemText,
   CircularProgress,
   Avatar,
-  Divider,
   Chip,
 } from '@mui/material';
 import { Close, QuestionAnswer, Help } from '@mui/icons-material';
@@ -298,7 +297,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
       const initialCount = getInitialLoadCount();
       loadAncestors(0, initialCount);
     }
-  }, [open, currentQuestionId, lastQuestionId, filteredAncestors.length, getInitialLoadCount, loadAncestors]);
+  }, [open, currentQuestionId, lastQuestionId, filteredAncestors.length, ancestorItems.length, getInitialLoadCount, loadAncestors]);
 
   // Reset when closed
   useEffect(() => {

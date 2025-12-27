@@ -15,7 +15,6 @@ import {
   Grid,
   Divider,
   Fade,
-  Slide,
   FormControlLabel,
   Switch,
 } from '@mui/material';
@@ -23,7 +22,6 @@ import {
   FilterList,
   Clear,
   Close,
-  Search as SearchIcon,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { categories, sortOptions } from '../../types/question';

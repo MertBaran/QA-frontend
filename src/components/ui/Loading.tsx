@@ -4,14 +4,12 @@ import {
   Typography,
   Backdrop,
   Fade,
-  useTheme,
 } from '@mui/material';
 import { useAppSelector } from '../../store/hooks';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 
 // Basic Loading Component
 const Loading = ({ message = 'Loading...', size = 'medium' }) => {
-  const theme = useTheme();
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   
@@ -69,7 +67,6 @@ const Loading = ({ message = 'Loading...', size = 'medium' }) => {
 
 // Full Screen Loading
 export const FullScreenLoading = ({ message = 'Loading application...' }) => {
-  const theme = useTheme();
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   
