@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -7,6 +7,7 @@ import {
   IconButton,
   Avatar,
   useTheme,
+  Dialog,
 } from '@mui/material';
 import {
   ThumbUp,
@@ -133,6 +134,36 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
+  const [thumbnailPreviewOpen, setThumbnailPreviewOpen] = useState(false);
+  const [thumbnailUrlState, setThumbnailUrlState] = useState<string | null>(null);
+
+  // Thumbnail URL'ini oluştur (key varsa ama URL yoksa)
+  useEffect(() => {
+    if (question?.thumbnail?.key) {
+      if (question.thumbnail.url) {
+        setThumbnailUrlState(question.thumbnail.url);
+      } else {
+        // URL yoksa, key'den URL oluştur
+        const loadThumbnailUrl = async () => {
+          try {
+            const { contentAssetService } = await import('../../services/contentAssetService');
+            const url = await contentAssetService.resolveAssetUrl({
+              key: question.thumbnail!.key,
+              type: 'question-thumbnail',
+              entityId: question.id,
+            });
+            setThumbnailUrlState(url);
+          } catch (error) {
+            // Silent fail
+            setThumbnailUrlState(null);
+          }
+        };
+        loadThumbnailUrl();
+      }
+    } else {
+      setThumbnailUrlState(null);
+    }
+  }, [question?.thumbnail?.key, question?.thumbnail?.url, question?.id]);
 
   // If no question provided, render children (for answer writing section)
   if (!question) {
@@ -151,6 +182,9 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   );
   const isBookmarked = !!questionBookmark;
   const bookmarkId = questionBookmark?._id || null;
+
+  const thumbnailUrl = thumbnailUrlState || question.thumbnail?.url;
+  const hasThumbnail = Boolean(question.thumbnail?.key || thumbnailUrl);
 
   const handleLikeClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -327,8 +361,8 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
       <Box 
         sx={{ 
           cursor: 'pointer',
-          padding: '2px',
-          margin: '-2px',
+          padding: theme => theme.spacing(1),
+          margin: theme => `-${theme.spacing(1)}`,
           display: 'flex',
           gap: 2,
           alignItems: 'flex-start',
@@ -339,113 +373,178 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
         }}
         onClick={() => window.location.href = `/questions/${question.id}`}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
-              <Avatar 
-                src={question.userInfo?.profile_image || question.author.avatar} 
-                sx={{ 
-                  width: 32, 
-                  height: 32,
-                  cursor: 'pointer',
-                  '&:hover': { opacity: 0.8 }
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/profile/${question.author.id}`);
-                }}
-              />
-              <Typography 
-                variant="body2" 
-                sx={{ 
+        <Box sx={{ flex: 1, paddingX: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Avatar 
+              src={question.userInfo?.profile_image || question.author.avatar} 
+              sx={{ 
+                width: 32, 
+                height: 32,
+                cursor: 'pointer',
+                '&:hover': { opacity: 0.8 }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/profile/${question.author.id}`);
+              }}
+            />
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: isMagnefite 
+                  ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                  : theme.palette.text.secondary,
+                cursor: 'pointer',
+                '&:hover': { 
                   color: isMagnefite 
                     ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                    : theme.palette.text.secondary,
-                  cursor: 'pointer',
-                  '&:hover': { 
-                    color: isMagnefite 
-                      ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                      : theme.palette.primary.main 
-                  }
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/profile/${question.author.id}`);
-                }}
-              >
-                {question.userInfo?.name || question.author.name}
-              </Typography>
-              <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
-                •
-              </Typography>
-              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                {question.timeAgo}
-              </Typography>
-              <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
-                •
-              </Typography>
-              <Chip 
-                label={question.category} 
-                size="small" 
-                sx={(theme) => {
-                  const chipColor = isMagnefite 
-                    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                    : theme.palette.primary.main;
-                  return {
-                    bgcolor: `${chipColor}33`, 
-                    color: chipColor,
-                  fontSize: '0.75rem',
-                  };
-                }} 
-              />
-            </Box>
-            
-            <Typography 
-              variant="h5" 
-              sx={{ 
-                fontWeight: 600, 
-                mb: 2,
-                color: theme.palette.text.primary,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                wordBreak: 'break-word',
-                maxWidth: '100%',
+                    : theme.palette.primary.main 
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/profile/${question.author.id}`);
               }}
             >
-              {question.title}
+              {question.userInfo?.name || question.author.name}
             </Typography>
-            <Box sx={{ 
-              mb: 3, 
-              overflow: 'hidden', 
-              wordWrap: 'break-word',
-              wordBreak: 'break-word',
-              maxWidth: '100%',
-            }}>
-              {question.content.length > 200 
-                ? (
-                    <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
-                      <MarkdownRenderer content={question.content.substring(0, 200)} />
-                      <Typography variant="body2" sx={{ color: theme.palette.primary.main, mt: 1 }}>
-                        ...
-                      </Typography>
-                    </Box>
-                  )
-                : <Box sx={{ maxWidth: '100%', overflow: 'hidden' }}>
-                    <MarkdownRenderer content={question.content} />
-                  </Box>
-              }
-            </Box>
-            
+            <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
+              •
+            </Typography>
+            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+              {question.timeAgo}
+            </Typography>
+            <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
+              •
+            </Typography>
+            <Chip 
+              label={question.category} 
+              size="small" 
+              sx={(theme) => {
+                const chipColor = isMagnefite 
+                  ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                  : theme.palette.primary.main;
+                return {
+                  bgcolor: `${chipColor}33`, 
+                  color: chipColor,
+                  fontSize: '0.75rem',
+                };
+              }} 
+            />
+          </Box>
+
+          {/* Başlık ve İçerik Container */}
+          <Box sx={{ 
+            mb: 2, 
+            display: 'flex',
+            gap: 2,
+            alignItems: 'flex-start',
+          }}>
             <Box sx={{ 
               flex: 1,
-              minWidth: 0,
-              maxWidth: '100%',
-              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
             }}>
-            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+              <Typography 
+                variant="h5"
+                sx={{
+                  fontWeight: 700,
+                  mb: 1.5,
+                  color: theme.palette.text.primary,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {question.title}
+              </Typography>
+
+              <Box sx={{ 
+                overflow: 'hidden',
+                wordBreak: 'break-all',
+                overflowWrap: 'break-word',
+                '& .wmde-markdown': {
+                  overflow: 'hidden',
+                  wordBreak: 'break-all',
+                  overflowWrap: 'break-word',
+                  maxWidth: '100%',
+                },
+              }}>
+                <MarkdownRenderer content={`${question.content.slice(0, 280)}${question.content.length > 280 ? '...' : ''}`} />
+              </Box>
+            </Box>
+
+            {/* Thumbnail Container - Dikey olarak ortalanmış */}
+            {hasThumbnail && thumbnailUrl && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  alignSelf: 'stretch',
+                  flexShrink: 0,
+                }}
+              >
+                <Box
+                  sx={(theme) => ({
+                    width: 60,
+                    height: 60,
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                    border: `1px solid ${theme.palette.divider}`,
+                    boxShadow: theme.palette.mode === 'dark'
+                      ? '0 2px 8px rgba(0,0,0,0.2)'
+                      : '0 2px 8px rgba(0,0,0,0.1)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s ease',
+                    backgroundColor: theme.palette.background.paper,
+                    '&:hover': {
+                      transform: 'scale(1.05)',
+                    },
+                  })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setThumbnailPreviewOpen(true);
+                  }}
+                >
+                  <img
+                    src={thumbnailUrl || ''}
+                    alt={question.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={async (e) => {
+                      const img = e.currentTarget;
+                      const currentSrc = img.src;
+                      
+                      // Eğer thumbnail key varsa ama URL yüklenemiyorsa, yeniden URL oluşturmayı dene
+                      if (question?.thumbnail?.key) {
+                        try {
+                          const { contentAssetService } = await import('../../services/contentAssetService');
+                          const newUrl = await contentAssetService.resolveAssetUrl({
+                            key: question.thumbnail.key,
+                            type: 'question-thumbnail',
+                            entityId: question.id,
+                          });
+                          if (newUrl && newUrl !== currentSrc) {
+                            img.src = newUrl;
+                            return; // Yeniden yükleme başarılı
+                          }
+                        } catch (error) {
+                          // Silent fail - thumbnail yüklenemiyorsa gizlenir
+                        }
+                      }
+                      
+                      // Başarısız olursa gizle
+                      img.style.display = 'none';
+                    }}
+                  />
+                </Box>
+              </Box>
+            )}
+          </Box>
+
+          {question.tags.length > 0 && (
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
               {question.tags.map((tag) => (
                 <Chip
                   key={tag}
@@ -460,79 +559,40 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                       ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Darker gray for Magnefite
                       : theme.palette.primary.dark;
                     return {
-                    borderRadius: 2,
+                      borderRadius: 2,
                       borderColor: tagColor,
                       color: tagColor,
                       bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
-                    '&:hover': {
+                      '&:hover': {
                         background: `${tagColor}22`,
                         borderColor: tagDark,
-                    }
+                      }
                     };
-                  }} 
+                  }}
                 />
               ))}
             </Box>
-            
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <IconButton
-                  onClick={handleLikeClick}
-                  sx={(theme) => {
-                    // ActionButtons'daki gibi tema bazlı renkler
-                    const getPositiveColor = () => {
-                      if (themeName === 'magnefite') {
-                        return '#7A9470'; // Brighter greenish-gray for Magnefite
-                      } else if (themeName === 'molume') {
-                        return '#00ED64'; // Green for Molume
-                      } else if (themeName === 'papirus') {
-                        return (theme.palette as any).custom?.positive || '#8D6E63';
-                      }
-                      return (theme.palette as any).custom?.positive || theme.palette.success.main;
-                    };
-                    const positiveColor = getPositiveColor();
-                    const isLiked = question.likedByUsers.includes(user?.id || '');
-                    
-                    return {
-                      color: isLiked ? positiveColor : theme.palette.text.secondary,
-                      width: '40px',
-                      height: '40px',
-                      padding: 0,
-                      border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
-                      backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
-                    '&:hover': {
-                        color: positiveColor,
-                        backgroundColor: theme.palette.mode === 'dark' 
-                          ? `${positiveColor}22` 
-                          : `${positiveColor}11`,
-                        borderColor: theme.palette.mode === 'light' ? positiveColor : undefined,
-                    }
-                    };
-                  }}
-                >
-                  {question.likedByUsers.includes(user?.id || '') ? <ThumbUp /> : <ThumbUpOutlined />}
-                </IconButton>
-                <span 
-                  style={{ 
-                    color: theme.palette.text.secondary,
-                    fontSize: 14,
-                    cursor: question.likesCount > 0 ? 'pointer' : 'default'
-                  }}
-                  onClick={handleLikesCountClick}
-                >
-                  {question.likesCount}
-                </span>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Comment sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF8C42' : themeName === 'papirus' ? '#D2691E' : '#FF9500' }} />
-                <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>{question.answers}</span>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Visibility sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF6B35' : themeName === 'papirus' ? '#CD853F' : '#FF7F50' }} />
-                <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>{question.views}</span>
-              </Box>
+          )}
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                {question.likesCount}
+              </Typography>
             </Box>
-          </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Comment sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                {question.answers}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Visibility sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                {question.views}
+              </Typography>
+            </Box>
           </Box>
         </Box>
       </Box>
@@ -544,6 +604,47 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
         ancestors={question.ancestors || []}
         currentQuestionId={question.id}
       />
+
+      <Dialog
+        open={thumbnailPreviewOpen}
+        onClose={() => setThumbnailPreviewOpen(false)}
+        maxWidth="md"
+      >
+        {(thumbnailUrl || question?.thumbnail?.key) && (
+          <Box sx={{ p: 0, m: 0 }}>
+            <img
+              src={thumbnailUrl || ''}
+              alt={question.title}
+              style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+              onError={async (e) => {
+                const img = e.currentTarget;
+                const currentSrc = img.src;
+                
+                // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
+                if (question?.thumbnail?.key) {
+                  try {
+                    const { contentAssetService } = await import('../../services/contentAssetService');
+                    const newUrl = await contentAssetService.resolveAssetUrl({
+                      key: question.thumbnail.key,
+                      type: 'question-thumbnail',
+                      entityId: question.id,
+                    });
+                    if (newUrl && newUrl !== currentSrc) {
+                      setThumbnailUrlState(newUrl);
+                      img.src = newUrl;
+                      return;
+                    }
+                  } catch (error) {
+                    // Silent fail
+                  }
+                }
+                
+                img.style.display = 'none';
+              }}
+            />
+          </Box>
+        )}
+      </Dialog>
     </StyledPaper>
   );
 });

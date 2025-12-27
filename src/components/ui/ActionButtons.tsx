@@ -7,6 +7,7 @@ import {
   ThumbDownOutlined,
   Delete,
   HelpOutline,
+  Edit,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import BookmarkButton from './BookmarkButton';
@@ -107,7 +108,7 @@ interface ActionButtonsProps {
   showDislike?: boolean;
   showDelete?: boolean;
   showHelp?: boolean; // Only for questions
-  
+  showEdit?: boolean;
   // State
   isLiked?: boolean;
   isDisliked?: boolean;
@@ -122,6 +123,7 @@ interface ActionButtonsProps {
   onUndislike?: (e: React.MouseEvent) => void;
   onDelete?: (e: React.MouseEvent) => void;
   onHelp?: (e: React.MouseEvent) => void;
+  onEdit?: (e: React.MouseEvent) => void;
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -136,6 +138,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   showDislike = false,
   showDelete = false,
   showHelp = false,
+  showEdit = false,
   isLiked = false,
   isDisliked = false,
   canDelete = false,
@@ -147,6 +150,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onUndislike,
   onDelete,
   onHelp,
+  onEdit,
 }) => {
   const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
@@ -196,77 +200,12 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           position: 'absolute',
           top: top !== undefined ? top : theme.spacing(2),
           right: right !== undefined ? right : theme.spacing(2),
-          zIndex: 10,
+          zIndex: 20,
         };
       }
       
       return baseStyles;
     }}>
-      {showHelp && user && onHelp && (
-        <AskButtonWrapperStyled
-            ref={(el: HTMLDivElement | null) => {
-              if (el) {
-                const textEl = el.querySelector('.hover-text') as HTMLElement;
-                if (textEl) {
-                  const width = textEl.offsetWidth;
-                  el.style.setProperty('--text-width', `${width}px`);
-                }
-              }
-            }}
-            onClick={onHelp}
-          >
-          <Box className="hover-icon-box">
-            <IconButton
-              size="small"
-              sx={{
-                color: theme.palette.text.secondary,
-                width: '40px',
-                height: '40px',
-                padding: 0,
-                border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
-                backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
-                '&:hover': {
-                  color: theme.palette.primary.main,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? `${theme.palette.primary.main}22` 
-                    : `${theme.palette.primary.main}11`,
-                  borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
-                },
-              }}
-            >
-              <HelpOutline />
-            </IconButton>
-          </Box>
-          <Typography 
-            className="hover-text"
-            variant="caption"
-            sx={{ 
-              color: 'rgba(255,255,255,0.8)',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              fontSize: '0.75rem',
-              visibility: 'hidden',
-              position: 'absolute',
-              left: '48px',
-            }}
-          >
-            {t('ask_question', currentLanguage)}
-          </Typography>
-          <Typography 
-            className="hover-text"
-            variant="caption"
-            sx={{ 
-              color: 'rgba(255,255,255,0.8)',
-              fontWeight: 600,
-              whiteSpace: 'nowrap',
-              fontSize: '0.75rem',
-            }}
-          >
-            {t('ask_question', currentLanguage)}
-          </Typography>
-        </AskButtonWrapperStyled>
-      )}
-      
       {showBookmark && (
         <Box sx={{ 
           display: 'inline-flex', 
@@ -299,7 +238,34 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           />
         </Box>
       )}
-      
+
+      {showEdit && onEdit && (
+        <Tooltip title={t('edit_question', currentLanguage)}>
+          <IconButton
+            size="small"
+            onClick={onEdit}
+            sx={{
+              color: theme.palette.text.secondary,
+              width: '40px',
+              height: '40px',
+              padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+              '&:hover': {
+                color: theme.palette.primary.main,
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? `${theme.palette.primary.main}22`
+                    : `${theme.palette.primary.main}11`,
+                borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
+              },
+            }}
+          >
+            <Edit />
+          </IconButton>
+        </Tooltip>
+      )}
+
       {showLike && onLike && onUnlike && (
         <Tooltip title={isLiked ? t('unlike', currentLanguage) : t('like', currentLanguage)}>
           <IconButton
@@ -375,6 +341,35 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             }}
           >
             <Delete />
+          </IconButton>
+        </Tooltip>
+      )}
+      
+      {/* Help button rendered last to appear on top */}
+      {showHelp && user && onHelp && (
+        <Tooltip title={t('ask_question', currentLanguage)}>
+          <IconButton
+            size="small"
+            onClick={onHelp}
+            sx={{
+              color: theme.palette.text.secondary,
+              width: '40px',
+              height: '40px',
+              padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+              position: 'relative',
+              zIndex: 30,
+              '&:hover': {
+                color: theme.palette.primary.main,
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? `${theme.palette.primary.main}22` 
+                  : `${theme.palette.primary.main}11`,
+                borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
+              },
+            }}
+          >
+            <HelpOutline />
           </IconButton>
         </Tooltip>
       )}

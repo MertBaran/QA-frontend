@@ -40,9 +40,11 @@ const createBaseThemeConfig = (
 
   // Theme-specific font families
   let fontFamily: string;
+  let headingFontFamily: string;
   if (isPapirus) {
     // Vintage serif font for Papirus theme
     fontFamily = ['"Georgia"', '"Times New Roman"', 'Times', 'serif'].join(',');
+    headingFontFamily = fontFamily;
   } else if (isMagnefite) {
     // Ultra-modern rounded font for Magnefite theme - distinctive, soft edges, no sharp corners
     fontFamily = [
@@ -52,6 +54,21 @@ const createBaseThemeConfig = (
       '"Manrope"',
       '"Nunito"',
       '"Poppins"',
+      '-apple-system',
+      'BlinkMacSystemFont',
+      '"Segoe UI"',
+      'Roboto',
+      '"Helvetica Neue"',
+      'Arial',
+      'sans-serif',
+    ].join(',');
+    headingFontFamily = [
+      '"Space Grotesk"',
+      '"Geist Sans Neue"',
+      '"Sora"',
+      '"Quicksand"',
+      '"Varela Round"',
+      '"Manrope"',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
@@ -72,6 +89,7 @@ const createBaseThemeConfig = (
       'Arial',
       'sans-serif',
     ].join(',');
+    headingFontFamily = fontFamily;
   }
 
   // Add negative and positive colors to palette as custom properties
@@ -91,6 +109,7 @@ const createBaseThemeConfig = (
         fontSize: '3rem',
         fontWeight: 700,
         lineHeight: 1.2,
+        fontFamily: headingFontFamily,
         background:
           palette.mode === 'dark'
             ? `linear-gradient(135deg, ${palette.primary.main} 0%, ${palette.primary.dark} 100%)`
@@ -103,30 +122,35 @@ const createBaseThemeConfig = (
         fontSize: '2.25rem',
         fontWeight: 700,
         lineHeight: 1.3,
+        fontFamily: headingFontFamily,
         color: typographyColors.text,
       },
       h3: {
         fontSize: '1.875rem',
         fontWeight: 600,
         lineHeight: 1.3,
+        fontFamily: headingFontFamily,
         color: typographyColors.text,
       },
       h4: {
         fontSize: '1.5rem',
         fontWeight: 600,
         lineHeight: 1.4,
+        fontFamily: headingFontFamily,
         color: typographyColors.text,
       },
       h5: {
         fontSize: '1.25rem',
         fontWeight: 600,
         lineHeight: 1.4,
+        fontFamily: headingFontFamily,
         color: typographyColors.text,
       },
       h6: {
         fontSize: '1rem',
         fontWeight: 600,
         lineHeight: 1.4,
+        fontFamily: headingFontFamily,
         color: typographyColors.text,
       },
       body1: {
@@ -372,16 +396,16 @@ export const molumeDarkTheme = createTheme(
 
 // Molume Light (new - bone-like texture)
 const molumeLightColors = {
-  primary: '#FFB800',
-  secondary: '#E8E4DC',
-  background: '#E8E4DC', // Kemiksi beyaz
-  surface: '#F5F2EA', // Kirli beyaz
-  card: '#EDE9E1', // Kum beji
-  text: '#2C2823', // Koyu kahve
-  textSecondary: '#4A4540',
-  textTertiary: '#6B665F',
-  border: 'rgba(44, 40, 35, 0.15)',
-  divider: 'rgba(44, 40, 35, 0.1)',
+  primary: '#F0B34A', // Yumuşatılmış amber
+  secondary: '#DED6C8', // Dengeli kemik tonu
+  background: '#E2DBD0', // Hafifçe aydınlatılmış kemiksi beyaz
+  surface: '#E9E2D7', // Katmanlı yüzey
+  card: '#DDD4C6', // Gölgesi belirgin kart rengi
+  text: '#2B261E', // Derin kahverengi
+  textSecondary: '#4F463B',
+  textTertiary: '#706352',
+  border: 'rgba(43, 38, 30, 0.16)',
+  divider: 'rgba(43, 38, 30, 0.1)',
 };
 
 export const molumeLightTheme = createTheme(
@@ -390,14 +414,14 @@ export const molumeLightTheme = createTheme(
       mode: 'light',
       primary: {
         main: molumeLightColors.primary,
-        light: '#FFD54F',
-        dark: '#FF8F00',
+        light: '#FFD27A',
+        dark: '#D99824',
         contrastText: '#000000',
       },
       secondary: {
         main: molumeLightColors.secondary,
-        light: '#F5F2EA',
-        dark: '#E0DCD4',
+        light: '#E7E0D4',
+        dark: '#C7BEAF',
         contrastText: '#2C2823',
       },
       background: {
@@ -574,18 +598,18 @@ export const papirusLightTheme = createTheme(
 
 // ==================== MAGNEFITE THEMES ====================
 
-// Magnefite Dark - Balanced modern tech theme with gray
+// Magnefite Dark - Modern dark mode with softened charcoal base
 const magnefiteDarkColors = {
-  primary: '#9CA3AF', // Light gray - primary color
-  secondary: '#6B7280', // Medium gray - secondary
-  background: '#0F0F0F', // Softer dark gray (not pure black)
-  surface: '#1A1A1A', // Dark gray
-  card: '#262626', // Medium dark gray (lighter than before)
-  text: '#F5F5F5', // Softer white (not pure white)
-  textSecondary: 'rgba(245, 245, 245, 0.85)',
-  textTertiary: 'rgba(245, 245, 245, 0.65)',
-  border: 'rgba(255, 255, 255, 0.15)',
-  divider: 'rgba(245, 245, 245, 0.12)',
+  primary: '#A0938E', // Muted warm taupe - primary accent
+  secondary: '#2A2A2F', // Neutral charcoal-gray secondary surfaces
+  background: '#161616', // Slightly lighter charcoal base
+  surface: '#1D1D21', // Lifted neutral charcoal
+  card: '#242429', // Elevated card tone with neutral gray
+  text: '#F7F5F2', // Soft warm white
+  textSecondary: 'rgba(247, 245, 242, 0.85)',
+  textTertiary: 'rgba(247, 245, 242, 0.65)',
+  border: 'rgba(160, 147, 142, 0.22)',
+  divider: 'rgba(160, 147, 142, 0.14)',
 };
 
 export const magnefiteDarkTheme = createTheme(
@@ -593,15 +617,15 @@ export const magnefiteDarkTheme = createTheme(
     {
       mode: 'dark',
       primary: {
-        main: magnefiteDarkColors.primary, // #9CA3AF - Light gray
-        light: '#D1D5DB', // Lighter gray
-        dark: '#6B7280', // Darker gray
+        main: magnefiteDarkColors.primary, // #A0938E - Warm taupe
+        light: '#BAAAA6', // Lighter taupe
+        dark: '#857770', // Darker taupe
         contrastText: '#FFFFFF',
       },
       secondary: {
         main: magnefiteDarkColors.secondary,
-        light: '#FF8A65',
-        dark: '#E64A19',
+        light: '#35353B',
+        dark: '#1A1A1E',
         contrastText: '#FFFFFF',
       },
       background: {
@@ -613,45 +637,45 @@ export const magnefiteDarkTheme = createTheme(
         secondary: magnefiteDarkColors.textSecondary,
       },
       success: {
-        main: '#8B5CF6',
-        light: '#A78BFA',
-        dark: '#7C3AED',
+        main: '#5E8F6F',
+        light: '#7AA887',
+        dark: '#477457',
       },
       warning: {
-        main: '#FF6B35',
-        light: '#FF8A65',
-        dark: '#E64A19',
+        main: '#D27B55',
+        light: '#E1906D',
+        dark: '#B8613E',
       },
       error: {
-        main: '#FF3B30',
-        light: '#FF6B6B',
-        dark: '#D32F2F',
+        main: '#C45A54',
+        light: '#D97A76',
+        dark: '#A43E3A',
       },
       info: {
-        main: '#8B5CF6',
-        light: '#A78BFA',
-        dark: '#7C3AED',
+        main: '#7A9CC6', // Muted steel blue
+        light: '#9AB5D6',
+        dark: '#5A7CA8',
       },
     },
     magnefiteDarkColors,
     'magnefite',
-    '#DB7093', // negative (pink-red - pembe-kırmızı)
-    '#8B5CF6', // positive (purple)
+    '#D4756A', // negative (soft clay red)
+    '#7A9CC6', // positive (steel blue)
   ) as any,
 );
 
-// Magnefite Light - Clean tech theme with gray
+// Magnefite Light - Warm neutral base with slightly deeper contrast
 const magnefiteLightColors = {
-  primary: '#6B7280', // Medium gray - primary color
-  secondary: '#4B5563', // Darker gray - secondary
-  background: '#FFFFFF',
-  surface: '#FAFAFA', // Slightly off-white
-  card: '#F0F0F0', // Light gray
-  text: '#1F2937', // Dark gray text (high contrast)
-  textSecondary: '#4B5563',
-  textTertiary: '#6B7280',
-  border: 'rgba(0, 0, 0, 0.15)',
-  divider: 'rgba(0, 0, 0, 0.12)',
+  primary: '#A0938E', // Warm taupe accent
+  secondary: '#3A4A59', // Deep blue-gray secondary
+  background: '#D1D4D8', // Daha koyu nötr zemin
+  surface: '#C3C7CC', // Griye yaklaşan yüzey
+  card: '#A8AEB6', // Daha koyu kart yüzeyi
+  text: '#1B232C', // Daha derin gri-mavi metin
+  textSecondary: '#3F4751',
+  textTertiary: '#5B6570',
+  border: 'rgba(27, 35, 44, 0.3)',
+  divider: 'rgba(27, 35, 44, 0.18)',
 };
 
 export const magnefiteLightTheme = createTheme(
@@ -659,15 +683,15 @@ export const magnefiteLightTheme = createTheme(
     {
       mode: 'light',
       primary: {
-        main: magnefiteLightColors.primary, // #6B7280 - Medium gray
-        light: '#9CA3AF', // Lighter gray
-        dark: '#4B5563', // Darker gray
+        main: magnefiteLightColors.primary, // #A0938E - Warm taupe
+        light: '#BAAAA6', // Lighter taupe
+        dark: '#857770', // Darker taupe
         contrastText: '#FFFFFF',
       },
       secondary: {
         main: magnefiteLightColors.secondary,
-        light: '#FF8A65',
-        dark: '#E64A19',
+        light: '#516275',
+        dark: '#24313D',
         contrastText: '#FFFFFF',
       },
       background: {
@@ -680,30 +704,30 @@ export const magnefiteLightTheme = createTheme(
       },
       divider: magnefiteLightColors.divider,
       success: {
-        main: '#8B5CF6',
-        light: '#A78BFA',
-        dark: '#7C3AED',
+        main: '#5E8F6F', // Muted earthy green
+        light: '#7AA887',
+        dark: '#477457',
       },
       warning: {
-        main: '#FF6B35',
-        light: '#FF8A65',
-        dark: '#E64A19',
+        main: '#D27B55', // Warm clay orange
+        light: '#E1906D',
+        dark: '#B8613E',
       },
       error: {
-        main: '#FF3B30',
-        light: '#FF6B6B',
-        dark: '#D32F2F',
+        main: '#C45A54',
+        light: '#D97A76',
+        dark: '#A43E3A',
       },
       info: {
-        main: '#8B5CF6',
-        light: '#A78BFA',
-        dark: '#7C3AED',
+        main: '#6E93BD', // Steel blue
+        light: '#8BAACD',
+        dark: '#4F749E',
       },
     },
     magnefiteLightColors,
     'magnefite',
-    '#DB7093', // negative (pink-red - pembe-kırmızı)
-    '#8B5CF6', // positive (purple)
+    '#C45A54', // negative (muted red clay)
+    '#5E8F6F', // positive (earthy green)
   ) as any,
 );
 

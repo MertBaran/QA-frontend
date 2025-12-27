@@ -77,7 +77,12 @@ export const common = {
   creating: {
     tr: 'Oluşturuluyor...',
     en: 'Creating...',
-    de: 'Erstellt...',
+    de: 'Wird erstellt...',
+  },
+  updating: {
+    tr: 'Güncelleniyor...',
+    en: 'Updating...',
+    de: 'Wird aktualisiert...',
   },
   items_per_page: {
     tr: 'Sayfa başına göster',

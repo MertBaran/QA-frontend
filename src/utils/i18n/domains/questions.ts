@@ -9,6 +9,76 @@ export const questions = {
     en: 'Create Question',
     de: 'Frage erstellen',
   },
+  question_created: {
+    tr: 'Soru oluşturuldu',
+    en: 'Question created',
+    de: 'Frage erstellt',
+  },
+  question_updated: {
+    tr: 'Soru güncellendi',
+    en: 'Question updated',
+    de: 'Frage aktualisiert',
+  },
+  question_update_failed: {
+    tr: 'Soru güncellenirken bir hata oluştu',
+    en: 'An error occurred while updating the question',
+    de: 'Beim Aktualisieren der Frage ist ein Fehler aufgetreten',
+  },
+  edit_question: {
+    tr: 'Soruyu Düzenle',
+    en: 'Edit Question',
+    de: 'Frage bearbeiten',
+  },
+  update_question: {
+    tr: 'Soruyu Güncelle',
+    en: 'Update Question',
+    de: 'Frage aktualisieren',
+  },
+  question_thumbnail_label: {
+    tr: 'Kapak Görseli',
+    en: 'Thumbnail',
+    de: 'Vorschaubild',
+  },
+  question_thumbnail_helper: {
+    tr: 'Bir görsel seçerek sorunu daha dikkat çekici hâle getirebilirsin. Maksimum {size}MB.',
+    en: 'Select an image to make your question more noticeable. Maximum {size}MB.',
+    de: 'Wählen Sie ein Bild, um Ihre Frage hervorzuheben. Maximal {size}MB.',
+  },
+  question_thumbnail_select: {
+    tr: 'Görsel Seç',
+    en: 'Choose Image',
+    de: 'Bild auswählen',
+  },
+  question_thumbnail_remove: {
+    tr: 'Görseli Sil',
+    en: 'Remove Image',
+    de: 'Bild entfernen',
+  },
+  question_thumbnail_clear_selection: {
+    tr: 'Seçimi Temizle',
+    en: 'Clear Selection',
+    de: 'Auswahl löschen',
+  },
+  question_thumbnail_restore: {
+    tr: 'Görseli Geri Yükle',
+    en: 'Restore Image',
+    de: 'Bild wiederherstellen',
+  },
+  question_thumbnail_remove_info: {
+    tr: 'Kaydedildiğinde mevcut görsel kaldırılacak.',
+    en: 'The current image will be removed when you save.',
+    de: 'Das aktuelle Bild wird beim Speichern entfernt.',
+  },
+  question_thumbnail_too_large: {
+    tr: 'Görsel {size}MB değerini geçmemelidir',
+    en: 'Image must not exceed {size}MB',
+    de: 'Das Bild darf {size}MB nicht überschreiten',
+  },
+  question_thumbnail_preview: {
+    tr: 'Görsel Önizlemesi',
+    en: 'Image Preview',
+    de: 'Bildvorschau',
+  },
   no_questions: {
     tr: 'Henüz soru yok.',
     en: 'No questions yet.',

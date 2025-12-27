@@ -6,11 +6,19 @@ import '@uiw/react-markdown-preview/markdown.css';
 
 const MarkdownContainer = styled(Box)(({ theme }) => ({
   width: '100%',
+  maxWidth: '100%',
+  overflow: 'hidden',
+  wordBreak: 'break-all',
+  overflowWrap: 'break-word',
   '& .wmde-markdown': {
     backgroundColor: 'transparent',
     color: theme.palette.text.primary,
     fontSize: '16px !important',
     lineHeight: '1.6',
+    maxWidth: '100%',
+    overflow: 'hidden',
+    wordBreak: 'break-all',
+    overflowWrap: 'break-word',
   },
   '& .wmde-markdown pre': {
     backgroundColor: theme.palette.mode === 'dark' 
@@ -72,6 +80,9 @@ const MarkdownContainer = styled(Box)(({ theme }) => ({
   '& .wmde-markdown p': {
     marginBottom: theme.spacing(1.5),
     fontSize: '16px !important',
+    wordBreak: 'break-all',
+    overflowWrap: 'break-word',
+    maxWidth: '100%',
   },
 }));
 

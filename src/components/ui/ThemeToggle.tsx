@@ -105,11 +105,35 @@ const ThemeToggleContainer = styled(Box)(({ theme }) => ({
 }));
 
 const BulbContainer = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isPulling' && prop !== 'isDragging',
+  shouldForwardProp: (prop) =>
+    prop !== 'isPulling' && prop !== 'isDragging' && prop !== 'themeName',
 })<{
   isPulling: boolean;
   isDragging: boolean;
-}>(({ theme, isPulling, isDragging }) => ({
+  themeName: 'molume' | 'papirus' | 'magnefite';
+}>(({ theme, isPulling, isDragging, themeName }) => {
+  const isDark = theme.palette.mode === 'dark';
+  const baseStyles = {
+    background: isDark
+      ? 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)'
+      : 'linear-gradient(135deg, #FFD54F 0%, #FFB800 100%)',
+    boxShadow: isDark
+      ? '0 0 20px rgba(255, 184, 0, 0.4)'
+      : '0 0 10px rgba(255, 184, 0, 0.2)',
+  };
+
+  const papirusStyles = {
+    background: isDark
+      ? 'linear-gradient(135deg, #C28C45 0%, #8B6F47 100%)'
+      : 'linear-gradient(135deg, #E2B273 0%, #BA8A55 100%)',
+    boxShadow: isDark
+      ? '0 0 22px rgba(226, 178, 115, 0.45)'
+      : '0 0 14px rgba(226, 178, 115, 0.28)',
+  };
+
+  const themeStyles = themeName === 'papirus' ? papirusStyles : baseStyles;
+
+  return {
   position: 'relative',
   width: 50,
   height: 50,
@@ -117,12 +141,8 @@ const BulbContainer = styled(Box, {
   alignItems: 'center',
   justifyContent: 'center',
   borderRadius: '50%',
-  background: theme.palette.mode === 'dark' 
-    ? 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)'
-    : 'linear-gradient(135deg, #FFD54F 0%, #FFB800 100%)',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 0 20px rgba(255, 184, 0, 0.4)'
-    : '0 0 10px rgba(255, 184, 0, 0.2)',
+    background: themeStyles.background,
+    boxShadow: themeStyles.boxShadow,
   transition: isDragging ? 'none' : 'all 0.3s ease',
   zIndex: 2,
   transform: isPulling 
@@ -130,13 +150,41 @@ const BulbContainer = styled(Box, {
     : 'translateY(0px) scale(1)',
   animation: isDragging ? 'none' : isPulling ? `${pullAnimation} 0.8s ease-in-out` : `${naturalSwing} 4s ease-in-out infinite`,
   '&:hover': {
-    boxShadow: theme.palette.mode === 'dark'
+    boxShadow: themeName === 'papirus'
+      ? isDark
+        ? '0 0 28px rgba(226, 178, 115, 0.6)'
+        : '0 0 18px rgba(226, 178, 115, 0.4)'
+      : isDark
       ? '0 0 30px rgba(255, 184, 0, 0.6)'
       : '0 0 20px rgba(255, 184, 0, 0.4)',
   },
-}));
+};
+});
 
-const BulbIcon = styled('div')(({ theme }) => ({
+const BulbIcon = styled('div', {
+  shouldForwardProp: (prop) => prop !== 'themeName',
+})<{ themeName: 'molume' | 'papirus' | 'magnefite' }>(({ theme, themeName }) => {
+  const isPapirus = themeName === 'papirus';
+  const outerGlow = isPapirus
+    ? {
+        background: 'rgba(248, 236, 218, 0.92)',
+        boxShadow: '0 0 8px rgba(248, 236, 218, 0.7)',
+      }
+    : {
+        background: 'rgba(255, 255, 255, 0.9)',
+        boxShadow: '0 0 8px rgba(255, 255, 255, 0.8)',
+      };
+  const innerGlow = isPapirus
+    ? {
+        background: 'rgba(226, 178, 115, 0.8)',
+        boxShadow: '0 0 5px rgba(226, 178, 115, 0.6)',
+      }
+    : {
+        background: 'rgba(255, 184, 0, 0.8)',
+        boxShadow: '0 0 4px rgba(255, 184, 0, 0.6)',
+      };
+
+  return {
   width: 30,
   height: 30,
   position: 'relative',
@@ -149,8 +197,7 @@ const BulbIcon = styled('div')(({ theme }) => ({
     width: 20,
     height: 20,
     borderRadius: '50%',
-    background: 'rgba(255, 255, 255, 0.9)',
-    boxShadow: '0 0 8px rgba(255, 255, 255, 0.8)',
+      ...outerGlow,
   },
   '&::after': {
     content: '""',
@@ -161,10 +208,10 @@ const BulbIcon = styled('div')(({ theme }) => ({
     width: 10,
     height: 10,
     borderRadius: '50%',
-    background: 'rgba(255, 184, 0, 0.8)',
-    boxShadow: '0 0 4px rgba(255, 184, 0, 0.6)',
+      ...innerGlow,
   },
-}));
+  };
+});
 
 const Rope = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isDragging',
@@ -270,34 +317,44 @@ const PullString = styled(Box, {
 });
 
 const LightBeam = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isOn',
-})<{ isOn: boolean }>(({ theme, isOn }) => ({
+  shouldForwardProp: (prop) => prop !== 'isOn' && prop !== 'themeName',
+})<{ isOn: boolean; themeName: 'molume' | 'papirus' | 'magnefite' }>(({ isOn, themeName }) => {
+  const beamColor =
+    themeName === 'papirus'
+      ? 'rgba(226, 178, 115, 0.35)'
+      : 'rgba(255, 184, 0, 0.3)';
+  return {
   position: 'absolute',
   top: '100%',
   left: '50%',
   transform: 'translateX(-50%)',
   width: isOn ? 60 : 0,
   height: isOn ? 40 : 0,
-  background: 'linear-gradient(to bottom, rgba(255, 184, 0, 0.3) 0%, transparent 100%)',
+  background: `linear-gradient(to bottom, ${beamColor} 0%, transparent 100%)`,
   borderRadius: '50% 50% 0 0',
   transition: 'all 0.3s ease',
   opacity: isOn ? 1 : 0,
   pointerEvents: 'none',
   zIndex: 1,
-}));
+};
+});
 
 const ThemeToggle = () => {
   const theme = useTheme();
   const dispatch = useAppDispatch();
-  const currentTheme = useAppSelector((state) => state.theme.mode);
+  const { mode: currentMode, name: themeName } = useAppSelector((state) => state.theme);
   const [isPulling, setIsPulling] = useState(false);
-  const [isOn, setIsOn] = useState(currentTheme === 'dark');
+  const [isOn, setIsOn] = useState(currentMode === 'dark');
   const [isHovered, setIsHovered] = useState(false);
   const [isReleased, setIsReleased] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [mouseX, setMouseX] = useState(0);
   const [mouseY, setMouseY] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsOn(currentMode === 'dark');
+  }, [currentMode]);
 
   // Mouse pozisyonunu takip et
   useEffect(() => {
@@ -399,8 +456,9 @@ const ThemeToggle = () => {
       <BulbContainer 
         isPulling={isPulling}
         isDragging={isDragging}
+        themeName={themeName}
       >
-        <BulbIcon />
+        <BulbIcon themeName={themeName} />
       </BulbContainer>
       <PullString 
         isPulling={isPulling} 
@@ -414,7 +472,7 @@ const ThemeToggle = () => {
         onMouseLeave={() => setIsHovered(false)}
         onClick={!isDragging ? handlePull : undefined}
       />
-      <LightBeam isOn={isOn} />
+      <LightBeam isOn={isOn} themeName={themeName} />
     </ThemeToggleContainer>
   );
 };

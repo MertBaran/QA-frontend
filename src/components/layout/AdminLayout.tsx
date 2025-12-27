@@ -39,6 +39,7 @@ import { logout } from '../../store/auth/authSlice';
 import { setLanguage } from '../../store/language/languageSlice';
 import ThemeToggle from '../ui/ThemeToggle';
 import { t } from '../../utils/translations';
+import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -56,6 +57,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
+  const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const isMagnefite = themeName === 'magnefite';
   const { currentLanguage } = useAppSelector((state) => state.language);
 
   const menuItems = [
@@ -152,12 +155,54 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex', position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
+      {isMagnefite && (
+        <>
+          <Box
+            component="video"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden
+            src={magnefiteBackgroundVideo}
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: mode === 'dark' ? 'brightness(0.32)' : 'brightness(0.5)',
+              pointerEvents: 'none',
+              zIndex: -2,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: mode === 'dark'
+                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.8) 0%, rgba(15, 15, 15, 0.65) 60%, rgba(15, 15, 15, 0.85) 100%)'
+                : 'linear-gradient(180deg, rgba(209, 212, 216, 0.82) 0%, rgba(209, 212, 216, 0.74) 55%, rgba(209, 212, 216, 0.9) 100%)',
+              pointerEvents: 'none',
+              zIndex: -1,
+            }}
+          />
+        </>
+      )}
       <AppBar
         position="fixed"
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
+          backgroundColor: 'transparent',
+          boxShadow: 'none',
+          zIndex: theme.zIndex.modal + 1,
+          pointerEvents: 'auto',
         }}
       >
         <Toolbar>
@@ -239,7 +284,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
       <Box
         component="nav"
-        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
+        sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 }, position: 'relative', zIndex: theme.zIndex.drawer + 1 }}
       >
         <Drawer
           variant="temporary"
@@ -273,6 +318,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           flexGrow: 1,
           p: 3,
           width: { md: `calc(100% - ${drawerWidth}px)` },
+          position: 'relative',
+          zIndex: theme.zIndex.drawer + 1,
         }}
       >
         <Toolbar />

@@ -240,7 +240,6 @@ const Questions = () => {
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {filteredQuestions.map((question: Question) => {
-                console.log('Rendering question:', question);
                 const isLiked = question.likedByUsers.includes(user?.id || '');
                 const likeCount = question.likesCount;
                 const answerCount = question.answers;

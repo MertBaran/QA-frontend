@@ -1,5 +1,10 @@
 import { ApiResponse } from './api';
 
+export interface QuestionThumbnail {
+  key: string;
+  url?: string;
+}
+
 // Parent content bilgisi
 export interface ParentContentInfo {
   id: string;
@@ -55,6 +60,9 @@ export interface QuestionData {
   parent?: ParentReference;
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
+  category?: string;
+  tags?: string[];
+  thumbnail?: QuestionThumbnail | null;
   __v?: number;
 }
 
@@ -108,19 +116,27 @@ export interface Question {
   parentType?: 'question' | 'answer';
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
+  thumbnail?: QuestionThumbnail | null;
 }
 
 // Soru oluşturma için tip
 export interface CreateQuestionData {
   title: string;
   content: string;
+  category?: string;
+  tags?: string[];
   parent?: ParentReference;
+  thumbnailKey?: string;
 }
 
 // Soru güncelleme için tip
 export interface UpdateQuestionData {
   title?: string;
   content?: string;
+  category?: string;
+  tags?: string[];
+  thumbnailKey?: string;
+  removeThumbnail?: boolean;
 }
 
 // API Response tipleri

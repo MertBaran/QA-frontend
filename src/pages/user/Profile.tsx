@@ -51,6 +51,7 @@ import { authService } from '../../services/authService';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
+import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
 import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
@@ -92,7 +93,9 @@ const Profile = () => {
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
+  // TODO: Kullanıcı bazlı tema yükleme tamamlandığında themeName yerine kullanıcı verisinden gelen tema tercihleri kullanılacak.
   const isPapirus = themeName === 'papirus';
+  const isMagnefite = themeName === 'magnefite';
   const dispatch = useAppDispatch();
 
   // State
@@ -312,23 +315,25 @@ const Profile = () => {
   if (!isAuthenticated || !user) {
     return (
       <Layout>
-        {/* Admin Panel Texture Background */}
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundImage: `url(${papyrusHorizontal2})`,
-            backgroundSize: '130%',
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            opacity: mode === 'dark' ? 0.15 : 0.25,
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
+        {/* Papirus temasına özel arka plan dokusu */}
+        {isPapirus && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: `url(${papyrusHorizontal2})`,
+              backgroundSize: '130%',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: mode === 'dark' ? 0.15 : 0.25,
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+        )}
         <Container maxWidth="md" sx={{ mt: 4, position: 'relative', zIndex: 1 }}>
           <Alert severity="warning">
             {t('login_required', currentLanguage)}
@@ -341,23 +346,25 @@ const Profile = () => {
   if (!profileUser) {
     return (
       <Layout>
-        {/* Admin Panel Texture Background */}
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundImage: `url(${papyrusHorizontal2})`,
-            backgroundSize: '120%',
-            backgroundPosition: 'center 15%',
-            backgroundRepeat: 'no-repeat',
-            opacity: mode === 'dark' ? 0.15 : 0.25,
-            pointerEvents: 'none',
-            zIndex: 0,
-          }}
-        />
+        {/* Papirus temasına özel arka plan dokusu */}
+        {isPapirus && (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundImage: `url(${papyrusHorizontal2})`,
+              backgroundSize: '120%',
+              backgroundPosition: 'center 15%',
+              backgroundRepeat: 'no-repeat',
+              opacity: mode === 'dark' ? 0.15 : 0.25,
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+        )}
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4, position: 'relative', zIndex: 1 }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -373,23 +380,65 @@ const Profile = () => {
 
   return (
     <Layout>
-      {/* Admin Panel Texture Background */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: `url(${papyrusHorizontal2})`,
-          backgroundSize: '110%',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          opacity: mode === 'dark' ? 0.15 : 0.25,
-          pointerEvents: 'none',
-          zIndex: 0,
-        }}
-      />
+      {/* Magnefite Video Background */}
+      {isMagnefite && (
+        <>
+          <Box
+            component="video"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden
+            src={magnefiteBackgroundVideo}
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: mode === 'dark'
+                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
+                : 'linear-gradient(180deg, rgba(209, 212, 216, 0.78) 0%, rgba(209, 212, 216, 0.72) 50%, rgba(209, 212, 216, 0.88) 100%)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+        </>
+      )}
+
+      {/* Papirus temasına özel arka plan dokusu */}
+      {isPapirus && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundImage: `url(${papyrusHorizontal2})`,
+            backgroundSize: '110%',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            opacity: mode === 'dark' ? 0.15 : 0.25,
+            pointerEvents: 'none',
+            zIndex: 0,
+          }}
+        />
+      )}
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, position: 'relative', zIndex: 1 }}>
         {/* Header */}
         <Box sx={{ mb: 4 }}>

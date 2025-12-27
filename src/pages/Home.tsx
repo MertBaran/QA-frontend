@@ -37,6 +37,8 @@ import {
 } from '../store/home/homeSlice';
 import { likeQuestion, unlikeQuestion, deleteQuestion } from '../store/questions/questionThunks';
 import { fetchUserBookmarks } from '../store/bookmarks/bookmarkThunks';
+import { contentAssetService, uploadFileToPresignedUrl } from '../services/contentAssetService';
+import { showErrorToast, showSuccessToast } from '../utils/notificationUtils';
 
 const PaginationContainer = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isPapirus',
@@ -175,34 +177,71 @@ const Home = () => {
     dispatch(clearCreateQuestionForm());
   };
 
-  const handleCreateQuestion = async () => {
+  const handleCreateQuestion = async ({
+    thumbnailFile,
+  }: {
+    thumbnailFile?: File | null;
+    removeThumbnail?: boolean;
+  }) => {
     if (!newQuestion.title.trim() || !newQuestion.content.trim()) {
       return;
     }
 
-    const questionData = {
-      title: newQuestion.title,
-      content: newQuestion.content,
-      category: newQuestion.category || 'General',
-      tags: newQuestion.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-    };
+    try {
+      let thumbnailKey: string | undefined;
 
-    const result = await dispatch(createHomeQuestion(questionData));
-    
-    if (createHomeQuestion.fulfilled.match(result)) {
-      handleCloseCreateQuestionModal();
-      
-      // Soruları yeniden yükle
-      dispatch(fetchHomeQuestions({
-        page: currentPage,
-        limit: itemsPerPage,
-        sortBy: filters.sortBy,
-        sortOrder: 'desc',
-        search: filters.search || undefined,
-        category: filters.category || undefined,
-        tags: filters.tags || undefined,
-        savedOnly: filters.savedOnly || undefined,
-      }));
+      if (thumbnailFile) {
+        if (!user) {
+          showErrorToast(t('login_required', currentLanguage));
+          return;
+        }
+
+        const presigned = await contentAssetService.createPresignedUpload({
+          type: 'question-thumbnail',
+          filename: thumbnailFile.name,
+          mimeType: thumbnailFile.type,
+          contentLength: thumbnailFile.size,
+          ownerId: user.id,
+          visibility: 'public',
+        });
+
+        await uploadFileToPresignedUrl(presigned, thumbnailFile);
+        thumbnailKey = presigned.key;
+      }
+
+      const questionData = {
+        title: newQuestion.title,
+        content: newQuestion.content,
+        category: newQuestion.category || 'General',
+        tags: newQuestion.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter((tag) => tag),
+        thumbnailKey,
+      };
+
+      const result = await dispatch(createHomeQuestion(questionData));
+
+      if (createHomeQuestion.fulfilled.match(result)) {
+        showSuccessToast(t('question_created', currentLanguage));
+        handleCloseCreateQuestionModal();
+
+        dispatch(
+          fetchHomeQuestions({
+            page: currentPage,
+            limit: itemsPerPage,
+            sortBy: filters.sortBy,
+            sortOrder: 'desc',
+            search: filters.search || undefined,
+            category: filters.category || undefined,
+            tags: filters.tags || undefined,
+            savedOnly: filters.savedOnly || undefined,
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Soru oluşturulurken hata:', error);
+      showErrorToast(t('error', currentLanguage));
     }
   };
 
@@ -426,6 +465,7 @@ const Home = () => {
         validationErrors={validationErrors}
         isSubmitting={isSubmitting}
         currentLanguage={currentLanguage}
+        mode="create"
       />
 
       {/* Likes Modal */}

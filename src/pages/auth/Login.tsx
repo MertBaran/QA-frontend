@@ -20,12 +20,15 @@ import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
 import ReCaptchaComponent from '../../components/auth/ReCaptcha';
 import axios from 'axios';
 import { getCurrentUser } from '../../store/auth/authThunks';
+import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
 
 const Login = () => {
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector((state) => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const navigate = useNavigate();
+  const { mode, name: themeName } = useAppSelector(state => state.theme);
+  const isMagnefite = themeName === 'magnefite';
 
   const [formData, setFormData] = useState({
     email: '',
@@ -205,15 +208,64 @@ const Login = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
+    <Box
+      sx={{
+        position: 'relative',
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        py: 8,
+      }}
+    >
+      {isMagnefite && (
+        <>
+          <Box
+            component="video"
+            autoPlay
+            loop
+            muted
+            playsInline
+            aria-hidden
+            src={magnefiteBackgroundVideo}
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: mode === 'dark'
+                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
+                : 'linear-gradient(180deg, rgba(225, 226, 228, 0.82) 0%, rgba(209, 212, 216, 0.78) 50%, rgba(209, 212, 216, 0.9) 100%)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
+        </>
+      )}
+      <Container component="main" maxWidth="xs" sx={{ position: 'relative', zIndex: 1 }}>
+        <Box
+          sx={{
+            marginTop: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
         <Paper
           elevation={3}
           sx={{
@@ -324,8 +376,9 @@ const Login = () => {
             </Box>
           </Box>
         </Paper>
-      </Box>
-    </Container>
+        </Box>
+      </Container>
+    </Box>
   );
 };
 

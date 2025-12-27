@@ -41,9 +41,10 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     timeAgo = `${days} gün önce`;
   }
 
-  // Kategori belirleme (basit bir algoritma)
   const content = questionData.content.toLowerCase();
-  let category = 'Genel';
+
+  // Backend'den kategori gelmezse basit bir algoritma ile tahmin et
+  let inferredCategory = 'Genel';
 
   if (
     content.includes('react') ||
@@ -51,42 +52,44 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     content.includes('angular') ||
     content.includes('javascript')
   ) {
-    category = 'Frontend';
+    inferredCategory = 'Frontend';
   } else if (
     content.includes('node') ||
     content.includes('express') ||
     content.includes('api') ||
     content.includes('server')
   ) {
-    category = 'Backend';
+    inferredCategory = 'Backend';
   } else if (
     content.includes('mobile') ||
     content.includes('react native') ||
     content.includes('flutter')
   ) {
-    category = 'Mobile';
+    inferredCategory = 'Mobile';
   } else if (
     content.includes('docker') ||
     content.includes('kubernetes') ||
     content.includes('deploy')
   ) {
-    category = 'DevOps';
+    inferredCategory = 'DevOps';
   } else if (
     content.includes('database') ||
     content.includes('mongodb') ||
     content.includes('sql')
   ) {
-    category = 'Database';
+    inferredCategory = 'Database';
   } else if (
     content.includes('ai') ||
     content.includes('machine learning') ||
     content.includes('neural')
   ) {
-    category = 'AI/ML';
+    inferredCategory = 'AI/ML';
   }
 
-  // Tag'leri çıkar (basit bir algoritma)
-  const tags: string[] = [];
+  const backendTags = Array.isArray(questionData.tags) ? questionData.tags : [];
+
+  // İçerikten tag çıkar (backend'den gelmezse fallback)
+  const inferredTags: string[] = [];
   const commonTags = [
     'react',
     'javascript',
@@ -99,7 +102,7 @@ const transformQuestionData = (questionData: QuestionData): Question => {
   ];
   commonTags.forEach((tag) => {
     if (content.includes(tag)) {
-      tags.push(tag.charAt(0).toUpperCase() + tag.slice(1));
+      inferredTags.push(tag.charAt(0).toUpperCase() + tag.slice(1));
     }
   });
 
@@ -130,7 +133,7 @@ const transformQuestionData = (questionData: QuestionData): Question => {
       email: userInfo.email,
       profile_image: userInfo.profile_image,
     },
-    tags,
+    tags: backendTags.length > 0 ? backendTags : inferredTags,
     likesCount: questionData.likes.length,
     likedByUsers: questionData.likes,
     dislikesCount: questionData.dislikes.length,
@@ -139,7 +142,7 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     views: Math.floor(Math.random() * 1000) + 50, // Backend'de view sistemi yok, geçici
     timeAgo,
     isTrending,
-    category,
+    category: questionData.category || inferredCategory,
     createdAt: questionData.createdAt,
     parentQuestionId: questionData.parent?.type === 'question' ? questionData.parent.id : undefined,
     parentAnswerId: questionData.parent?.type === 'answer' ? questionData.parent.id : undefined,
@@ -147,6 +150,7 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     parentType: questionData.parent?.type,
     ancestors: questionData.ancestors,
     parentContentInfo: questionData.parentContentInfo,
+    thumbnail: questionData.thumbnail ?? null,
   };
 };
 

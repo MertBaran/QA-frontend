@@ -16,6 +16,7 @@ import {
   Alert,
   Badge,
   useTheme,
+  Dialog,
 } from '@mui/material';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 import papyrusGenis2Light from '../../asset/textures/papyrus_genis_2.png';
@@ -42,7 +43,7 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
-import { Question } from '../../types/question';
+import { Question, UpdateQuestionData } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
@@ -62,6 +63,11 @@ import { openModal, closeModal } from '../../store/likes/likesSlice';
 import { fetchLikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
 import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
+import CreateQuestionModal from '../../components/question/CreateQuestionModal';
+import { contentAssetService, uploadFileToPresignedUrl } from '../../services/contentAssetService';
+import { updateQuestion as updateQuestionThunk } from '../../store/questions/questionThunks';
+import { updateQuestionInList } from '../../store/home/homeSlice';
+import { showSuccessToast, showErrorToast } from '../../utils/notificationUtils';
 
 const QuestionCard = styled(Paper, {
   shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isAnswerWriting',
@@ -193,6 +199,7 @@ const QuestionDetail: React.FC = () => {
   const isMagnefite = themeName === 'magnefite';
   
   const [question, setQuestion] = useState<Question | null>(null);
+  const [questionThumbnailUrl, setQuestionThumbnailUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [newAnswer, setNewAnswer] = useState('');
@@ -224,6 +231,23 @@ const QuestionDetail: React.FC = () => {
   // Ancestors drawer state
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
 
+  // Edit question modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editQuestionForm, setEditQuestionForm] = useState({
+    title: '',
+    content: '',
+    category: '',
+    tags: '',
+  });
+  const [editValidationErrors, setEditValidationErrors] = useState<{
+    title?: string;
+    content?: string;
+    category?: string;
+    tags?: string;
+  }>({});
+  const [updatingQuestion, setUpdatingQuestion] = useState(false);
+  const [questionThumbnailPreviewOpen, setQuestionThumbnailPreviewOpen] = useState(false);
+
   // Soru ve cevapları yükle
   useEffect(() => {
     const loadQuestionData = async () => {
@@ -241,6 +265,28 @@ const QuestionDetail: React.FC = () => {
         
         if (questionData) {
           setQuestion(questionData);
+          
+          // Thumbnail URL'ini oluştur
+          if (questionData.thumbnail?.url) {
+            // URL zaten varsa direkt kullan
+            setQuestionThumbnailUrl(questionData.thumbnail.url);
+          } else if (questionData.thumbnail?.key) {
+            // URL yoksa, key'den URL oluştur
+            try {
+              const thumbnailUrl = await contentAssetService.resolveAssetUrl({
+                key: questionData.thumbnail.key,
+                type: 'question-thumbnail',
+                entityId: questionData.id,
+              });
+              setQuestionThumbnailUrl(thumbnailUrl);
+            } catch (error) {
+              logger.error('Thumbnail URL oluşturulamadı:', error);
+              setQuestionThumbnailUrl(null);
+            }
+          } else {
+            setQuestionThumbnailUrl(null);
+          }
+          
           setLoadingQuestion(false); // Ana soru yüklendi, loading'i kapat
           
           // Parent question/answer yükle (background'da, blocking yapmadan)
@@ -746,6 +792,168 @@ const QuestionDetail: React.FC = () => {
     setRelatedQuestionsAnchor(null);
   };
 
+  const handleOpenEditQuestionModal = () => {
+    if (!question) return;
+    setEditQuestionForm({
+      title: question.title,
+      content: question.content,
+      category: question.category ?? '',
+      tags: question.tags.join(', '),
+    });
+    setEditValidationErrors({});
+    setEditModalOpen(true);
+  };
+
+  const handleCloseEditQuestionModal = () => {
+    if (updatingQuestion) return;
+    setEditModalOpen(false);
+    setEditValidationErrors({});
+  };
+
+  const handleEditQuestionChange = (field: string, value: string) => {
+    setEditQuestionForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const validateEditForm = (): boolean => {
+    const errors: typeof editValidationErrors = {};
+
+    if (editQuestionForm.title.trim().length < 10) {
+      errors.title = t('validation_title_min', currentLanguage);
+    }
+
+    if (editQuestionForm.content.trim().length < 20) {
+      errors.content = t('validation_content_min', currentLanguage);
+    }
+
+    setEditValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleUpdateQuestion = async ({
+    thumbnailFile,
+    removeThumbnail,
+  }: {
+    thumbnailFile?: File | null;
+    removeThumbnail?: boolean;
+  }) => {
+    if (!question) return;
+    if (!validateEditForm()) {
+      return;
+    }
+
+    try {
+      setUpdatingQuestion(true);
+
+      let newThumbnailKey: string | undefined;
+
+      if (thumbnailFile) {
+        if (!user) {
+          showErrorToast(t('login_required', currentLanguage));
+          setUpdatingQuestion(false);
+          return;
+        }
+
+        const presigned = await contentAssetService.createPresignedUpload({
+          type: 'question-thumbnail',
+          filename: thumbnailFile.name,
+          mimeType: thumbnailFile.type,
+          contentLength: thumbnailFile.size,
+          ownerId: user.id,
+          entityId: question.id,
+          visibility: 'public',
+        });
+
+        await uploadFileToPresignedUrl(presigned, thumbnailFile);
+        newThumbnailKey = presigned.key;
+      }
+
+      const tagsArray = editQuestionForm.tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0);
+
+      const updatePayload: UpdateQuestionData = {
+        title: editQuestionForm.title,
+        content: editQuestionForm.content,
+        category: editQuestionForm.category || undefined,
+        tags: tagsArray,
+      };
+
+      if (newThumbnailKey) {
+        updatePayload.thumbnailKey = newThumbnailKey;
+      }
+
+      if (removeThumbnail && !thumbnailFile) {
+        updatePayload.removeThumbnail = true;
+      }
+
+      const result = await dispatch(
+        updateQuestionThunk({ id: question.id, questionData: updatePayload }),
+      );
+
+      if (updateQuestionThunk.fulfilled.match(result)) {
+        const updatedQuestion = result.payload;
+        setQuestion(updatedQuestion);
+        
+        // Thumbnail state'ini güncelle
+        if (removeThumbnail && !thumbnailFile) {
+          // Thumbnail kaldırıldıysa
+          setQuestionThumbnailUrl(null);
+        } else if (newThumbnailKey) {
+          // Yeni thumbnail yüklendiyse, URL'ini oluştur
+          try {
+            const thumbnailUrl = await contentAssetService.resolveAssetUrl({
+              key: newThumbnailKey,
+              type: 'question-thumbnail',
+              entityId: question.id,
+            });
+            setQuestionThumbnailUrl(thumbnailUrl);
+          } catch (error) {
+            logger.error('Yeni thumbnail URL oluşturulamadı:', error);
+            setQuestionThumbnailUrl(null);
+          }
+        } else if (updatedQuestion.thumbnail?.url) {
+          // Backend'den gelen URL'i kullan
+          setQuestionThumbnailUrl(updatedQuestion.thumbnail.url);
+        } else if (updatedQuestion.thumbnail?.key) {
+          // Key varsa ama URL yoksa, URL oluştur
+          try {
+            const thumbnailUrl = await contentAssetService.resolveAssetUrl({
+              key: updatedQuestion.thumbnail.key,
+              type: 'question-thumbnail',
+              entityId: question.id,
+            });
+            setQuestionThumbnailUrl(thumbnailUrl);
+          } catch (error) {
+            logger.error('Thumbnail URL oluşturulamadı:', error);
+            setQuestionThumbnailUrl(null);
+          }
+        } else {
+          setQuestionThumbnailUrl(null);
+        }
+        
+        setEditModalOpen(false);
+        setEditValidationErrors({});
+        setQuestionThumbnailPreviewOpen(false);
+        showSuccessToast(t('question_updated', currentLanguage));
+        dispatch(updateQuestionInList({ questionId: updatedQuestion.id, updates: updatedQuestion }));
+      } else {
+        const message =
+          (result.payload as { message?: string } | undefined)?.message ||
+          t('question_update_failed', currentLanguage);
+        showErrorToast(message);
+      }
+    } catch (err) {
+      console.error('Soru güncellenirken hata:', err);
+      showErrorToast(t('question_update_failed', currentLanguage));
+    } finally {
+      setUpdatingQuestion(false);
+    }
+  };
+
   if (loadingQuestion) {
     return (
       <Layout>
@@ -877,6 +1085,7 @@ const QuestionDetail: React.FC = () => {
               showDislike={true}
               showDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
               showHelp={true}
+              showEdit={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
               isLiked={question.likedByUsers.includes(user?.id || '')}
               isDisliked={question.dislikedByUsers.includes(user?.id || '')}
               canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
@@ -893,6 +1102,10 @@ const QuestionDetail: React.FC = () => {
               onHelp={(e) => {
                 e.stopPropagation();
                 handleAskQuestionAboutQuestion();
+              }}
+              onEdit={(e) => {
+                e.stopPropagation();
+                handleOpenEditQuestionModal();
               }}
             />
           </Box>
@@ -945,7 +1158,8 @@ const QuestionDetail: React.FC = () => {
           })()}
           
           <Box sx={{ position: 'relative', mb: 3 }}>
-            <Box sx={{ width: '100%' }}>
+            <Box sx={{ flex: 1, width: '100%' }}>
+
               {/* Yazar Bilgisi */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Avatar 
@@ -980,8 +1194,8 @@ const QuestionDetail: React.FC = () => {
                   <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                     {question.timeAgo}
                   </Typography>
+                </Box>
               </Box>
-            </Box>
 
               {/* Kategori */}
               <Box sx={{ mb: 2 }}>
@@ -1001,36 +1215,110 @@ const QuestionDetail: React.FC = () => {
                 />
               </Box>
 
-              {/* Soru Başlığı */}
-              <Typography 
-                variant="h4" 
-                sx={{ 
-                  fontWeight: 700, 
-                  color: theme.palette.text.primary,
-                  mb: 3,
+              {/* Soru Başlığı, İçeriği ve Thumbnail */}
+              <Box sx={{ 
+                display: 'flex',
+                gap: 2,
+                alignItems: 'flex-start',
+                mb: 4,
+                width: '100%',
+              }}>
+                {/* Başlık ve İçerik Container */}
+                <Box sx={{ 
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      fontWeight: 700, 
+                      color: theme.palette.text.primary,
+                      mb: 3,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       display: '-webkit-box',
                       WebkitLineClamp: 3,
                       WebkitBoxOrient: 'vertical',
                       wordBreak: 'break-word',
-                  width: '100%',
-                  pr: 10, // ActionButtons için sağdan boşluk bırak
-                }}
-              >
-                {question.title}
-              </Typography>
+                      pr: 10, // ActionButtons için sağdan boşluk bırak
+                    }}
+                  >
+                    {question.title}
+                  </Typography>
 
-              {/* Soru İçeriği */}
                   <Box sx={{ 
-                  mb: 4, 
                     overflow: 'hidden',
                     wordWrap: 'break-word',
                     wordBreak: 'break-word',
-                width: '100%',
-                pr: 10, // ActionButtons için sağdan boşluk bırak
+                    pr: 10, // ActionButtons için sağdan boşluk bırak
                   }}>
                     <MarkdownRenderer content={question.content} />
+                  </Box>
+                </Box>
+
+                {/* Thumbnail Container - Dikey olarak ortalanmış */}
+                {(questionThumbnailUrl || question?.thumbnail?.url) && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      alignSelf: 'stretch',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Box
+                      sx={(theme) => ({
+                        width: 60,
+                        height: 60,
+                        borderRadius: 1.5,
+                        overflow: 'hidden',
+                        border: `1px solid ${theme.palette.divider}`,
+                        boxShadow: theme.palette.mode === 'dark'
+                          ? '0 2px 8px rgba(0,0,0,0.2)'
+                          : '0 2px 8px rgba(0,0,0,0.1)',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s ease',
+                        backgroundColor: theme.palette.background.paper,
+                        '&:hover': {
+                          transform: 'scale(1.05)',
+                        },
+                      })}
+                      onClick={() => setQuestionThumbnailPreviewOpen(true)}
+                    >
+                      <img
+                        src={questionThumbnailUrl || question?.thumbnail?.url || ''}
+                        alt={question.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={async (e) => {
+                          const img = e.currentTarget;
+                          const currentSrc = img.src;
+                          
+                          // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene (URL expire olmuş olabilir)
+                          if (question?.thumbnail?.key) {
+                            try {
+                              const newUrl = await contentAssetService.resolveAssetUrl({
+                                key: question.thumbnail.key,
+                                type: 'question-thumbnail',
+                                entityId: question.id,
+                              });
+                              if (newUrl && newUrl !== currentSrc) {
+                                setQuestionThumbnailUrl(newUrl);
+                                img.src = newUrl;
+                                return; // Yeniden yükleme başarılı
+                              }
+                            } catch (error) {
+                              logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
+                            }
+                          }
+                          
+                          // Başarısız olursa gizle
+                          img.style.display = 'none';
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                )}
               </Box>
 
               {/* Tag'ler */}
@@ -1340,7 +1628,60 @@ const QuestionDetail: React.FC = () => {
           )}
         </Box>
       </Container>
-      
+
+      <Dialog
+        open={questionThumbnailPreviewOpen}
+        onClose={() => setQuestionThumbnailPreviewOpen(false)}
+        maxWidth="md"
+      >
+        {(questionThumbnailUrl || question?.thumbnail?.url || question?.thumbnail?.key) && (
+          <Box sx={{ p: 0, m: 0 }}>
+            <img
+              src={questionThumbnailUrl || question?.thumbnail?.url || ''}
+              alt={question?.title || 'Question thumbnail'}
+              style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+              onError={async (e) => {
+                const img = e.currentTarget;
+                const currentSrc = img.src;
+                
+                // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
+                if (question?.thumbnail?.key) {
+                  try {
+                    const newUrl = await contentAssetService.resolveAssetUrl({
+                      key: question.thumbnail.key,
+                      type: 'question-thumbnail',
+                      entityId: question.id,
+                    });
+                    if (newUrl && newUrl !== currentSrc) {
+                      setQuestionThumbnailUrl(newUrl);
+                      img.src = newUrl;
+                      return;
+                    }
+                  } catch (error) {
+                    logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
+                  }
+                }
+                
+                img.style.display = 'none';
+              }}
+            />
+          </Box>
+        )}
+      </Dialog>
+
+      <CreateQuestionModal
+        open={editModalOpen}
+        onClose={handleCloseEditQuestionModal}
+        onSubmit={handleUpdateQuestion}
+        question={editQuestionForm}
+        onQuestionChange={handleEditQuestionChange}
+        validationErrors={editValidationErrors}
+        isSubmitting={updatingQuestion}
+        currentLanguage={currentLanguage}
+        mode="edit"
+        initialThumbnailUrl={questionThumbnailUrl}
+      />
+
       {/* Likes Modal */}
       <LikesModal 
         open={likesModalOpen}
