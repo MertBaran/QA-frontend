@@ -21,7 +21,7 @@ initSentry();
 
 function AppContent() {
   const { name: themeName, mode } = useAppSelector((state) => state.theme);
-  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const theme = getTheme(themeName, mode);
   
@@ -32,7 +32,7 @@ function AppContent() {
   useEffect(() => {
     const token = getStoredToken();
     if (token && !isAuthenticated) {
-      dispatch(getCurrentUser());
+      void dispatch(getCurrentUser());
     }
   }, [dispatch, isAuthenticated]);
 
@@ -50,6 +50,66 @@ function AppContent() {
             },
             'body *, html *, #root *': {
               fontFamily: `${theme.typography.fontFamily} !important`,
+            },
+            // Tarayıcı autocomplete stilleri - Tema ile uyumlu
+            'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active': {
+              WebkitBoxShadow: mode === 'dark' 
+                ? `0 0 0 30px ${theme.palette.background.paper} inset !important`
+                : `0 0 0 30px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: mode === 'dark'
+                ? theme.palette.text.primary
+                : theme.palette.text.primary,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            'textarea:-webkit-autofill, textarea:-webkit-autofill:hover, textarea:-webkit-autofill:focus, textarea:-webkit-autofill:active': {
+              WebkitBoxShadow: mode === 'dark' 
+                ? `0 0 0 30px ${theme.palette.background.paper} inset !important`
+                : `0 0 0 30px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: mode === 'dark'
+                ? theme.palette.text.primary
+                : theme.palette.text.primary,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            'select:-webkit-autofill, select:-webkit-autofill:hover, select:-webkit-autofill:focus, select:-webkit-autofill:active': {
+              WebkitBoxShadow: mode === 'dark' 
+                ? `0 0 0 30px ${theme.palette.background.paper} inset !important`
+                : `0 0 0 30px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: mode === 'dark'
+                ? theme.palette.text.primary
+                : theme.palette.text.primary,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            // MUI InputBase için özel stiller
+            '.MuiInputBase-input:-webkit-autofill, .MuiInputBase-input:-webkit-autofill:hover, .MuiInputBase-input:-webkit-autofill:focus, .MuiInputBase-input:-webkit-autofill:active': {
+              WebkitBoxShadow: mode === 'dark' 
+                ? `0 0 0 30px ${theme.palette.background.paper} inset !important`
+                : `0 0 0 30px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: mode === 'dark'
+                ? theme.palette.text.primary
+                : theme.palette.text.primary,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            // MUI TextField için özel stiller
+            '.MuiTextField-root input:-webkit-autofill, .MuiTextField-root input:-webkit-autofill:hover, .MuiTextField-root input:-webkit-autofill:focus, .MuiTextField-root input:-webkit-autofill:active': {
+              WebkitBoxShadow: mode === 'dark' 
+                ? `0 0 0 30px ${theme.palette.background.paper} inset !important`
+                : `0 0 0 30px ${theme.palette.background.paper} inset !important`,
+              WebkitTextFillColor: mode === 'dark'
+                ? theme.palette.text.primary
+                : theme.palette.text.primary,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            // Tarayıcı autocomplete dropdown stilleri (Chrome/Safari)
+            'input::-webkit-list-button': {
+              borderRadius: '4px', // Daha az yuvarlak
+            },
+            'input::-webkit-calendar-picker-indicator': {
+              borderRadius: '4px', // Daha az yuvarlak
             },
           },
         }}

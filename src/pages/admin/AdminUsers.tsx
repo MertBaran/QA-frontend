@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -28,13 +28,11 @@ import {
   Tooltip,
   Avatar,
   InputAdornment,
-  Collapse,
   Grid,
   Card,
   CardContent,
   LinearProgress,
   Badge,
-  Divider,
   Popover,
 } from '@mui/material';
 import {
@@ -44,13 +42,7 @@ import {
   Delete,
   Block,
   CheckCircle,
-  Warning,
-  FilterList,
-  Add,
   Refresh,
-  ExpandMore,
-  ExpandLess,
-  CalendarToday,
   OnlinePrediction,
   PersonAdd,
   PersonOff,
@@ -99,7 +91,7 @@ const AdminUsers: React.FC = () => {
 
 
   // Kullanıcıları yükle
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true);
     try {
       const response = await adminService.getUsers(
@@ -117,22 +109,22 @@ const AdminUsers: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters, page, rowsPerPage]);
 
   // İstatistikleri yükle
-  const loadStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const stats = await adminService.getUserStats();
       setUserStats(stats);
     } catch (error) {
       console.error('Stats yüklenirken hata:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadUsers();
     loadStats();
-  }, [page, rowsPerPage, filters]);
+  }, [page, rowsPerPage, filters, loadUsers, loadStats]);
 
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);

@@ -18,7 +18,7 @@ import { styled } from '@mui/material/styles';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { confirmActions } from '../../store/confirm/confirmSlice';
 import { confirmService } from '../../services/confirmService';
-import type { ConfirmType, ConfirmVariant } from '../../services/confirmService';
+import type { ConfirmType } from '../../services/confirmService';
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiDialog-paper': {

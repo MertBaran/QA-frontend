@@ -1,9 +1,7 @@
 import React from 'react';
-import { Box, Button, Typography } from '@mui/material';
-import { Google } from '@mui/icons-material';
+import { Box } from '@mui/material';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAppSelector } from '../../store/hooks';
-import { t } from '../../utils/translations';
 
 interface GoogleLoginButtonProps {
   onSuccess: (credential: string) => void;
@@ -16,9 +14,9 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess, onErro
   return (
     <Box sx={{ width: '100%', my: 2 }}>
       <GoogleLogin
-        onSuccess={async credentialResponse => {
+        onSuccess={(credentialResponse) => {
           if (credentialResponse.credential) {
-            await onSuccess(credentialResponse.credential);
+            void onSuccess(credentialResponse.credential);
           }
         }}
         onError={onError}

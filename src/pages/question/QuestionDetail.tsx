@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -7,8 +7,6 @@ import {
   Paper,
   Avatar,
   Button,
-  TextField,
-  // Divider,
   Chip,
   IconButton,
   Card,
@@ -19,26 +17,16 @@ import {
   Dialog,
 } from '@mui/material';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
-import papyrusGenis2Light from '../../asset/textures/papyrus_genis_2.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
-import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
-import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import papyrusVertical2 from '../../asset/textures/papyrus_vertical_2.png';
 import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 import {
   ThumbUp,
-  ThumbUpOutlined,
-  ThumbDown,
-  ThumbDownOutlined,
   Comment,
   Visibility,
   ArrowBack,
   Send,
-  Edit,
-  Delete,
-  HelpOutline,
-  KeyboardArrowRight,
   AccountTree,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
@@ -50,7 +38,6 @@ import { answerService } from '../../services/answerService';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
-import BookmarkButton from '../../components/ui/BookmarkButton';
 import ActionButtons from '../../components/ui/ActionButtons';
 import LikesModal from '../../components/ui/LikesModal';
 import ParentInfoChip from '../../components/ui/ParentInfoChip';
@@ -188,12 +175,13 @@ const QuestionDetail: React.FC = () => {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
-  const { answers, loading } = useAppSelector(state => state.answers);
+  const { answers } = useAppSelector(state => state.answers);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
@@ -1041,7 +1029,14 @@ const QuestionDetail: React.FC = () => {
         <Button
           variant="outlined"
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/')}
+          onClick={() => {
+            const from = (location.state as any)?.from;
+            if (from) {
+              navigate(from);
+            } else {
+              navigate(-1);
+            }
+          }}
           sx={{ 
             mb: 3, 
             color: theme.palette.text.primary, 

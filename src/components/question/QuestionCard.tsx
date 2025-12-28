@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -11,7 +11,6 @@ import {
 } from '@mui/material';
 import {
   ThumbUp,
-  ThumbUpOutlined,
   Comment,
   Visibility,
   Delete,
@@ -24,10 +23,7 @@ import ParentInfoChip from '../ui/ParentInfoChip';
 import AncestorsDrawer from './AncestorsDrawer';
 import MarkdownRenderer from '../ui/MarkdownRenderer';
 import { t } from '../../utils/translations';
-import { useAppSelector, useAppDispatch } from '../../store/hooks';
-import { openModal } from '../../store/likes/likesSlice';
-import { fetchLikedUsers } from '../../store/likes/likesThunks';
-import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
+import { useAppSelector } from '../../store/hooks';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 
@@ -126,9 +122,9 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
 }, ref) => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
+  const location = useLocation();
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { user, isAuthenticated } = useAppSelector(state => state.auth);
+  const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
@@ -163,7 +159,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     } else {
       setThumbnailUrlState(null);
     }
-  }, [question?.thumbnail?.key, question?.thumbnail?.url, question?.id]);
+  }, [question?.thumbnail?.key, question?.thumbnail?.url, question?.thumbnail, question?.id]);
 
   // If no question provided, render children (for answer writing section)
   if (!question) {
@@ -186,26 +182,6 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const thumbnailUrl = thumbnailUrlState || question.thumbnail?.url;
   const hasThumbnail = Boolean(question.thumbnail?.key || thumbnailUrl);
 
-  const handleLikeClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (question.likedByUsers.includes(user?.id || '')) {
-      onUnlike?.(question.id);
-    } else {
-      onLike?.(question.id);
-    }
-  };
-
-  const handleLikesCountClick = async (e: React.MouseEvent) => {
-    if (question.likesCount > 0 && question.likedByUsers.length > 0) {
-      e.stopPropagation();
-      try {
-        await dispatch(fetchLikedUsers(question.likedByUsers));
-        dispatch(openModal());
-      } catch (err) {
-        console.error('Kullanıcılar yüklenirken hata:', err);
-      }
-    }
-  };
 
   // Use parentContentInfo from backend if available, otherwise fall back to old logic
   const parentId = question.parentContentInfo?.id || question.parentQuestionId || question.parentAnswerId;
@@ -371,7 +347,12 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             opacity: 0.9
           }
         }}
-        onClick={() => window.location.href = `/questions/${question.id}`}
+        onClick={() => {
+          const from = location.pathname + location.search;
+          navigate(`/questions/${question.id}`, { 
+            state: { from } 
+          });
+        }}
       >
         <Box sx={{ flex: 1, paddingX: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>

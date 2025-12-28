@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice } from '@reduxjs/toolkit';
 import { ThemeState } from '../../models/ThemeState';
 
 const initialState: ThemeState = {

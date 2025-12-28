@@ -9,7 +9,7 @@ import {
 } from '../types/answer';
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
-const transformAnswerData = (answerData: AnswerData): Answer => {
+export const transformAnswerData = (answerData: AnswerData): Answer => {
   const createdAt = new Date(answerData.createdAt);
   const now = new Date();
   const timeDiff = now.getTime() - createdAt.getTime();
@@ -31,24 +31,31 @@ const transformAnswerData = (answerData: AnswerData): Answer => {
   const userInfo =
     answerData.userInfo || (typeof answerData.user === 'object' ? answerData.user : null);
 
-  if (!userInfo) {
-    throw new Error('User information not available');
-  }
+  // userInfo yoksa default değerler kullan
+  const defaultUserInfo = {
+    _id: typeof answerData.user === 'string' ? answerData.user : 'unknown',
+    name: 'Unknown User',
+    email: '',
+    profile_image: undefined,
+    title: undefined,
+  };
+
+  const finalUserInfo = userInfo || defaultUserInfo;
 
   return {
     id: answerData._id,
     content: answerData.content,
     author: {
-      id: userInfo._id,
-      name: userInfo.name,
-      avatar: userInfo.profile_image || '',
-      title: userInfo.title,
+      id: finalUserInfo._id,
+      name: finalUserInfo.name,
+      avatar: finalUserInfo.profile_image || '',
+      title: finalUserInfo.title,
     },
     userInfo: answerData.userInfo || {
-      _id: userInfo._id,
-      name: userInfo.name,
-      email: userInfo.email,
-      profile_image: userInfo.profile_image,
+      _id: finalUserInfo._id,
+      name: finalUserInfo.name,
+      email: finalUserInfo.email,
+      profile_image: finalUserInfo.profile_image,
     },
     likesCount: answerData.likes.length,
     likedByUsers: answerData.likes,

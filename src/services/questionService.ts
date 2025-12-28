@@ -22,7 +22,7 @@ export interface PaginatedQuestionsResponse {
 }
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
-const transformQuestionData = (questionData: QuestionData): Question => {
+export const transformQuestionData = (questionData: QuestionData): Question => {
   const createdAt = new Date(questionData.createdAt);
   const now = new Date();
   const timeDiff = now.getTime() - createdAt.getTime();
@@ -112,9 +112,16 @@ const transformQuestionData = (questionData: QuestionData): Question => {
   const userInfo =
     questionData.userInfo || (typeof questionData.user === 'object' ? questionData.user : null);
 
-  if (!userInfo) {
-    throw new Error('User information not available');
-  }
+  // userInfo yoksa default değerler kullan
+  const defaultUserInfo = {
+    _id: typeof questionData.user === 'string' ? questionData.user : 'unknown',
+    name: 'Unknown User',
+    email: '',
+    profile_image: undefined,
+    title: undefined,
+  };
+
+  const finalUserInfo = userInfo || defaultUserInfo;
 
   return {
     id: questionData._id,
@@ -122,16 +129,16 @@ const transformQuestionData = (questionData: QuestionData): Question => {
     content: questionData.content,
     slug: questionData.slug,
     author: {
-      id: userInfo._id,
-      name: userInfo.name,
-      avatar: userInfo.profile_image || '',
-      title: userInfo.title,
+      id: finalUserInfo._id,
+      name: finalUserInfo.name,
+      avatar: finalUserInfo.profile_image || '',
+      title: finalUserInfo.title,
     },
     userInfo: questionData.userInfo || {
-      _id: userInfo._id,
-      name: userInfo.name,
-      email: userInfo.email,
-      profile_image: userInfo.profile_image,
+      _id: finalUserInfo._id,
+      name: finalUserInfo.name,
+      email: finalUserInfo.email,
+      profile_image: finalUserInfo.profile_image,
     },
     tags: backendTags.length > 0 ? backendTags : inferredTags,
     likesCount: questionData.likes.length,

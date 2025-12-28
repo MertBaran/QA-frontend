@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, IconButton, Tooltip, Typography } from '@mui/material';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import {
   ThumbUp,
   ThumbUpOutlined,
@@ -9,88 +9,11 @@ import {
   HelpOutline,
   Edit,
 } from '@mui/icons-material';
-import { styled } from '@mui/material/styles';
 import BookmarkButton from './BookmarkButton';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { useTheme } from '@mui/material/styles';
 import type { AddBookmarkRequest } from '../../types/bookmark';
-
-const AskButtonWrapperStyled = styled(Box)(({ theme }) => ({
-  position: 'relative',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  cursor: 'pointer',
-  flexShrink: 0,
-  width: '40px',
-  height: '40px',
-  overflow: 'visible',
-  borderRadius: theme.shape.borderRadius,
-  padding: theme.spacing(0.5),
-  margin: `-${theme.spacing(0.5)}`,
-  boxSizing: 'border-box',
-  transition: 'background-color 0.3s ease-in-out, border-color 0.3s ease-in-out, width 0.3s ease-in-out, min-width 0.3s ease-in-out, padding-left 0.3s ease-in-out, margin-left 0.3s ease-in-out',
-  '& .hover-text': {
-    position: 'relative',
-    whiteSpace: 'nowrap',
-    opacity: 0,
-    transition: 'transform 0.3s ease-in-out',
-    pointerEvents: 'none',
-    zIndex: 1000,
-    transform: 'translateX(0)',
-    marginLeft: theme.spacing(0.5),
-  },
-  '& .hover-icon-box': {
-    position: 'relative',
-    transition: 'transform 0.5s ease-out',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '40px',
-    height: '40px',
-    flexShrink: 0,
-    zIndex: 1,
-          '& .MuiIconButton-root': {
-      transform: 'translateX(0)',
-      transition: 'transform 0.5s ease-out, color 0.2s ease-in-out',
-      '& svg': {
-        transition: 'transform 0.5s ease-out',
-        transform: 'rotate(0deg)',
-      },
-      '&:hover': {
-        transform: 'translateX(0) !important',
-        backgroundColor: 'transparent',
-        color: '#FFB800',
-      },
-    },
-  },
-  '&:hover': {
-    width: 'max-content',
-    minWidth: 'max-content',
-    paddingLeft: 'calc(8px + var(--text-width, 0px) * 0.3)',
-    marginLeft: 'calc(-1 * var(--text-width, 0px) * 0.3)',
-    backgroundColor: 'rgba(255, 184, 0, 0.1)',
-    border: '1px solid rgba(255, 184, 0, 0.3)',
-    '& .hover-text': {
-      opacity: 1,
-      transition: 'opacity 0.3s ease-in-out 0.15s, transform 0.8s ease-in-out',
-      transitionDelay: '0.15s, 0s',
-      transform: 'translateX(calc(-1 * var(--text-width , 0px) * 0.3))',
-    },
-    '& .hover-icon-box': {
-      transform: 'translateX(calc(-1 * var(--text-width, 0px) * 0.3))',
-      '& .MuiIconButton-root': {
-        transform: 'translateX(0)',
-        '& svg': {
-          transform: 'rotate(180deg)',
-        },
-      },
-    },
-  },
-}));
-
-
 
 interface ActionButtonsProps {
   targetType: 'question' | 'answer';
@@ -157,8 +80,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   const { user } = useAppSelector(state => state.auth);
   const { name: themeName } = useAppSelector(state => state.theme);
   
-  // Get negative and positive colors from theme
-  const negativeColor = (theme.palette as any).custom?.negative || theme.palette.error.main;
+  // Get positive colors from theme
   const positiveColor = (theme.palette as any).custom?.positive || theme.palette.success.main;
   
   // Theme-specific negative colors

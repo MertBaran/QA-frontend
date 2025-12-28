@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { TextField, InputAdornment, IconButton } from '@mui/material';
 import { Visibility, VisibilityOff, Lock } from '@mui/icons-material';
 import { SecurePasswordState } from '../../utils/passwordSecurity';
@@ -32,21 +32,21 @@ const SecurePasswordField: React.FC<SecurePasswordFieldProps> = ({
   const [displayValue, setDisplayValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const updateDisplayValue = useCallback(() => {
+    setDisplayValue(secureState.getDisplayValue());
+  }, [secureState]);
+
   // Password değerini güvenli şekilde sakla
   useEffect(() => {
     secureState.setPassword(value);
     updateDisplayValue();
-  }, [value, secureState]);
+  }, [value, secureState, updateDisplayValue]);
 
   // Görünürlük değiştiğinde display value'yu güncelle
   useEffect(() => {
     secureState.setVisible(showPassword);
     updateDisplayValue();
-  }, [showPassword, secureState]);
-
-  const updateDisplayValue = () => {
-    setDisplayValue(secureState.getDisplayValue());
-  };
+  }, [showPassword, secureState, updateDisplayValue]);
 
   // Custom onChange handler
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,12 +161,12 @@ const SecurePasswordField: React.FC<SecurePasswordFieldProps> = ({
       }}
       sx={{
         '& input[type="password"]': {
-          WebkitTextSecurity: 'disc' as any,
-          textSecurity: 'disc' as any,
+          WebkitTextSecurity: ('disc' as any),
+          textSecurity: ('disc' as any),
         },
         '& input[data-secure="true"]': {
-          WebkitTextSecurity: showPassword ? 'none' : 'disc' as any,
-          textSecurity: showPassword ? 'none' : 'disc' as any,
+          WebkitTextSecurity: showPassword ? 'none' : ('disc' as any),
+          textSecurity: showPassword ? 'none' : ('disc' as any),
         },
         '& input': {
           caretColor: showPassword ? 'auto' : 'transparent',

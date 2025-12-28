@@ -8,7 +8,6 @@ import {
   IconButton,
   Alert,
   CircularProgress,
-  Fade,
 } from '@mui/material';
 import { Close, Send } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';

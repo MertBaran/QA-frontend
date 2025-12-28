@@ -223,6 +223,28 @@ const createBaseThemeConfig = (
               '&.Mui-focused fieldset': {
                 borderColor: isMagnefite ? typographyColors.border : `${palette.primary.main}CC`,
               },
+              // Autocomplete stilleri
+              '& input:-webkit-autofill': {
+                WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+                WebkitTextFillColor: typographyColors.text,
+                borderRadius: '4px', // Daha az yuvarlak
+                transition: 'background-color 5000s ease-in-out 0s',
+              },
+              '& input:-webkit-autofill:hover': {
+                WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+                WebkitTextFillColor: typographyColors.text,
+                borderRadius: '4px', // Daha az yuvarlak
+              },
+              '& input:-webkit-autofill:focus': {
+                WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+                WebkitTextFillColor: typographyColors.text,
+                borderRadius: '4px', // Daha az yuvarlak
+              },
+              '& input:-webkit-autofill:active': {
+                WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+                WebkitTextFillColor: typographyColors.text,
+                borderRadius: '4px', // Daha az yuvarlak
+              },
             },
           },
         },
@@ -319,6 +341,29 @@ const createBaseThemeConfig = (
         styleOverrides: {
           root: {
             fontFamily: fontFamily,
+          },
+          input: {
+            '&:-webkit-autofill': {
+              WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+              WebkitTextFillColor: typographyColors.text,
+              borderRadius: '4px', // Daha az yuvarlak
+              transition: 'background-color 5000s ease-in-out 0s',
+            },
+            '&:-webkit-autofill:hover': {
+              WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+              WebkitTextFillColor: typographyColors.text,
+              borderRadius: '4px', // Daha az yuvarlak
+            },
+            '&:-webkit-autofill:focus': {
+              WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+              WebkitTextFillColor: typographyColors.text,
+              borderRadius: '4px', // Daha az yuvarlak
+            },
+            '&:-webkit-autofill:active': {
+              WebkitBoxShadow: `0 0 0 30px ${palette.background.paper} inset !important`,
+              WebkitTextFillColor: typographyColors.text,
+              borderRadius: '4px', // Daha az yuvarlak
+            },
           },
         },
       },
