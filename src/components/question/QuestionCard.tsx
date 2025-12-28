@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -122,6 +122,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
 }, ref) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
@@ -346,7 +347,12 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             opacity: 0.9
           }
         }}
-        onClick={() => window.location.href = `/questions/${question.id}`}
+        onClick={() => {
+          const from = location.pathname + location.search;
+          navigate(`/questions/${question.id}`, { 
+            state: { from } 
+          });
+        }}
       >
         <Box sx={{ flex: 1, paddingX: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
