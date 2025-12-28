@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
   Typography,
@@ -175,6 +175,7 @@ const QuestionDetail: React.FC = () => {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
@@ -1028,7 +1029,14 @@ const QuestionDetail: React.FC = () => {
         <Button
           variant="outlined"
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/')}
+          onClick={() => {
+            const from = (location.state as any)?.from;
+            if (from) {
+              navigate(from);
+            } else {
+              navigate(-1);
+            }
+          }}
           sx={{ 
             mb: 3, 
             color: theme.palette.text.primary, 
