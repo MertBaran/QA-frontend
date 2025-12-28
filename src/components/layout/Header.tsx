@@ -50,7 +50,7 @@ import { t } from '../../utils/translations';
 // Styled search component
 const Search = styled('div')(({ theme }) => ({
   position: 'relative',
-  borderRadius: 12,
+  borderRadius: 4, // Daha az yuvarlak (önceden 12 idi)
   backgroundColor: theme.palette.mode === 'dark' 
     ? alpha(theme.palette.common.white, 0.15)
     : alpha(theme.palette.common.black, 0.05),
@@ -67,27 +67,33 @@ const Search = styled('div')(({ theme }) => ({
 }));
 
 const SearchIconWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 2),
-  height: '100%',
+  padding: theme.spacing(0, 1.5),
   position: 'absolute',
-  pointerEvents: 'none',
+  right: 0,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  pointerEvents: 'auto', // Tıklanabilir yap
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  color: theme.palette.mode === 'dark' ? theme.palette.common.white : theme.palette.text.secondary,
+  color: theme.palette.text.secondary,
+  zIndex: 1,
+  cursor: 'pointer',
+  '&:hover': {
+    color: theme.palette.primary.main,
+  },
 }));
 
 const StyledInputBase = styled(InputBase)(({ theme }) => ({
   color: 'inherit',
+  width: '100%',
   '& .MuiInputBase-input': {
-    padding: theme.spacing(1, 1, 1, 0),
-    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    padding: theme.spacing(1, 1.5, 1, 1.5),
+    paddingRight: `calc(${theme.spacing(4)} + 8px)`,
     transition: theme.transitions.create('width'),
     width: '100%',
     '&::placeholder': {
-      color: theme.palette.mode === 'dark' 
-        ? alpha(theme.palette.common.white, 0.7)
-        : alpha(theme.palette.common.black, 0.5),
+      color: theme.palette.text.secondary,
       opacity: 1,
     },
   },
@@ -148,8 +154,10 @@ const Header = () => {
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    const trimmedQuery = searchQuery.trim();
+    // Minimum 3 karakter kontrolü
+    if (trimmedQuery && trimmedQuery.length >= 3) {
+      navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
     }
   };
 
@@ -432,186 +440,66 @@ const Header = () => {
             {!isMobile && (
               <Box sx={{ 
                 width: '100%',
-                display: 'grid',
-                gridTemplateColumns: '1fr auto 1fr',
+                display: 'flex',
                 alignItems: 'center',
-                gap: 2,
+                justifyContent: 'center',
                 position: 'relative',
                 zIndex: 1,
               }}>
-              {/* Sol taraf: Soruştur butonu */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+              {/* Orta: İnquire ve Query butonları yan yana */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 1.5,
+              }}>
                 <Button
                   variant="contained"
                   onClick={() => navigate('/inquire')}
                   startIcon={<HelpOutline sx={{ fontSize: '1.1rem' }} />}
                   sx={{
-                    borderRadius: 12,
-                    backgroundColor: (() => {
-                      if (themeName === 'magnefite') {
-                        return '#8B5CF6'; // Purple - fixed for both modes
-                      } else if (themeName === 'papirus') {
-                        return mode === 'dark' ? '#8B7355' : '#A0826D'; // Bronze brown
-                      } else if (themeName === 'molume') {
-                        return mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Grayish
-                      }
-                      return theme.palette.info.main; // Default: info
-                    })(),
-                    color: 'white',
+                    borderRadius: 2,
+                    backgroundColor: theme.palette.primary.main,
+                    color: theme.palette.primary.contrastText || 'white',
                     textTransform: 'none',
-                    py: 1.3,
+                    py: 1.2,
                     px: 2.5,
                     fontSize: '0.9rem',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     minWidth: '140px',
-                    boxShadow: (() => {
-                      let color = '#8B5CF6';
-                      if (themeName === 'magnefite') {
-                        color = '#8B5CF6';
-                      } else if (themeName === 'papirus') {
-                        color = mode === 'dark' ? '#8B7355' : '#A0826D';
-                      } else if (themeName === 'molume') {
-                        color = mode === 'dark' ? '#9CA3AF' : '#6B7280';
-                      } else {
-                        color = theme.palette.info.main;
-                      }
-                      return `0 2px 8px ${color}33`;
-                    })(),
+                    boxShadow: 'none',
+                    border: `1px solid ${theme.palette.primary.main}`,
                     '&:hover': {
-                      backgroundColor: (() => {
-                        if (themeName === 'magnefite') {
-                          return '#7C3AED'; // Darker purple
-                        } else if (themeName === 'papirus') {
-                          return mode === 'dark' ? '#6B5B3D' : '#8B7355';
-                        } else if (themeName === 'molume') {
-                          return mode === 'dark' ? '#6B7280' : '#4B5563';
-                        }
-                        return theme.palette.info.dark;
-                      })(),
+                      backgroundColor: theme.palette.primary.dark,
+                      boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
+                      transform: 'translateY(-1px)',
                     },
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {t('inquire', currentLanguage)}
                 </Button>
-              </Box>
-
-              {/* Orta: Arama Bar */}
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <form onSubmit={handleSearch} style={{ display: 'flex', minWidth: 0 }}>
-                  <Search
-                    sx={{
-                      width: '320px',
-                      backgroundColor: mode === 'dark' 
-                        ? alpha(theme.palette.common.white, 0.08)
-                        : alpha(theme.palette.common.black, 0.04),
-                      borderColor: mode === 'dark'
-                        ? alpha(theme.palette.common.white, 0.25)
-                        : alpha(theme.palette.common.black, 0.2),
-                      borderWidth: '1px',
-                      borderStyle: 'solid',
-                      py: 1.3,
-                      minWidth: 0,
-                      '&:hover': {
-                        backgroundColor: mode === 'dark'
-                          ? alpha(theme.palette.common.white, 0.12)
-                          : alpha(theme.palette.common.black, 0.06),
-                        borderColor: mode === 'dark'
-                          ? alpha(theme.palette.common.white, 0.35)
-                          : alpha(theme.palette.common.black, 0.3),
-                      },
-                    }}
-                  >
-                    <SearchIconWrapper>
-                      <SearchIcon sx={{ 
-                        color: mode === 'dark' 
-                          ? alpha(theme.palette.common.white, 0.75)
-                          : alpha(theme.palette.common.black, 0.65),
-                        fontSize: '1.15rem' 
-                      }} />
-                    </SearchIconWrapper>
-                    <StyledInputBase
-                      placeholder={t('search', currentLanguage)}
-                      inputProps={{ 'aria-label': 'search' }}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      sx={{
-                        '& .MuiInputBase-input': {
-                          color: mode === 'dark'
-                            ? alpha(theme.palette.common.white, 0.95)
-                            : alpha(theme.palette.common.black, 0.85),
-                          fontSize: '0.95rem',
-                          padding: '7px 14px 7px 0',
-                          fontWeight: 400,
-                          '&::placeholder': {
-                            color: mode === 'dark'
-                              ? alpha(theme.palette.common.white, 0.65)
-                              : alpha(theme.palette.common.black, 0.55),
-                            opacity: 1,
-                          },
-                        },
-                      }}
-                    />
-                  </Search>
-                </form>
-              </Box>
-
-              {/* Sağ taraf: Sorgula butonu */}
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
-                  variant="contained"
+                  variant="outlined"
                   onClick={() => navigate('/query')}
                   startIcon={<FindInPage sx={{ fontSize: '1.1rem' }} />}
                   sx={{
-                    borderRadius: 12,
-                    backgroundColor: (() => {
-                      if (themeName === 'magnefite') {
-                        return mode === 'dark' ? '#9CA3AF' : '#6B7280'; // Gray
-                      } else if (themeName === 'papirus') {
-                        return mode === 'dark' ? '#6B5B3D' : '#C4B5A0'; // Different bronze brown
-                      } else if (themeName === 'molume') {
-                        return mode === 'dark' ? '#0A1A23' : '#E8E4DC'; // Different color
-                      }
-                      return theme.palette.secondary.main; // Default: secondary
-                    })(),
-                    color: (() => {
-                      if (themeName === 'magnefite') {
-                        return 'white';
-                      } else if (themeName === 'papirus') {
-                        return 'white';
-                      } else if (themeName === 'molume') {
-                        return mode === 'dark' ? 'white' : '#2C2823';
-                      }
-                      return 'white';
-                    })(),
+                    borderRadius: 2,
+                    borderColor: theme.palette.primary.main,
+                    color: theme.palette.primary.main,
                     textTransform: 'none',
-                    py: 1.3,
+                    py: 1.2,
                     px: 2.5,
                     fontSize: '0.9rem',
-                    fontWeight: 600,
+                    fontWeight: 500,
                     minWidth: '140px',
-                    boxShadow: (() => {
-                      let color = theme.palette.secondary.main;
-                      if (themeName === 'magnefite') {
-                        color = mode === 'dark' ? '#9CA3AF' : '#6B7280';
-                      } else if (themeName === 'papirus') {
-                        color = mode === 'dark' ? '#6B5B3D' : '#C4B5A0';
-                      } else if (themeName === 'molume') {
-                        color = mode === 'dark' ? '#0A1A23' : '#E8E4DC';
-                      }
-                      return `0 2px 8px ${color}33`;
-                    })(),
+                    backgroundColor: 'transparent',
                     '&:hover': {
-                      backgroundColor: (() => {
-                        if (themeName === 'magnefite') {
-                          return mode === 'dark' ? '#6B7280' : '#4B5563';
-                        } else if (themeName === 'papirus') {
-                          return mode === 'dark' ? '#4A3E2F' : '#B8A895';
-                        } else if (themeName === 'molume') {
-                          return mode === 'dark' ? '#061218' : '#E0DCD4';
-                        }
-                        return theme.palette.secondary.dark;
-                      })(),
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                      borderColor: theme.palette.primary.dark,
+                      color: theme.palette.primary.dark,
+                      transform: 'translateY(-1px)',
+                      boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
                     },
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   {t('query', currentLanguage)}
@@ -623,6 +511,69 @@ const Header = () => {
 
           {/* Right side controls - Container dışında */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: { xs: 2, sm: 3, md: 4 } }}>
+            {/* Arama Bar - Theme Toggle'ın solunda */}
+            {!isMobile && (
+              <form onSubmit={handleSearch} style={{ display: 'flex', minWidth: 0 }}>
+                <Search
+                  sx={{
+                    width: '280px',
+                    backgroundColor: theme.palette.mode === 'dark' 
+                      ? alpha(theme.palette.common.white, 0.05)
+                      : alpha(theme.palette.common.black, 0.03),
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRadius: '4px', // Daha az yuvarlak (override styled component)
+                    py: 1,
+                    minWidth: 0,
+                    '&:hover': {
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? alpha(theme.palette.common.white, 0.08)
+                        : alpha(theme.palette.common.black, 0.05),
+                      borderColor: theme.palette.primary.main,
+                    },
+                    '&:focus-within': {
+                      borderColor: theme.palette.primary.main,
+                      backgroundColor: theme.palette.mode === 'dark'
+                        ? alpha(theme.palette.common.white, 0.08)
+                        : alpha(theme.palette.common.black, 0.05),
+                    },
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <SearchIconWrapper
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSearch(e as any);
+                    }}
+                  >
+                    <SearchIcon sx={{ 
+                      color: theme.palette.text.secondary,
+                      fontSize: '1.2rem' 
+                    }} />
+                  </SearchIconWrapper>
+                  <StyledInputBase
+                    placeholder={t('search', currentLanguage)}
+                    inputProps={{ 'aria-label': 'search' }}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    sx={{
+                      width: '100%',
+                      '& .MuiInputBase-input': {
+                        color: theme.palette.text.primary,
+                        fontSize: '0.95rem',
+                        padding: '8px 14px 8px 14px',
+                        paddingRight: '40px',
+                        fontWeight: 400,
+                        '&::placeholder': {
+                          color: theme.palette.text.secondary,
+                          opacity: 1,
+                        },
+                      },
+                    }}
+                  />
+                </Search>
+              </form>
+            )}
+            
             {/* Theme Toggle - Ampul */}
             <ThemeToggle />
 
