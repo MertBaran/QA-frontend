@@ -25,6 +25,7 @@ const ResetPassword = lazy(() => import('../pages/auth/ResetPassword'));
 const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 const Inquire = lazy(() => import('../pages/Inquire'));
 const Query = lazy(() => import('../pages/Query'));
+const Search = lazy(() => import('../pages/Search'));
 
 // Admin page components
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
@@ -47,10 +48,11 @@ const Pages = {
   TestError,
   NotFound,
   ResetPassword,
-  ForgotPassword,
-  Inquire,
-  Query,
-  // Admin pages
+    ForgotPassword,
+    Inquire,
+    Query,
+    Search,
+    // Admin pages
   AdminDashboard,
   AdminUsers,
   AdminQuestions,
