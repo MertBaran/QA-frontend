@@ -164,4 +164,149 @@ export const common = {
     en: 'Search',
     de: 'Suchen',
   },
+  include_answers: {
+    tr: 'Cevapları dahil et',
+    en: 'Include answers',
+    de: 'Antworten einschließen',
+  },
+  questions: {
+    tr: 'Sorular',
+    en: 'Questions',
+    de: 'Fragen',
+  },
+  no_results: {
+    tr: 'Sonuç bulunamadı',
+    en: 'No results found',
+    de: 'Keine Ergebnisse gefunden',
+  },
+  search_error: {
+    tr: 'Arama yapılırken bir hata oluştu',
+    en: 'An error occurred while searching',
+    de: 'Beim Suchen ist ein Fehler aufgetreten',
+  },
+  answer_to_question: {
+    tr: 'Bir soruya cevap',
+    en: 'Answer to a question',
+    de: 'Antwort auf eine Frage',
+  },
+  search_mode: {
+    tr: 'Arama Modu',
+    en: 'Search Mode',
+    de: 'Suchmodus',
+  },
+  search_mode_exact: {
+    tr: 'Kesin Eşleşme',
+    en: 'Exact Match',
+    de: 'Exakte Übereinstimmung',
+  },
+  search_mode_fuzzy: {
+    tr: 'Yakın Kelimeler',
+    en: 'Similar Words',
+    de: 'Ähnliche Wörter',
+  },
+  search_mode_phrase: {
+    tr: 'Sıralı Tam İfade',
+    en: 'Exact Phrase (Ordered)',
+    de: 'Exakter Ausdruck (Geordnet)',
+  },
+  search_mode_all_words: {
+    tr: 'Tüm Kelimeleri İçeren',
+    en: 'All Words',
+    de: 'Alle Wörter',
+  },
+  search_mode_any_word: {
+    tr: 'Herhangi Bir Kelimeyi İçeren',
+    en: 'Any Word',
+    de: 'Irgendein Wort',
+  },
+  match_type: {
+    tr: 'Eşleşme Tipi',
+    en: 'Match Type',
+    de: 'Übereinstimmungstyp',
+  },
+  match_type_fuzzy: {
+    tr: 'Typo Hatası',
+    en: 'Typo Error',
+    de: 'Tippfehler',
+  },
+  match_type_fuzzy_tooltip: {
+    tr: 'Kelime başına maksimum 2 karakter hatası',
+    en: 'Maximum 2 character errors per word',
+    de: 'Maximal 2 Zeichenfehler pro Wort',
+  },
+  match_type_exact: {
+    tr: 'Kesin Eşleşme',
+    en: 'Exact',
+    de: 'Exakt',
+  },
+  match_type_smart: {
+    tr: 'Akıllı',
+    en: 'Smart',
+    de: 'Intelligent',
+  },
+  smart_options: {
+    tr: 'Akıllı Seçenekler',
+    en: 'Smart Options',
+    de: 'Intelligente Optionen',
+  },
+  smart_linguistic: {
+    tr: 'Dilsel',
+    en: 'Linguistic',
+    de: 'Sprachlich',
+  },
+  smart_semantic: {
+    tr: 'Anlamsal',
+    en: 'Semantic',
+    de: 'Semantisch',
+  },
+  semantic_search_unavailable: {
+    tr: 'Anlamsal arama şu anda kullanılamıyor, dilsel arama kullanılıyor.',
+    en: 'Semantic search is currently unavailable, using linguistic search.',
+    de: 'Semantische Suche ist derzeit nicht verfügbar, es wird linguistische Suche verwendet.',
+  },
+  min_search_length: {
+    tr: 'Arama için en az 3 karakter girmelisiniz.',
+    en: 'You must enter at least 3 characters to search.',
+    de: 'Sie müssen mindestens 3 Zeichen eingeben, um zu suchen.',
+  },
+  typo_tolerance: {
+    tr: 'Typo Toleransı',
+    en: 'Typo Tolerance',
+    de: 'Tippfehler-Toleranz',
+  },
+  typo_tolerance_low: {
+    tr: 'Düşük',
+    en: 'Low',
+    de: 'Niedrig',
+  },
+  typo_tolerance_low_tooltip: {
+    tr: 'İlk 3 karakter kesin doğru, maksimum 1 karakter hatası',
+    en: 'First 3 characters must be correct, maximum 1 character error',
+    de: 'Erste 3 Zeichen müssen korrekt sein, maximal 1 Zeichenfehler',
+  },
+  typo_tolerance_medium: {
+    tr: 'Orta',
+    en: 'Medium',
+    de: 'Mittel',
+  },
+  typo_tolerance_medium_tooltip: {
+    tr: 'İlk 2 karakter kesin doğru, maksimum 2 karakter hatası',
+    en: 'First 2 characters must be correct, maximum 2 character errors',
+    de: 'Erste 2 Zeichen müssen korrekt sein, maximal 2 Zeichenfehler',
+  },
+  typo_tolerance_high: {
+    tr: 'Yüksek',
+    en: 'High',
+    de: 'Hoch',
+  },
+  typo_tolerance_high_tooltip: {
+    tr: 'İlk 1 karakter kesin doğru, maksimum 2 karakter hatası',
+    en: 'First 1 character must be correct, maximum 2 character errors',
+    de: 'Erstes Zeichen muss korrekt sein, maximal 2 Zeichenfehler',
+  },
+  smart_search: {
+    tr: 'Akıllı Arama',
+    en: 'Smart Search',
+    de: 'Intelligente Suche',
+  },
 } as const;
