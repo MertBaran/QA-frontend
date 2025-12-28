@@ -20,6 +20,11 @@ export const userRoutes = [
     component: 'Query',
     exact: true,
   },
+  {
+    path: '/search',
+    component: 'Search',
+    exact: true,
+  },
 ];
 
 // Home route (protected)
