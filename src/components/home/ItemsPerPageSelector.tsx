@@ -90,9 +90,6 @@ const ItemsPerPageSelector: React.FC<ItemsPerPageSelectorProps> = ({
         <FormControlLabel value="25" control={<Radio />} label="25" />
         <FormControlLabel value="50" control={<Radio />} label="50" />
       </RadioGroup>
-      <Typography variant="body2" sx={{ color: theme.palette.text.secondary, ml: 'auto' }}>
-        {t('total_questions', currentLanguage)}: {totalQuestions}
-      </Typography>
     </Container>
   );
 };
