@@ -9,7 +9,6 @@ export interface MockQuestion {
   tags: string[];
   likes: number;
   answers: number;
-  views: number;
   timeAgo: string;
   isTrending: boolean;
   category: string;
@@ -28,7 +27,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['React', 'JavaScript', 'Hooks'],
     likes: 24,
     answers: 8,
-    views: 156,
     timeAgo: '2 saat önce',
     isTrending: true,
     category: 'Frontend',
@@ -45,7 +43,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['TypeScript', 'Generics'],
     likes: 18,
     answers: 5,
-    views: 89,
     timeAgo: '4 saat önce',
     isTrending: false,
     category: 'Frontend',
@@ -62,7 +59,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['MongoDB', 'Database', 'Aggregation'],
     likes: 32,
     answers: 12,
-    views: 234,
     timeAgo: '6 saat önce',
     isTrending: true,
     category: 'Backend',
@@ -79,7 +75,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['Docker', 'DevOps', 'Containerization'],
     likes: 15,
     answers: 6,
-    views: 67,
     timeAgo: '8 saat önce',
     isTrending: false,
     category: 'DevOps',
@@ -96,7 +91,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['Node.js', 'Performance', 'JavaScript'],
     likes: 28,
     answers: 9,
-    views: 178,
     timeAgo: '1 gün önce',
     isTrending: true,
     category: 'Backend',
@@ -113,7 +107,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['CSS', 'Grid', 'Flexbox', 'Layout'],
     likes: 22,
     answers: 7,
-    views: 145,
     timeAgo: '1 gün önce',
     isTrending: false,
     category: 'Frontend',
@@ -130,7 +123,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['GraphQL', 'REST', 'API', 'Backend'],
     likes: 35,
     answers: 14,
-    views: 289,
     timeAgo: '2 gün önce',
     isTrending: true,
     category: 'Backend',
@@ -147,7 +139,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['React Native', 'Navigation', 'Mobile'],
     likes: 19,
     answers: 6,
-    views: 98,
     timeAgo: '2 gün önce',
     isTrending: false,
     category: 'Mobile',
@@ -196,9 +187,6 @@ export const filterQuestions = (
     case 'En Popüler':
       filtered.sort((a, b) => b.likes - a.likes);
       break;
-    case 'En Çok Görüntülenen':
-      filtered.sort((a, b) => b.views - a.views);
-      break;
     case 'En Çok Cevaplanan':
       filtered.sort((a, b) => b.answers - a.answers);
       break;
@@ -213,4 +201,4 @@ export const filterQuestions = (
 export const categories = ['Frontend', 'Backend', 'Mobile', 'DevOps', 'Database', 'AI/ML'];
 
 // Sıralama seçenekleri
-export const sortOptions = ['En Yeni', 'En Popüler', 'En Çok Görüntülenen', 'En Çok Cevaplanan'];
+export const sortOptions = ['En Yeni', 'En Popüler', 'En Çok Cevaplanan'];
