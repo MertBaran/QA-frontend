@@ -11,19 +11,20 @@ import {
 } from '@mui/material';
 import {
   ThumbUp,
+  ThumbDown,
   Comment,
-  Visibility,
-  Delete,
   AccountTree,
+  Quiz,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { Question } from '../../types/question';
-import BookmarkButton from '../ui/BookmarkButton';
 import ParentInfoChip from '../ui/ParentInfoChip';
 import AncestorsDrawer from './AncestorsDrawer';
 import MarkdownRenderer from '../ui/MarkdownRenderer';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
+import { questionService } from '../../services/questionService';
+import RelatedQuestionsPopover from './RelatedQuestionsPopover';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 
@@ -97,9 +98,6 @@ const StyledPaper = styled(Box, {
 
 interface QuestionCardProps {
   question?: Question;
-  onLike?: (questionId: string) => void;
-  onUnlike?: (questionId: string) => void;
-  onDelete?: (questionId: string) => void;
   parentQuestions?: Record<string, Question>;
   parentAnswers?: Record<string, any>;
   parentAnswerQuestions?: Record<string, Question>;
@@ -110,9 +108,6 @@ interface QuestionCardProps {
 
 const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   question,
-  onLike,
-  onUnlike,
-  onDelete,
   parentQuestions = {},
   parentAnswers = {},
   parentAnswerQuestions = {},
@@ -125,13 +120,16 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const location = useLocation();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
-  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
   const [thumbnailPreviewOpen, setThumbnailPreviewOpen] = useState(false);
   const [thumbnailUrlState, setThumbnailUrlState] = useState<string | null>(null);
+  const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
+  const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
+  const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
+  const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<number>(0);
 
   // Thumbnail URL'ini oluştur (key varsa ama URL yoksa)
   useEffect(() => {
@@ -161,6 +159,49 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     }
   }, [question?.thumbnail?.key, question?.thumbnail?.url, question?.thumbnail, question?.id]);
 
+  // Load related questions count
+  useEffect(() => {
+    const loadRelatedCount = async () => {
+      if (!question || !question.id) return;
+      
+      try {
+        const related = await questionService.getQuestionsByParent(question.id);
+        setRelatedQuestionsCount(related.length);
+      } catch (err) {
+        console.error('Related questions count hatası:', err);
+        setRelatedQuestionsCount(0);
+      }
+    };
+    
+    loadRelatedCount();
+  }, [question]);
+
+  const handleShowRelatedQuestions = async (event: React.MouseEvent<HTMLElement>) => {
+    if (!question) return;
+    event.stopPropagation();
+    setRelatedQuestionsAnchor(event.currentTarget);
+    setLoadingRelatedQuestions(true);
+    
+    try {
+      const questions = await questionService.getQuestionsByParent(question.id);
+      setRelatedQuestions(questions);
+    } catch (error) {
+      console.error('İlişkili sorular yüklenirken hata:', error);
+      setRelatedQuestions([]);
+    } finally {
+      setLoadingRelatedQuestions(false);
+    }
+  };
+
+  const handleCloseRelatedQuestionsPopover = () => {
+    setRelatedQuestionsAnchor(null);
+  };
+
+  const handleRelatedQuestionClick = (questionId: string) => {
+    navigate(`/questions/${questionId}`);
+    setRelatedQuestionsAnchor(null);
+  };
+
   // If no question provided, render children (for answer writing section)
   if (!question) {
     return (
@@ -173,12 +214,6 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   }
 
   // Check if this question is bookmarked
-  const questionBookmark = bookmarks.find(
-    b => b.target_type === 'question' && b.target_id === question.id
-  );
-  const isBookmarked = !!questionBookmark;
-  const bookmarkId = questionBookmark?._id || null;
-
   const thumbnailUrl = thumbnailUrlState || question.thumbnail?.url;
   const hasThumbnail = Boolean(question.thumbnail?.key || thumbnailUrl);
 
@@ -194,100 +229,6 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
 
   return (
     <StyledPaper ref={ref} isPapirus={isPapirus} isMagnefite={isMagnefite} isAlternateTexture={isAlternateTexture} isAnswerWriting={isAnswerWriting}>
-      {/* Action Buttons - Sağ Üst Köşe */}
-      <Box sx={{ 
-        position: 'absolute',
-        top: theme => theme.spacing(2),
-        right: theme => theme.spacing(2),
-        display: 'flex',
-        gap: 0.5,
-        alignItems: 'center',
-        zIndex: 20,
-      }}>
-        <Box sx={{ 
-          display: 'inline-flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          width: '40px',
-          height: '40px',
-          flexShrink: 0,
-          '& > span': {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '40px',
-            height: '40px',
-            '& .MuiIconButton-root': {
-              width: '40px !important',
-              height: '40px !important',
-              padding: '0 !important',
-              minWidth: '40px',
-              minHeight: '40px',
-            },
-          },
-        }}>
-          <BookmarkButton 
-            targetType={'question'} 
-            targetId={question.id} 
-            targetData={{
-              title: question.title,
-              content: question.content,
-              author: question.author?.name,
-              authorId: question.author?.id,
-              created_at: question.createdAt,
-              url: window.location.origin + '/questions/' + question.id,
-            }}
-            isBookmarked={isBookmarked}
-            bookmarkId={bookmarkId}
-          />
-        </Box>
-        {user && (
-          question.author.id === user.id || 
-          question.userInfo?._id === user.id ||
-          question.author.id === user.id?.toString()
-        ) && (
-          <IconButton 
-            size="small" 
-            sx={(theme) => {
-              // Theme-specific negative colors
-              const getNegativeColor = () => {
-                if (themeName === 'molume') {
-                  return '#FF3B30'; // Red
-                } else if (themeName === 'papirus') {
-                  return theme.palette.mode === 'dark' ? '#A0522D' : '#8B4513'; // Sienna brown
-                } else {
-                  return '#DB7093'; // Pink-red
-                }
-              };
-              const negativeColor = getNegativeColor();
-              
-              return {
-                color: negativeColor,
-              cursor: 'pointer',
-              width: '40px',
-              height: '40px',
-              padding: 0,
-                border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
-                backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
-              '&:hover': {
-                  color: negativeColor,
-                  backgroundColor: theme.palette.mode === 'dark' 
-                    ? `${negativeColor}22` 
-                    : `${negativeColor}11`,
-                  borderColor: theme.palette.mode === 'light' ? negativeColor : undefined,
-              }
-              };
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete?.(question.id);
-            }}
-            title={t('delete', currentLanguage)}
-          >
-            <Delete />
-          </IconButton>
-        )}
-      </Box>
 
       {/* Parent Question/Answer Info with Ancestors Button */}
       {parentId && (
@@ -555,7 +496,13 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             </Box>
           )}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          {/* Stats Container - Alt Kısım */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 3,
+            mt: 2,
+          }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
@@ -563,17 +510,34 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Comment sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                {question.dislikesCount}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Comment sx={{ fontSize: 18, color: theme.palette.text.secondary, transform: 'rotate(180deg)' }} />
               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                 {question.answers}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Visibility sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+            {user && relatedQuestionsCount > 0 && (
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                cursor: 'pointer',
+              }}
+              onClick={handleShowRelatedQuestions}
+              title={t('related_questions', currentLanguage)}
+            >
+              <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                {question.views}
+                  {relatedQuestionsCount}
               </Typography>
             </Box>
+            )}
           </Box>
         </Box>
       </Box>
@@ -581,9 +545,24 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
       {/* Ancestors Drawer */}
       <AncestorsDrawer
         open={ancestorsDrawerOpen}
-        onClose={() => setAncestorsDrawerOpen(false)}
+        onClose={(event) => {
+          if (event) {
+            event.stopPropagation();
+          }
+          setAncestorsDrawerOpen(false);
+        }}
         ancestors={question.ancestors || []}
         currentQuestionId={question.id}
+        contentType="question"
+      />
+
+      {/* Related Questions Popover */}
+      <RelatedQuestionsPopover
+        anchorEl={relatedQuestionsAnchor}
+        onClose={handleCloseRelatedQuestionsPopover}
+        questions={relatedQuestions}
+        loading={loadingRelatedQuestions}
+        onQuestionClick={handleRelatedQuestionClick}
       />
 
       <Dialog
