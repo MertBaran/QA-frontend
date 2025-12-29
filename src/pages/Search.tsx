@@ -32,6 +32,7 @@ import Tooltip from '@mui/material/Tooltip';
 import { styled, alpha } from '@mui/material/styles';
 import Layout from '../components/layout/Layout';
 import { searchService } from '../services/searchService';
+import { questionService } from '../services/questionService';
 import { Question } from '../types/question';
 import { Answer } from '../types/answer';
 import { t } from '../utils/translations';
@@ -39,6 +40,8 @@ import { useAppSelector, useAppDispatch } from '../store/hooks';
 import QuestionCard from '../components/question/QuestionCard';
 import AnswerCard from '../components/answer/AnswerCard';
 import ItemsPerPageSelector from '../components/home/ItemsPerPageSelector';
+import RelatedQuestionsPopover from '../components/question/RelatedQuestionsPopover';
+import { SearchPageSkeleton } from '../components/ui/skeleton';
 import { likeQuestion, unlikeQuestion } from '../store/questions/questionThunks';
 import { likeAnswer, unlikeAnswer } from '../store/answers/answerThunks';
 import papyrusVertical1 from '../asset/textures/papyrus_vertical_1.png';
@@ -92,7 +95,7 @@ const Search = () => {
   
   const query = searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(query);
-  const [includeAnswers, setIncludeAnswers] = useState(false);
+  const [lastSearchTerm, setLastSearchTerm] = useState<string>('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -126,13 +129,20 @@ const Search = () => {
   const [questionsPagination, setQuestionsPagination] = useState<any>(null);
   const [answersPagination, setAnswersPagination] = useState<any>(null);
   
+  // Related questions state
+  const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
+  const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
+  const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
+  const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
+  const [currentRelatedTargetId, setCurrentRelatedTargetId] = useState<string | null>(null);
+  const [currentRelatedMode, setCurrentRelatedMode] = useState<'question' | 'answer' | null>(null);
+  
   // Kelime sayısını hesapla
   const wordCount = searchTerm.trim().split(/\s+/).filter(w => w.length > 0).length;
   const isSingleWord = wordCount === 1;
 
   useEffect(() => {
     const urlQuery = searchParams.get('q') || '';
-    // includeAnswers artık kullanılmıyor, her zaman cevapları dahil ediyoruz
     
     // searchOptions'ı query parametrelerinden oku
     const urlSearchMode = (searchParams.get('searchMode') as 'phrase' | 'all_words' | 'any_word' | null) || 'any_word';
@@ -157,15 +167,19 @@ const Search = () => {
     // URL'de query varsa ve minimum 3 karakter ise arama yap
     const trimmedUrlQuery = urlQuery.trim();
     if (trimmedUrlQuery && trimmedUrlQuery.length >= 3) {
-      // Reset pagination when search term changes
+      // Reset pagination when search term changes (or when _t parameter changes for same term)
+      const timestampParam = searchParams.get('_t');
+      if (lastSearchTerm !== trimmedUrlQuery || timestampParam) {
       setQuestionsPage(1);
       setAnswersPage(1);
+        setLastSearchTerm(trimmedUrlQuery);
+      }
       // Smart search açıksa otomatik olarak sadece linguistic aktif (semantic false)
       const finalSmartOpts = urlSmartSearch 
         ? { linguistic: true, semantic: false }
         : undefined;
       
-      performSearch(trimmedUrlQuery, true, urlSearchMode, urlMatchType, urlTypoTolerance, urlSmartSearch, finalSmartOpts); // Her zaman cevapları dahil et
+      performSearch(trimmedUrlQuery, urlSearchMode, urlMatchType, urlTypoTolerance, urlSmartSearch, finalSmartOpts);
     } else if (trimmedUrlQuery && trimmedUrlQuery.length > 0 && trimmedUrlQuery.length < 3) {
       // 3 karakterden azsa hata göster
       setError(t('min_search_length', currentLanguage) || 'Arama için en az 3 karakter girmelisiniz.');
@@ -180,12 +194,11 @@ const Search = () => {
       setAnswersPagination(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, [searchParams, searchParams.get('_t')]);
 
 
   const performSearch = async (
     term: string,
-    includeAns: boolean = true, // Artık her zaman cevapları dahil et
     mode: 'phrase' | 'all_words' | 'any_word' = 'any_word',
     match: 'fuzzy' | 'exact' = 'fuzzy',
     tolerance: 'low' | 'medium' | 'high' = 'medium',
@@ -227,7 +240,6 @@ const Search = () => {
     try {
       const results = await searchService.searchAll(
         term, 
-        includeAns,
         qPage,
         qItemsPerPage,
         aPage,
@@ -286,6 +298,13 @@ const Search = () => {
     if (trimmedSearchTerm) {
       setError(null); // Hata mesajını temizle
       const params = new URLSearchParams(searchParams);
+      const currentQuery = params.get('q');
+      
+      // Eğer aynı kelime için tekrar arama yapılıyorsa, timestamp ekle
+      if (currentQuery === trimmedSearchTerm) {
+        params.set('_t', Date.now().toString());
+      }
+      
       params.set('q', trimmedSearchTerm);
       // includeAnswers artık kullanılmıyor, her zaman cevapları dahil ediyoruz
       params.delete('includeAnswers'); // Eski parametreyi temizle
@@ -414,6 +433,53 @@ const Search = () => {
     }
   };
 
+  // Load related questions count for each answer
+  useEffect(() => {
+    const loadRelatedCounts = async () => {
+      if (!answers || answers.length === 0) return;
+      
+      const counts: Record<string, number> = {};
+      for (const answer of answers) {
+        try {
+          const related = await questionService.getQuestionsByParent(answer.id);
+          counts[answer.id] = related.length;
+        } catch (err) {
+          console.error('Related questions count hatası:', err);
+          counts[answer.id] = 0;
+        }
+      }
+      setRelatedQuestionsCount(counts);
+    };
+    
+    loadRelatedCounts();
+  }, [answers]);
+
+  const handleShowRelatedQuestions = async (event: React.MouseEvent<HTMLElement>, answerId: string) => {
+    setRelatedQuestionsAnchor(event.currentTarget);
+    setCurrentRelatedTargetId(answerId);
+    setCurrentRelatedMode('answer');
+    setLoadingRelatedQuestions(true);
+    
+    try {
+      const questions = await questionService.getQuestionsByParent(answerId);
+      setRelatedQuestions(questions);
+    } catch (error) {
+      console.error('İlişkili sorular yüklenirken hata:', error);
+      setRelatedQuestions([]);
+    } finally {
+      setLoadingRelatedQuestions(false);
+    }
+  };
+
+  const handleCloseRelatedQuestionsPopover = () => {
+    setRelatedQuestionsAnchor(null);
+  };
+
+  const handleRelatedQuestionClick = (questionId: string) => {
+    navigate(`/questions/${questionId}`);
+    setRelatedQuestionsAnchor(null);
+  };
+
   const handleLikeAnswer = async (answerId: string) => {
     const answer = answers.find(a => a.id === answerId);
     if (!answer || !answer.questionId || !user) return;
@@ -494,7 +560,6 @@ const Search = () => {
     if (trimmedSearchTerm && trimmedSearchTerm.length >= 3) {
       performSearch(
         trimmedSearchTerm, 
-        true, // Her zaman cevapları dahil et
         searchMode, 
         matchType, 
         typoTolerance,
@@ -517,7 +582,6 @@ const Search = () => {
     if (searchTerm.trim()) {
       performSearch(
         searchTerm, 
-        includeAnswers, 
         searchMode, 
         matchType, 
         typoTolerance,
@@ -541,7 +605,6 @@ const Search = () => {
     if (searchTerm.trim()) {
       performSearch(
         searchTerm, 
-        includeAnswers, 
         searchMode, 
         matchType, 
         typoTolerance,
@@ -565,7 +628,6 @@ const Search = () => {
     if (searchTerm.trim()) {
       performSearch(
         searchTerm, 
-        includeAnswers, 
         searchMode, 
         matchType, 
         typoTolerance,
@@ -781,9 +843,7 @@ const Search = () => {
         )}
 
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
+          <SearchPageSkeleton />
         ) : (
           <>
             {questions.length === 0 && answers.length === 0 && searchTerm.trim() && !loading && (
@@ -862,8 +922,6 @@ const Search = () => {
                     <Fade in timeout={800 + index * 200} key={question.id}>
                       <QuestionCard
                         question={question}
-                        onLike={handleLikeQuestion}
-                        onUnlike={handleUnlikeQuestion}
                         isAlternateTexture={index % 2 === 1}
                       />
                     </Fade>
@@ -922,9 +980,11 @@ const Search = () => {
                     <Fade in timeout={800 + index * 200} key={answer.id}>
                       <AnswerCard
                         answer={answer}
-                        onLike={handleLikeAnswer}
-                        onUnlike={handleUnlikeAnswer}
                         isAlternateTexture={index % 2 === 1}
+                        relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
+                        onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
+                          handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId);
+                        }}
                       />
                     </Fade>
                   ))}
@@ -1049,6 +1109,15 @@ const Search = () => {
           </>
         )}
       </Container>
+
+      {/* Related Questions Popover */}
+      <RelatedQuestionsPopover
+        anchorEl={relatedQuestionsAnchor}
+        onClose={handleCloseRelatedQuestionsPopover}
+        questions={relatedQuestions}
+        loading={loadingRelatedQuestions}
+        onQuestionClick={handleRelatedQuestionClick}
+      />
     </Layout>
   );
 };

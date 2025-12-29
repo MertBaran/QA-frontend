@@ -44,6 +44,11 @@ export const common = {
     en: 'Loading...',
     de: 'Lädt...',
   },
+  no_data: {
+    tr: 'Henüz burada bir şey yok.',
+    en: 'Nothing here yet.',
+    de: 'Hier ist noch nichts.',
+  },
   back: {
     tr: 'Geri Dön',
     en: 'Back',
@@ -120,6 +125,16 @@ export const common = {
     de: 'Noch keine Likes',
   },
   ancestors: {
+    tr: 'Sorunun Soyu',
+    en: "Question's Ancestors",
+    de: 'Fragenvorläufer',
+  },
+  answer_ancestors: {
+    tr: 'Cevabın Soyu',
+    en: "Answer's Ancestors",
+    de: 'Antwortvorläufer',
+  },
+  question_ancestors: {
     tr: 'Sorunun Soyu',
     en: "Question's Ancestors",
     de: 'Fragenvorläufer',
@@ -308,5 +323,15 @@ export const common = {
     tr: 'Akıllı Arama',
     en: 'Smart Search',
     de: 'Intelligente Suche',
+  },
+  question: {
+    tr: 'Soru',
+    en: 'Question',
+    de: 'Frage',
+  },
+  answer: {
+    tr: 'Cevap',
+    en: 'Answer',
+    de: 'Antwort',
   },
 } as const;

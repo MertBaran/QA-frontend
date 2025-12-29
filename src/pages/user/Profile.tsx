@@ -47,6 +47,7 @@ import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
 import { t } from '../../utils/translations';
+import { ProfilePageSkeleton, QuestionsListSkeleton, AnswersListSkeleton } from '../../components/ui/skeleton';
 import { User } from '../../types/user';
 import { Question } from '../../types/question';
 import { Answer } from '../../types/answer';
@@ -82,7 +83,11 @@ const Profile = () => {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [answersLoading, setAnswersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
+  const [answersError, setAnswersError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [stats, setStats] = useState<ProfileStats>({
     totalQuestions: 0,
@@ -95,6 +100,22 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
   const [questionsPage, setQuestionsPage] = useState(1);
   const [answersPage, setAnswersPage] = useState(1);
+  const [questionsPagination, setQuestionsPagination] = useState({
+    totalItems: 0,
+    totalPages: 0,
+    currentPage: 1,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
+  const [answersPagination, setAnswersPagination] = useState({
+    total: 0,
+    totalPages: 0,
+    page: 1,
+    limit: 10,
+    hasNext: false,
+    hasPrev: false,
+  });
   const itemsPerPage = 10;
 
   // Form state
@@ -113,37 +134,65 @@ const Profile = () => {
   // Determine if viewing own profile
   const isOwnProfile = !userId || userId === user?.id;
 
+  // Load questions separately
+  const loadQuestions = useCallback(async (targetUserId: string, page: number = 1) => {
+    try {
+      setQuestionsLoading(true);
+      setQuestionsError(null);
+      const result = await questionService.getQuestionsByUser(targetUserId, page, itemsPerPage);
+      setUserQuestions(result.data);
+      setQuestionsPagination(result.pagination);
+    } catch (error: any) {
+      console.error('Sorular yüklenirken hata:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || t('error_loading_questions', currentLanguage);
+      setQuestionsError(errorMessage);
+    } finally {
+      setQuestionsLoading(false);
+    }
+  }, [currentLanguage, itemsPerPage]);
+
+  // Load answers separately
+  const loadAnswers = useCallback(async (targetUserId: string, page: number = 1) => {
+    try {
+      setAnswersLoading(true);
+      setAnswersError(null);
+      const result = await answerService.getAnswersByUser(targetUserId, page, itemsPerPage);
+      setUserAnswers(result.data);
+      setAnswersPagination(result.pagination);
+    } catch (error: any) {
+      console.error('Cevaplar yüklenirken hata:', error);
+      const errorMessage = error?.response?.data?.message || error?.message || t('error_loading_answers', currentLanguage);
+      setAnswersError(errorMessage);
+    } finally {
+      setAnswersLoading(false);
+    }
+  }, [currentLanguage, itemsPerPage]);
+
+  // Load both questions and answers in parallel
   const loadUserData = useCallback(async (targetUserId: string) => {
     try {
-      setLoading(true);
-      
-      // Load questions and answers
-      const [questions, answers] = await Promise.all([
-        questionService.getQuestionsByUser(targetUserId),
-        answerService.getAnswersByUser(targetUserId),
+      // Load both in parallel without blocking
+      await Promise.all([
+        loadQuestions(targetUserId),
+        loadAnswers(targetUserId),
       ]);
-      
-      setUserQuestions(questions);
-      setUserAnswers(answers);
-      
-      // Calculate stats
-      const totalQuestions = questions.length;
-      const totalAnswers = answers.length;
-          const totalLikes = questions.reduce((sum, q) => sum + q.likesCount, 0) + answers.reduce((sum, a) => sum + a.likesCount, 0);
-          
-          setStats({
-            totalQuestions,
-            totalAnswers,
-            totalLikes,
-            profileViews: 0,
-          });
     } catch (error) {
       console.error('Kullanıcı verileri yüklenirken hata:', error);
-      setError(t('error_loading_profile', currentLanguage));
-    } finally {
-      setLoading(false);
     }
-  }, [currentLanguage]);
+  }, [loadQuestions, loadAnswers]);
+
+  // Update stats when pagination changes (total counts)
+  useEffect(() => {
+    if (!questionsLoading && !answersLoading) {
+          setStats({
+        totalQuestions: questionsPagination.totalItems,
+        totalAnswers: answersPagination.total,
+        totalLikes: userQuestions.reduce((sum, q) => sum + q.likesCount, 0) + 
+                    userAnswers.reduce((sum, a) => sum + a.likesCount, 0),
+            profileViews: 0,
+          });
+    }
+  }, [questionsPagination.totalItems, answersPagination.total, userQuestions, userAnswers, questionsLoading, answersLoading]);
 
   // Load user data
   useEffect(() => {
@@ -175,7 +224,10 @@ const Profile = () => {
             newPassword: '',
             confirmPassword: '',
           });
-          await loadUserData(targetUser.id);
+          
+          // Start loading questions and answers immediately (non-blocking)
+          // Don't await, let them load in parallel
+          loadUserData(targetUser.id);
         } else {
           setError('Kullanıcı bulunamadı');
         }
@@ -291,9 +343,7 @@ const Profile = () => {
         )}
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4, position: 'relative', zIndex: 1 }}>
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-              <CircularProgress />
-            </Box>
+            <ProfilePageSkeleton />
           ) : error ? (
             <Alert severity="error">{error}</Alert>
           ) : null}
@@ -718,21 +768,29 @@ const Profile = () => {
                     <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
                       <Tabs 
                         value={activeTab} 
-                        onChange={(_, newValue) => {
+                        onChange={async (_, newValue) => {
                           setActiveTab(newValue);
                           setQuestionsPage(1);
                           setAnswersPage(1);
+                          // Tab değiştiğinde ilk sayfayı yükle
+                          if (profileUser) {
+                            if (newValue === 'questions') {
+                              await loadQuestions(profileUser.id, 1);
+                            } else {
+                              await loadAnswers(profileUser.id, 1);
+                            }
+                          }
                         }}
                         textColor="primary"
                         indicatorColor="primary"
                       >
                         <Tab 
-                          label={`${t('questions', currentLanguage)} (${userQuestions.length})`} 
+                          label={`${t('questions', currentLanguage)} (${questionsPagination.totalItems})`} 
                           value="questions" 
                           sx={{ color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' }}
                         />
                         <Tab 
-                          label={`${t('answers', currentLanguage)} (${userAnswers.length})`} 
+                          label={`${t('answers', currentLanguage)} (${answersPagination.total})`} 
                           value="answers" 
                           sx={{ color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' }}
                         />
@@ -741,10 +799,18 @@ const Profile = () => {
                     
                     {activeTab === 'questions' && (
                       <>
-                        {userQuestions.length > 0 ? (
+                        {questionsLoading ? (
+                          <Box sx={{ mt: 2 }}>
+                            <QuestionsListSkeleton count={3} />
+                          </Box>
+                        ) : questionsError ? (
+                          <Alert severity="error" sx={{ my: 2 }}>
+                            {questionsError}
+                          </Alert>
+                        ) : userQuestions.length > 0 ? (
                           <>
-                            <List>
-                              {userQuestions.slice((questionsPage - 1) * itemsPerPage, questionsPage * itemsPerPage).map((question) => (
+                            <List id="questions-list">
+                              {userQuestions.map((question) => (
                               <ListItem 
                                 key={question.id} 
                                 sx={{ 
@@ -814,19 +880,30 @@ const Profile = () => {
                                     <Typography variant="caption" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
                                     }}>
-                                      • {question.answers} {t('answers', currentLanguage)}
+                                      • {question.answers} {currentLanguage === 'tr' ? 'cevap' : t('answers', currentLanguage)}
                                     </Typography>
                                   </Box>
                                 </Box>
                               </ListItem>
                               ))}
                             </List>
-                            {userQuestions.length > itemsPerPage && (
+                            {questionsPagination.totalPages > 1 && (
                               <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                                 <Pagination
-                                  count={Math.ceil(userQuestions.length / itemsPerPage)}
+                                  count={questionsPagination.totalPages}
                                   page={questionsPage}
-                                  onChange={(_, page) => setQuestionsPage(page)}
+                                  onChange={async (_, page) => {
+                                    setQuestionsPage(page);
+                                    // Scroll to top of the list
+                                    const listElement = document.getElementById('questions-list');
+                                    if (listElement) {
+                                      listElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                    // Backend'den yeni sayfayı yükle
+                                    if (profileUser) {
+                                      await loadQuestions(profileUser.id, page);
+                                    }
+                                  }}
                                   color="primary"
                                 />
                               </Box>
@@ -838,7 +915,7 @@ const Profile = () => {
                             textAlign: 'center',
                             py: 4,
                           }}>
-                            {t('no_questions', currentLanguage)}
+                            {t('no_data', currentLanguage)}
                           </Typography>
                         )}
                       </>
@@ -846,10 +923,18 @@ const Profile = () => {
                     
                     {activeTab === 'answers' && (
                       <>
-                        {userAnswers.length > 0 ? (
+                        {answersLoading ? (
+                          <Box sx={{ mt: 2 }}>
+                            <AnswersListSkeleton count={3} />
+                          </Box>
+                        ) : answersError ? (
+                          <Alert severity="error" sx={{ my: 2 }}>
+                            {answersError}
+                          </Alert>
+                        ) : userAnswers.length > 0 ? (
                           <>
-                            <List>
-                              {userAnswers.slice((answersPage - 1) * itemsPerPage, answersPage * itemsPerPage).map((answer) => (
+                            <List id="answers-list">
+                              {userAnswers.map((answer) => (
                               <ListItem 
                                 key={answer.id} 
                                 sx={{ 
@@ -930,12 +1015,23 @@ const Profile = () => {
                               </ListItem>
                               ))}
                             </List>
-                            {userAnswers.length > itemsPerPage && (
+                            {answersPagination.totalPages > 1 && (
                               <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
                                 <Pagination
-                                  count={Math.ceil(userAnswers.length / itemsPerPage)}
+                                  count={answersPagination.totalPages}
                                   page={answersPage}
-                                  onChange={(_, page) => setAnswersPage(page)}
+                                  onChange={async (_, page) => {
+                                    setAnswersPage(page);
+                                    // Scroll to top of the list
+                                    const listElement = document.getElementById('answers-list');
+                                    if (listElement) {
+                                      listElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                    // Backend'den yeni sayfayı yükle
+                                    if (profileUser) {
+                                      await loadAnswers(profileUser.id, page);
+                                    }
+                                  }}
                                   color="primary"
                                 />
                               </Box>
@@ -947,7 +1043,7 @@ const Profile = () => {
                             textAlign: 'center',
                             py: 4,
                           }}>
-                            {t('no_answers', currentLanguage)}
+                            {t('no_data', currentLanguage)}
                           </Typography>
                         )}
                       </>

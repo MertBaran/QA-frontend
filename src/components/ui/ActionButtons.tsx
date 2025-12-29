@@ -6,7 +6,7 @@ import {
   ThumbDown,
   ThumbDownOutlined,
   Delete,
-  HelpOutline,
+  ContactSupport,
   Edit,
 } from '@mui/icons-material';
 import BookmarkButton from './BookmarkButton';
@@ -291,7 +291,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               },
             }}
           >
-            <HelpOutline />
+            <ContactSupport />
           </IconButton>
         </Tooltip>
       )}

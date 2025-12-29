@@ -148,10 +148,22 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                 <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' })}>
                   {parentContentInfo.title}
                 </Typography>
-              ) : parentContentInfo.type === 'answer' && parentContentInfo.questionTitle ? (
-                <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' })}>
+              ) : parentContentInfo.type === 'answer' ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden', maxWidth: '300px' }}>
+                  <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>
+                    {t('answer', currentLanguage)}
+                  </Typography>
+                  {parentContentInfo.questionTitle && (
+                    <>
+                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
+                        •
+                      </Typography>
+                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>
                   {parentContentInfo.questionTitle}
                 </Typography>
+                    </>
+                  )}
+                </Box>
               ) : (
                 <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
                   {t('this_question_about', currentLanguage)}

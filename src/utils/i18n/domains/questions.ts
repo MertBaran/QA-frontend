@@ -235,7 +235,7 @@ export const questions = {
     de: 'Diese Frage handelt von',
   },
   related_questions: {
-    tr: 'Bu hakkında sorulan sorular',
+    tr: 'Bunun hakkında sorulan sorular',
     en: 'Questions about this',
     de: 'Fragen dazu',
   },
