@@ -20,16 +20,21 @@ import {
   Email,
   Lock,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { registerUser } from '../../store/auth/register/registerThunks';
 import { clearError } from '../../store/auth/authSlice';
 import { t } from '../../utils/translations';
 import { useFormValidation, registerSchema } from '../../utils/validation';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
+import axios from 'axios';
+import { showErrorToast } from '../../utils/notificationUtils';
+import { getCurrentUser } from '../../store/auth/authThunks';
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
 
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector(state => state.auth);
@@ -93,6 +98,25 @@ const Register = () => {
 
   const handleClickShowConfirmPassword = () => {
     setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleGoogleRegister = async (credential: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3000'}/auth/registerGoogle`,
+        { token: credential }
+      );
+      // JWT'yi kaydet
+      const { access_token } = response.data;
+      localStorage.setItem('access_token', access_token);
+      // Kullanıcı bilgisini güncelle
+      await dispatch(getCurrentUser());
+      navigate('/');
+    } catch (err: any) {
+      console.log(err);
+      const errorMessage = err.response?.data?.message || 'Google ile kayıt başarısız oldu.';
+      showErrorToast(errorMessage);
+    }
   };
 
   return (
@@ -318,6 +342,15 @@ const Register = () => {
                 t('register_button', currentLanguage)
               )}
             </Button>
+
+            {/* Google ile Kayıt */}
+            <GoogleLoginButton
+              onSuccess={handleGoogleRegister}
+              onError={() => {
+                showErrorToast(t('google_register_failed', currentLanguage) || 'Google ile kayıt başarısız oldu.');
+              }}
+              text="signup_with"
+            />
 
             <Box sx={{ textAlign: 'center' }}>
               <Link component={RouterLink} to="/login" variant="body2">

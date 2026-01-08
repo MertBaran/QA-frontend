@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -46,6 +46,7 @@ import { User } from '../../types/user';
 import ThemeToggle from '../ui/ThemeToggle';
 import ThemeSelector from '../ui/ThemeSelector';
 import { t } from '../../utils/translations';
+import { contentAssetService } from '../../services/contentAssetService';
 
 // Styled search component
 const Search = styled('div')(({ theme }) => ({
@@ -110,6 +111,7 @@ const Header = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [languageAnchorEl, setLanguageAnchorEl] = useState<null | HTMLElement>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   const { user, isAuthenticated, hasAdminPermission } = useAppSelector(
     (state) => ({
@@ -118,6 +120,47 @@ const Header = () => {
       hasAdminPermission: state.auth.hasAdminPermission,
     }),
   );
+
+  // Resolve profile image URL from Cloudflare key if needed
+  useEffect(() => {
+    if (!user?.profile_image) {
+      setProfileImageUrl(null);
+      return;
+    }
+
+    const profileImage = user.profile_image;
+    
+    // If it's already a URL, use it directly
+    if (profileImage.startsWith('http')) {
+      setProfileImageUrl(profileImage);
+      return;
+    }
+
+    // If it's 'default.jpg', use null (will show initials)
+    if (profileImage === 'default.jpg') {
+      setProfileImageUrl(null);
+      return;
+    }
+
+    // Otherwise, resolve from Cloudflare key
+    const resolveProfileImage = async () => {
+      try {
+        const url = await contentAssetService.resolveAssetUrl({
+          key: profileImage,
+          type: 'user-profile-avatar',
+          ownerId: user.id,
+          visibility: 'public',
+          presignedUrl: false,
+        });
+        setProfileImageUrl(url);
+      } catch (error) {
+        console.error('Failed to resolve profile image URL:', error);
+        setProfileImageUrl(null);
+      }
+    };
+
+    resolveProfileImage();
+  }, [user?.profile_image, user?.id]);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
@@ -625,23 +668,26 @@ const Header = () => {
                   onClick={handleProfileMenuOpen}
                   color="inherit"
                   sx={{ 
-                    borderRadius: 2,
+                    borderRadius: '50%',
                     border: '1px solid rgba(255,255,255,0.2)',
+                    padding: 0,
+                    width: 36,
+                    height: 36,
                     '&:hover': {
                       background: 'rgba(255,255,255,0.1)',
                     }
                   }}
                 >
-                  {user?.profile_image ? (
+                  {profileImageUrl ? (
                     <Avatar
-                      src={user.profile_image}
-                      sx={{ width: 32, height: 32 }}
+                      src={profileImageUrl}
+                      sx={{ width: 36, height: 36 }}
                     >
-                      {user.name.charAt(0).toUpperCase()}
+                      {user?.name?.charAt(0).toUpperCase()}
                     </Avatar>
                   ) : (
-                    <Avatar sx={{ width: 32, height: 32 }}>
-                      {user?.name.charAt(0).toUpperCase() || '?'}
+                    <Avatar sx={{ width: 36, height: 36 }}>
+                      {user?.name?.charAt(0).toUpperCase() || '?'}
                     </Avatar>
                   )}
                 </IconButton>

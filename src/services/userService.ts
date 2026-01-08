@@ -21,6 +21,7 @@ const transformUserData = (userData: UserData): User => {
     followingCount: userData.followingCount,
     isFollowing: userData.isFollowing,
     background_asset_key: userData.background_asset_key,
+    isGoogleUser: userData.isGoogleUser,
   };
 };
 

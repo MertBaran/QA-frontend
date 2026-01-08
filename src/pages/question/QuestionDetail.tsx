@@ -14,6 +14,7 @@ import {
   Alert,
   useTheme,
   Dialog,
+  Pagination,
 } from '@mui/material';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
@@ -166,7 +167,7 @@ const QuestionDetail: React.FC = () => {
     dislikedUsers,
     dislikesLoading,
   } = useAppSelector(state => state.likes);
-  const { answers } = useAppSelector(state => state.answers);
+  const { answers, totalAnswers, currentPage, answersPerPage } = useAppSelector(state => state.answers);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
@@ -222,6 +223,9 @@ const QuestionDetail: React.FC = () => {
   }>({});
   const [updatingQuestion, setUpdatingQuestion] = useState(false);
   const [questionThumbnailPreviewOpen, setQuestionThumbnailPreviewOpen] = useState(false);
+  const [answersPage, setAnswersPage] = useState(1);
+  const answersLimit = 5;
+  const [questionProfileImageUrl, setQuestionProfileImageUrl] = useState<string | null>(null);
 
   // Soru ve cevapları yükle
   useEffect(() => {
@@ -235,7 +239,7 @@ const QuestionDetail: React.FC = () => {
         // Soru ve cevapları paralel olarak yükle
         const [questionData] = await Promise.all([
           questionService.getQuestionById(id),
-          dispatch(getAnswersByQuestion(id))
+          dispatch(getAnswersByQuestion({ questionId: id, page: answersPage, limit: answersLimit }))
         ]);
         
         if (questionData) {
@@ -262,6 +266,29 @@ const QuestionDetail: React.FC = () => {
             }
           } else {
             setQuestionThumbnailUrl(null);
+          }
+
+          // Profile image URL'ini oluştur
+          const profileImage = questionData.userInfo?.profile_image || questionData.author.avatar;
+          if (profileImage && profileImage !== 'default.jpg' && !profileImage.startsWith('http')) {
+            // Key ise URL resolve et - daha geniş pattern kontrolü
+            try {
+              const profileImageUrl = await contentAssetService.resolveAssetUrl({
+                key: profileImage,
+                type: 'user-profile-avatar',
+                ownerId: questionData.userInfo?._id || questionData.author.id,
+                visibility: 'public',
+                presignedUrl: false, // Use public URL if available, fallback to presigned if not
+              });
+              setQuestionProfileImageUrl(profileImageUrl);
+            } catch (error) {
+              logger.error('Profile image URL oluşturulamadı:', error);
+              setQuestionProfileImageUrl(null);
+            }
+          } else if (profileImage && profileImage.startsWith('http')) {
+            setQuestionProfileImageUrl(profileImage);
+          } else {
+            setQuestionProfileImageUrl(null);
           }
           
           setLoadingQuestion(false); // Ana soru yüklendi, loading'i kapat
@@ -321,7 +348,7 @@ const QuestionDetail: React.FC = () => {
     };
 
     loadQuestionData();
-  }, [id, dispatch]);
+  }, [id, dispatch, answersPage]);
 
   // Load related questions count for each answer
   useEffect(() => {
@@ -346,13 +373,71 @@ const QuestionDetail: React.FC = () => {
 
   // Hash'ten cevap ID'sini al ve highlight et
   useEffect(() => {
-    const handleHashChange = () => {
+    const handleHashChange = async () => {
       const hash = window.location.hash;
       if (hash && hash.startsWith('#answer-')) {
         const answerId = hash.substring('#answer-'.length);
-        setHighlightedAnswerId(answerId);
         
-        // Scroll to answer
+        if (!id) return;
+        
+        // Cevabın hangi sayfada olduğunu bul
+        const pageNumber = await answerService.getAnswerPageNumber(id, answerId, answersLimit);
+        
+        if (pageNumber) {
+          // Eğer cevap mevcut sayfada değilse, o sayfaya git
+          if (pageNumber !== answersPage) {
+            setAnswersPage(pageNumber);
+            // Sayfa değiştiğinde cevaplar yüklenecek, sonra highlight edeceğiz
+            // Bu yüzden highlight'ı biraz geciktiriyoruz
+            return; // Sayfa değişti, cevaplar yüklendikten sonra tekrar kontrol edilecek
+          } else {
+            // Cevap mevcut sayfada, direkt highlight et
+            setHighlightedAnswerId(answerId);
+            setTimeout(() => {
+              const element = document.getElementById(`answer-${answerId}`);
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Remove highlight after animation
+                setTimeout(() => {
+                  setHighlightedAnswerId(null);
+                  window.history.replaceState(null, '', window.location.pathname);
+                }, 3000);
+              }
+            }, 100);
+          }
+        } else {
+          // Cevap bulunamadı
+          setHighlightedAnswerId(null);
+        }
+      } else {
+        setHighlightedAnswerId(null);
+      }
+    };
+    
+    // Check hash on mount and when hash changes
+    handleHashChange();
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [id, answersLimit]);
+
+  // Sayfa değiştiğinde veya cevaplar yüklendiğinde hash'i kontrol et
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#answer-')) {
+      const answerId = hash.substring('#answer-'.length);
+      
+      // Cevap mevcut sayfada mı kontrol et
+      const answerExists = answers.some(a => a.id === answerId);
+      
+      if (answerExists) {
+        // Cevap mevcut sayfada, highlight et
+        setHighlightedAnswerId(answerId);
         setTimeout(() => {
           const element = document.getElementById(`answer-${answerId}`);
           if (element) {
@@ -365,21 +450,9 @@ const QuestionDetail: React.FC = () => {
             }, 3000);
           }
         }, 100);
-      } else {
-        setHighlightedAnswerId(null);
       }
-    };
-    
-    // Check hash on mount and when answers change
-    handleHashChange();
-    
-    // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange);
-    
-    return () => {
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, [answers, id]);
+    }
+  }, [answers, answersPage]);
 
   // Cevap gönder
   const handleSubmitAnswer = async () => {
@@ -393,6 +466,11 @@ const QuestionDetail: React.FC = () => {
       
       setNewAnswer('');
       setAnswerValidationError('');
+      // Yeni cevap eklendiğinde ilk sayfaya dön ve cevapları yeniden yükle
+      setAnswersPage(1);
+      if (id) {
+        dispatch(getAnswersByQuestion({ questionId: id, page: 1, limit: answersLimit }));
+      }
       logger.user.action('answer_submitted', { questionId: id });
     } catch (err: any) {
       console.error('Cevap gönderilirken hata:', err);
@@ -692,7 +770,7 @@ const QuestionDetail: React.FC = () => {
       navigate('/');
     } catch (error) {
       console.error('Soru silinirken hata:', error);
-      alert(t('delete_failed', currentLanguage));
+      showErrorToast(t('delete_failed', currentLanguage));
     }
   };
 
@@ -715,8 +793,10 @@ const QuestionDetail: React.FC = () => {
     } catch (error) {
       // Rollback on error - re-fetch answers
       console.error('Cevap silinirken hata:', error);
-      dispatch(getAnswersByQuestion(id!));
-      alert(t('delete_failed', currentLanguage));
+      if (id) {
+        dispatch(getAnswersByQuestion({ questionId: id, page: answersPage, limit: answersLimit }));
+      }
+      showErrorToast(t('delete_failed', currentLanguage));
     }
   };
 
@@ -1157,7 +1237,7 @@ const QuestionDetail: React.FC = () => {
               {/* Yazar Bilgisi */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, position: 'relative' }}>
                 <Avatar 
-                  src={question.userInfo?.profile_image || question.author.avatar} 
+                  src={questionProfileImageUrl || question.userInfo?.profile_image || question.author.avatar} 
                   sx={{ 
                     width: 40, 
                     height: 40,
@@ -1440,9 +1520,9 @@ const QuestionDetail: React.FC = () => {
         )}
 
         {/* Cevaplar */}
-        <Box sx={{ mt: 4 }}>
+        <Box id="answers-section" sx={{ mt: 4 }}>
           <Typography variant="h5" sx={(theme) => ({ mb: 3, color: theme.palette.text.primary, fontWeight: 600 })}>
-            {t('answers', currentLanguage)} ({answers.length})
+            {t('answers', currentLanguage)} ({totalAnswers})
           </Typography>
           
           {answers.length === 0 ? (
@@ -1452,43 +1532,53 @@ const QuestionDetail: React.FC = () => {
               </Typography>
             </QuestionCard>
             ) : (
-            answers.map((answer) => (
-              <Box
-                key={answer.id}
-                id={`answer-${answer.id}`}
-                sx={(theme) => ({
-                  border: highlightedAnswerId === answer.id ? `2px solid ${theme.palette.primary.main}` : 'none',
-                  boxShadow: highlightedAnswerId === answer.id ? `0 0 20px ${theme.palette.primary.main}80` : 'none',
-                  transition: 'all 0.3s ease-in-out',
-                  animation: highlightedAnswerId === answer.id ? 'pulse 0.5s ease-in-out' : 'none',
-                  '@keyframes pulse': {
-                    '0%': { transform: 'scale(1)' },
-                    '50%': { transform: 'scale(1.02)' },
-                    '100%': { transform: 'scale(1)' },
-                  },
-                })}
-              >
-                <AnswerCard
-                  answer={answer}
-                  isAlternateTexture={false}
-                  relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
-                  onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
-                    handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId, 'answer');
-                  }}
-                  onLike={handleLikeAnswer}
-                  onUnlike={handleUnlikeAnswer}
-                  onDislike={handleDislikeAnswer}
-                  onUndislike={handleUndoDislikeAnswer}
-                  onDelete={handleDeleteAnswer}
-                  onHelp={handleAskQuestionAboutAnswer}
-                  onShowLikedUsers={handleShowLikedUsersForAnswer}
-                  onShowDislikedUsers={handleShowDislikedUsersForAnswer}
-                  questionId={question.id}
-                  questionTitle={question.title}
-                  showParentInfo={false}
-                />
-                      </Box>
-            ))
+            <>
+              {answers.map((answer) => (
+                <Box
+                  key={answer.id}
+                  id={`answer-${answer.id}`}
+                >
+                  <AnswerCard
+                    answer={answer}
+                    isAlternateTexture={false}
+                    relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
+                    isHighlighted={highlightedAnswerId === answer.id}
+                    onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
+                      handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId, 'answer');
+                    }}
+                    onLike={handleLikeAnswer}
+                    onUnlike={handleUnlikeAnswer}
+                    onDislike={handleDislikeAnswer}
+                    onUndislike={handleUndoDislikeAnswer}
+                    onDelete={handleDeleteAnswer}
+                    onHelp={handleAskQuestionAboutAnswer}
+                    onShowLikedUsers={handleShowLikedUsersForAnswer}
+                    onShowDislikedUsers={handleShowDislikedUsersForAnswer}
+                    questionId={question.id}
+                    questionTitle={question.title}
+                    showParentInfo={false}
+                  />
+                </Box>
+              ))}
+              {Math.ceil(totalAnswers / answersLimit) > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                  <Pagination
+                    count={Math.ceil(totalAnswers / answersLimit)}
+                    page={answersPage}
+                    onChange={(_, page) => {
+                      setAnswersPage(page);
+                      // Scroll to top of answers section
+                      const answersSection = document.getElementById('answers-section');
+                      if (answersSection) {
+                        answersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    color="primary"
+                    size="large"
+                  />
+                </Box>
+              )}
+            </>
           )}
         </Box>
       </Container>

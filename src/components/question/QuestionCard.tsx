@@ -132,35 +132,41 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<number>(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
-  // Profile image URL'ini resolve et (key ise)
+  // Profile image URL'ini resolve et (key ise) - Hızlı yükleme için optimize edilmiş
   useEffect(() => {
-    if (!question) return;
+    if (!question) {
+      setProfileImageUrl(null);
+      return;
+    }
     
     const profileImage = question.userInfo?.profile_image || question.author.avatar;
     
-    if (profileImage && !profileImage.startsWith('http')) {
-      // Key ise URL resolve et
-      if (profileImage.includes('user-profile-avatars') || profileImage.match(/^\d{4}\/\d{2}\/\d{2}\//)) {
-        const loadProfileImageUrl = async () => {
-          try {
-            const { contentAssetService } = await import('../../services/contentAssetService');
-            const url = await contentAssetService.resolveAssetUrl({
-              key: profileImage,
-              type: 'user-profile-avatar',
-              ownerId: question.userInfo?._id || question.author.id,
-              visibility: 'public',
-              presignedUrl: false, // Use public URL if available, fallback to presigned if not
-            });
-            setProfileImageUrl(url);
-          } catch (error) {
-            console.error('Failed to resolve profile image URL:', error);
-            setProfileImageUrl(null);
-          }
-        };
-        loadProfileImageUrl();
-      } else {
-        setProfileImageUrl(null);
-      }
+    // Eğer zaten HTTP URL ise direkt kullan
+    if (profileImage && profileImage.startsWith('http')) {
+      setProfileImageUrl(profileImage);
+      return;
+    }
+    
+    // Key ise URL resolve et - daha geniş pattern kontrolü (default.jpg hariç)
+    if (profileImage && profileImage !== 'default.jpg' && !profileImage.startsWith('http')) {
+      // Hemen başlat, await yerine promise chain kullan
+      import('../../services/contentAssetService')
+        .then(({ contentAssetService }) => {
+          return contentAssetService.resolveAssetUrl({
+            key: profileImage,
+            type: 'user-profile-avatar',
+            ownerId: question.userInfo?._id || question.author.id,
+            visibility: 'public',
+            presignedUrl: false, // Use public URL if available, fallback to presigned if not
+          });
+        })
+        .then(url => {
+          setProfileImageUrl(url);
+        })
+        .catch(error => {
+          console.error('Failed to resolve profile image URL:', error);
+          setProfileImageUrl(null);
+        });
     } else {
       setProfileImageUrl(profileImage || null);
     }
