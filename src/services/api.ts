@@ -1,7 +1,7 @@
 import axios, { AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import config from '../config/config';
 import logger from '../utils/logger';
-import { getStoredToken, isTokenValidAndNotExpired, forceLogout } from '../utils/tokenUtils';
+import { getStoredToken, isTokenValidAndNotExpired, logout } from '../utils/tokenUtils';
 import { showWarningToast, showErrorToast } from '../utils/notificationUtils';
 import { t } from '../utils/translations';
 import { store } from '../store';
@@ -55,7 +55,7 @@ api.interceptors.response.use(
       // Token expire olduğunda otomatik logout yap
       if (!isTokenValidAndNotExpired()) {
         showErrorToast(t('session_expired', lang));
-        forceLogout();
+        logout();
       } else {
         showWarningToast(t('unauthorized_action', lang));
       }

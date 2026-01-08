@@ -5,14 +5,27 @@ import logger from '../../utils/logger';
 import { Answer } from '../../types/answer';
 import { CreateAnswerData, UpdateAnswerData } from '../../types/answer';
 
-// Get answers by question
-export const getAnswersByQuestion = createAsyncThunk<Answer[], string>(
+// Get answers by question (with pagination)
+export const getAnswersByQuestion = createAsyncThunk<
+  {
+    data: Answer[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  },
+  { questionId: string; page?: number; limit?: number }
+>(
   'answers/getAnswersByQuestion',
-  async (questionId, { rejectWithValue }) => {
+  async ({ questionId, page = 1, limit = 5 }, { rejectWithValue }) => {
     try {
-      logger.user.action('fetch_answers', { questionId });
-      const answers = await answerService.getAnswersByQuestion(questionId);
-      return answers;
+      logger.user.action('fetch_answers', { questionId, page, limit });
+      const result = await answerService.getAnswersByQuestion(questionId, page, limit);
+      return result;
     } catch (error) {
       const errorInfo = await handleError(error, {
         action: 'getAnswersByQuestion',
