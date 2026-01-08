@@ -24,6 +24,7 @@ export interface UserData {
   followingCount?: number;
   isFollowing?: boolean;
   background_asset_key?: string;
+  isGoogleUser?: boolean;
 }
 
 // Frontend'de kullanılacak dönüştürülmüş user tipi
@@ -50,6 +51,7 @@ export interface User {
   followingCount?: number;
   isFollowing?: boolean;
   background_asset_key?: string;
+  isGoogleUser?: boolean;
 }
 
 // Kullanıcı kayıt için tip
