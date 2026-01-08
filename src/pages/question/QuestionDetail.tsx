@@ -12,7 +12,6 @@ import {
   Card,
   CardContent,
   Alert,
-  Badge,
   useTheme,
   Dialog,
 } from '@mui/material';
@@ -23,11 +22,12 @@ import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 import {
   ThumbUp,
+  ThumbDown,
   Comment,
-  Visibility,
   ArrowBack,
   Send,
   AccountTree,
+  Quiz,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
@@ -41,13 +41,15 @@ import { t } from '../../utils/translations';
 import ActionButtons from '../../components/ui/ActionButtons';
 import LikesModal from '../../components/ui/LikesModal';
 import ParentInfoChip from '../../components/ui/ParentInfoChip';
+import { QuestionDetailSkeleton } from '../../components/ui/skeleton';
 import AskQuestionModal from '../../components/question/AskQuestionModal';
 import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
 import RichTextEditor from '../../components/ui/RichTextEditor';
 import MarkdownRenderer from '../../components/ui/MarkdownRenderer';
 import AncestorsDrawer from '../../components/question/AncestorsDrawer';
-import { openModal, closeModal } from '../../store/likes/likesSlice';
-import { fetchLikedUsers } from '../../store/likes/likesThunks';
+import AnswerCard from '../../components/answer/AnswerCard';
+import { openModal, closeModal, openDislikesModal, closeDislikesModal } from '../../store/likes/likesSlice';
+import { fetchLikedUsers, fetchDislikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
 import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
 import CreateQuestionModal from '../../components/question/CreateQuestionModal';
@@ -91,53 +93,17 @@ const QuestionCard = styled(Paper, {
       pointerEvents: 'none',
       zIndex: 0,
     },
-    '& > *': {
+    '& > *:not(.action-buttons-container)': {
       position: 'relative',
       zIndex: 1,
+    },
+    '& > .action-buttons-container': {
+      position: 'absolute',
+      zIndex: 100,
     },
   } : {}),
 }));
 
-const AnswerCard = styled(Card, {
-  shouldForwardProp: (prop) => prop !== 'isPapirus',
-})<{ isPapirus?: boolean }>(({ theme, isPapirus }) => ({
-  position: 'relative',
-  background: theme.palette.mode === 'dark'
-    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
-  border: `1px solid ${theme.palette.divider}`,
-  borderRadius: 12,
-  marginBottom: theme.spacing(2),
-  color: theme.palette.text.primary,
-  backdropFilter: 'blur(8px)',
-  overflow: 'hidden',
-  ...(isPapirus ? {
-    '&::before': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundImage: `url(${papyrusVertical2})`,
-      backgroundSize: '105%',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat',
-      opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
-      pointerEvents: 'none',
-      zIndex: 0,
-    },
-  '& .MuiCardContent-root': {
-    padding: theme.spacing(3),
-      position: 'relative',
-      zIndex: 1,
-    },
-  } : {
-    '& .MuiCardContent-root': {
-      padding: theme.spacing(3),
-    },
-  }),
-}));
 
 
 
@@ -171,6 +137,19 @@ const ActionButton = styled(Button, {
   };
 });
 
+const ActionButtonsContainer = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: theme.spacing(4),
+  right: theme.spacing(2),
+  display: 'flex',
+  gap: theme.spacing(0.5),
+  alignItems: 'center',
+  zIndex: 100,
+  '&.action-buttons-container': {
+    position: 'absolute',
+  },
+}));
+
 const QuestionDetail: React.FC = () => {
   const theme = useTheme();
   const { id } = useParams<{ id: string }>();
@@ -180,7 +159,13 @@ const QuestionDetail: React.FC = () => {
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
+  const { 
+    modalOpen: likesModalOpen, 
+    users: likesModalUsers,
+    dislikesModalOpen,
+    dislikedUsers,
+    dislikesLoading,
+  } = useAppSelector(state => state.likes);
   const { answers } = useAppSelector(state => state.answers);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
@@ -215,6 +200,8 @@ const QuestionDetail: React.FC = () => {
   
   // Related questions count per answer
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
+  // Related questions count for the main question
+  const [questionRelatedQuestionsCount, setQuestionRelatedQuestionsCount] = useState<number>(0);
   
   // Ancestors drawer state
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
@@ -265,6 +252,8 @@ const QuestionDetail: React.FC = () => {
                 key: questionData.thumbnail.key,
                 type: 'question-thumbnail',
                 entityId: questionData.id,
+                visibility: 'public',
+                presignedUrl: false, // Use public URL if available, fallback to presigned if not
               });
               setQuestionThumbnailUrl(thumbnailUrl);
             } catch (error) {
@@ -309,6 +298,17 @@ const QuestionDetail: React.FC = () => {
         } else {
           setError('Soru bulunamadı');
           setLoadingQuestion(false);
+        }
+        
+        // Load related questions count for the main question immediately
+        if (questionData) {
+          try {
+            const related = await questionService.getQuestionsByParent(questionData.id);
+            setQuestionRelatedQuestionsCount(related.length);
+          } catch (err) {
+            console.error('Question related questions count hatası:', err);
+            setQuestionRelatedQuestionsCount(0);
+          }
         }
         
         logger.user.action('question_detail_loaded', { questionId: id });
@@ -780,6 +780,36 @@ const QuestionDetail: React.FC = () => {
     setRelatedQuestionsAnchor(null);
   };
 
+  // Show liked users for question
+  const handleShowLikedUsersForQuestion = async () => {
+    if (!question || question.likedByUsers.length === 0) return;
+    dispatch(openModal());
+    dispatch(fetchLikedUsers(question.likedByUsers));
+  };
+
+  // Show disliked users for question
+  const handleShowDislikedUsersForQuestion = async () => {
+    if (!question || question.dislikedByUsers.length === 0) return;
+    dispatch(openDislikesModal());
+    dispatch(fetchDislikedUsers(question.dislikedByUsers));
+  };
+
+  // Show liked users for answer
+  const handleShowLikedUsersForAnswer = async (answerId: string) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer || answer.likedByUsers.length === 0) return;
+    dispatch(openModal());
+    dispatch(fetchLikedUsers(answer.likedByUsers));
+  };
+
+  // Show disliked users for answer
+  const handleShowDislikedUsersForAnswer = async (answerId: string) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer || answer.dislikedByUsers.length === 0) return;
+    dispatch(openDislikesModal());
+    dispatch(fetchDislikedUsers(answer.dislikedByUsers));
+  };
+
   const handleOpenEditQuestionModal = () => {
     if (!question) return;
     setEditQuestionForm({
@@ -945,31 +975,8 @@ const QuestionDetail: React.FC = () => {
   if (loadingQuestion) {
     return (
       <Layout>
-        {/* Papyrus Background for Loading State */}
-        {isPapirus && (
-          <Box
-            sx={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundImage: `url(${papyrusGenis2Dark})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: mode === 'dark' ? 0.2 : 0.3,
-              pointerEvents: 'none',
-              zIndex: 0,
-            }}
-          />
-        )}
-        <Container maxWidth="lg" sx={{ pt: 4, position: 'relative', zIndex: 1 }}>
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
-              {t('loading', currentLanguage)}
-            </Typography>
-          </Box>
+        <Container maxWidth="lg" sx={{ pt: 4, pb: 8, position: 'relative', zIndex: 1 }}>
+          <QuestionDetailSkeleton />
         </Container>
       </Layout>
     );
@@ -1053,16 +1060,8 @@ const QuestionDetail: React.FC = () => {
         {/* Soru Detayı */}
         <Box sx={{ position: 'relative' }}>
         <QuestionCard isPapirus={isPapirus}>
-          {/* Action Butons - Sağ Üst Köşe (Ana sayfadaki gibi) */}
-          <Box sx={{ 
-            position: 'absolute',
-            top: theme => theme.spacing(2),
-            right: theme => theme.spacing(2),
-            display: 'flex',
-            gap: 0.5,
-            alignItems: 'center',
-            zIndex: 20,
-          }}>
+          {/* Action Buttons - Sağ Üst Köşe - Doğrudan QuestionCard içinde */}
+          <ActionButtonsContainer className="action-buttons-container">
             <ActionButtons
               targetType="question"
               targetId={question.id}
@@ -1103,14 +1102,14 @@ const QuestionDetail: React.FC = () => {
                 handleOpenEditQuestionModal();
               }}
             />
-          </Box>
+          </ActionButtonsContainer>
 
           {/* Parent Question/Answer Info with Ancestors Button */}
           {(question.parentQuestionId || question.parentAnswerId) && (() => {
             const parentId = question.parentQuestionId || question.parentAnswerId;
             
             return (
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 500px)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 200px)', pr: 20 }}>
                 {question.ancestors && question.ancestors.length > 1 && (
                   <IconButton
                     size="small"
@@ -1152,11 +1151,11 @@ const QuestionDetail: React.FC = () => {
             );
           })()}
           
-          <Box sx={{ position: 'relative', mb: 3 }}>
+          <Box sx={{ mb: 3 }}>
             <Box sx={{ flex: 1, width: '100%' }}>
 
               {/* Yazar Bilgisi */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, position: 'relative' }}>
                 <Avatar 
                   src={question.userInfo?.profile_image || question.author.avatar} 
                   sx={{ 
@@ -1348,44 +1347,63 @@ const QuestionDetail: React.FC = () => {
                 </Box>
               )}
 
-              {/* İstatistikler */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
+              {/* Stats Container - Alt Kısım */}
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 3, 
+                width: '100%',
+                mt: 2,
+              }}>
                 <Box 
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1 }}
-                  onClick={async () => {
-                    if (question.likesCount > 0 && question.likedByUsers.length > 0) {
-                      try {
-                        await dispatch(fetchLikedUsers(question.likedByUsers));
-                        dispatch(openModal());
-                      } catch (err) {
-                        console.error('Kullanıcılar yüklenirken hata:', err);
-                      }
-                    }
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 0.5,
+                    cursor: question.likesCount > 0 ? 'pointer' : 'default',
+                    '&:hover': question.likesCount > 0 ? { opacity: 0.7 } : {},
                   }}
+                  onClick={question.likesCount > 0 ? handleShowLikedUsersForQuestion : undefined}
+                  title={question.likesCount > 0 ? t('users_who_liked', currentLanguage) : ''}
                 >
-                  <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary, cursor: question.likesCount > 0 ? 'pointer' : 'default' }} />
-                  <span 
-                    style={{ 
-                      color: theme.palette.text.secondary, 
-                      fontSize: 14,
-                      cursor: question.likesCount > 0 ? 'pointer' : 'default'
-                    }}
-                  >
+                  <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                     {question.likesCount}
-                  </span>
+                  </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Comment sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF8C42' : themeName === 'papirus' ? '#D2691E' : '#FF9500' }} />
-                  <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>
-                    {answers.length}
-                  </span>
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 0.5,
+                    cursor: question.dislikesCount > 0 ? 'pointer' : 'default',
+                    '&:hover': question.dislikesCount > 0 ? { opacity: 0.7 } : {},
+                  }}
+                  onClick={question.dislikesCount > 0 ? handleShowDislikedUsersForQuestion : undefined}
+                  title={question.dislikesCount > 0 ? t('users_who_disliked', currentLanguage) : ''}
+                >
+                  <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                    {question.dislikesCount}
+                  </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Visibility sx={{ fontSize: 18, color: themeName === 'molume' ? '#FF6B35' : themeName === 'papirus' ? '#CD853F' : '#FF7F50' }} />
-                  <span style={{ color: theme.palette.text.secondary, fontSize: 14 }}>
-                    {question.views}
-                  </span>
+                {user && questionRelatedQuestionsCount > 0 && (
+                  <Box 
+                    sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 0.5,
+                      cursor: 'pointer',
+                    }}
+                    onClick={(e) => handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, question.id, 'question')}
+                    title={t('related_questions', currentLanguage)}
+                  >
+                    <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                      {questionRelatedQuestionsCount}
+                    </Typography>
                 </Box>
+                )}
               </Box>
             </Box>
           </Box>
@@ -1430,17 +1448,16 @@ const QuestionDetail: React.FC = () => {
           {answers.length === 0 ? (
             <QuestionCard isPapirus={isPapirus}>
               <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
-                {t('no_answers', currentLanguage)}
+                {t('no_data', currentLanguage)}
               </Typography>
             </QuestionCard>
             ) : (
             answers.map((answer) => (
-              <AnswerCard 
+              <Box
                 key={answer.id}
                 id={`answer-${answer.id}`}
-                isPapirus={isPapirus}
                 sx={(theme) => ({
-                  border: highlightedAnswerId === answer.id ? `2px solid ${theme.palette.primary.main}` : `1px solid ${theme.palette.divider}`,
+                  border: highlightedAnswerId === answer.id ? `2px solid ${theme.palette.primary.main}` : 'none',
                   boxShadow: highlightedAnswerId === answer.id ? `0 0 20px ${theme.palette.primary.main}80` : 'none',
                   transition: 'all 0.3s ease-in-out',
                   animation: highlightedAnswerId === answer.id ? 'pulse 0.5s ease-in-out' : 'none',
@@ -1451,174 +1468,26 @@ const QuestionDetail: React.FC = () => {
                   },
                 })}
               >
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar 
-                        src={answer.userInfo?.profile_image || answer.author.avatar} 
-                        sx={{ 
-                          width: 32, 
-                          height: 32,
-                          cursor: 'pointer',
-                          '&:hover': { opacity: 0.8 }
-                        }}
-                        onClick={() => navigate(`/profile/${answer.author.id}`)}
-                      />
-                      <Box>
-                        <Typography 
-                          variant="subtitle2" 
-                          sx={{ 
-                            color: isMagnefite 
-                              ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                              : theme.palette.text.primary, 
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            '&:hover': { 
-                              color: isMagnefite 
-                                ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                                : theme.palette.primary.main 
-                            }
-                          }}
-                          onClick={() => navigate(`/profile/${answer.author.id}`)}
-                        >
-                          {answer.userInfo?.name || answer.author.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: theme.palette.text.secondary }}>
-                          {answer.timeAgo}
-                        </Typography>
+                <AnswerCard
+                  answer={answer}
+                  isAlternateTexture={false}
+                  relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
+                  onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
+                    handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId, 'answer');
+                  }}
+                  onLike={handleLikeAnswer}
+                  onUnlike={handleUnlikeAnswer}
+                  onDislike={handleDislikeAnswer}
+                  onUndislike={handleUndoDislikeAnswer}
+                  onDelete={handleDeleteAnswer}
+                  onHelp={handleAskQuestionAboutAnswer}
+                  onShowLikedUsers={handleShowLikedUsersForAnswer}
+                  onShowDislikedUsers={handleShowDislikedUsersForAnswer}
+                  questionId={question.id}
+                  questionTitle={question.title}
+                  showParentInfo={false}
+                />
                       </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <ActionButtons
-                        targetType="answer"
-                        targetId={answer.id}
-                        targetData={{
-                          title: question.title,
-                          content: answer.content,
-                          author: answer.author?.name,
-                          authorId: answer.author?.id,
-                          created_at: answer.createdAt,
-                          url:
-                            window.location.origin +
-                            '/questions/' +
-                            question.id +
-                            '#answer-' +
-                            answer.id,
-                        }}
-                        position="relative"
-                        showBookmark={true}
-                        showLike={true}
-                        showDislike={true}
-                        showDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
-                        showHelp={true}
-                        isLiked={answer.likedByUsers.includes(user?.id || '')}
-                        isDisliked={answer.dislikedByUsers.includes(user?.id || '')}
-                        canDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
-                        isBookmarked={!!bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)}
-                        bookmarkId={bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)?._id || null}
-                        onLike={(e) => {
-                            e.stopPropagation();
-                          handleLikeAnswer(answer.id);
-                          }}
-                        onUnlike={(e) => {
-                          e.stopPropagation();
-                          handleUnlikeAnswer(answer.id);
-                        }}
-                        onDislike={(e) => {
-                          e.stopPropagation();
-                          handleDislikeAnswer(answer.id);
-                        }}
-                        onUndislike={(e) => {
-                          e.stopPropagation();
-                          handleUndoDislikeAnswer(answer.id);
-                        }}
-                        onDelete={(e) => {
-                          e.stopPropagation();
-                          handleDeleteAnswer(answer.id);
-                        }}
-                        onHelp={(e) => {
-                          e.stopPropagation();
-                          handleAskQuestionAboutAnswer(answer.id);
-                        }}
-                      />
-                      {user && (
-                        <>
-                          <Badge
-                            badgeContent={relatedQuestionsCount[answer.id] || 0}
-                            color="primary"
-                            sx={{
-                              '& .MuiBadge-badge': {
-                                bgcolor: '#FFB800',
-                                color: 'rgba(10,26,35,0.98)',
-                              }
-                            }}
-                          >
-                            <IconButton
-                              onClick={(e) => handleShowRelatedQuestions(e, answer.id, 'answer')}
-                              sx={{
-                                color: theme.palette.text.secondary,
-                                width: '40px',
-                                height: '40px',
-                                padding: 0,
-                                border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
-                                backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
-                                '&:hover': {
-                                  color: theme.palette.primary.main,
-                                  backgroundColor: theme.palette.mode === 'dark' 
-                                    ? `${theme.palette.primary.main}22` 
-                                    : `${theme.palette.primary.main}11`,
-                                  borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
-                                },
-                              }}
-                              title={t('related_questions', currentLanguage)}
-                            >
-                              <Comment fontSize="small" />
-                            </IconButton>
-                          </Badge>
-                        </>
-                      )}
-                    </Box>
-                  </Box>
-                  
-                  <Box>
-                    <MarkdownRenderer content={answer.content} />
-                  </Box>
-                  
-                  <Box 
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}
-                    onClick={async () => {
-                      if (answer.likesCount > 0 && answer.likedByUsers.length > 0) {
-                        try {
-                          await dispatch(fetchLikedUsers(answer.likedByUsers));
-                          dispatch(openModal());
-                        } catch (err) {
-                          console.error('Kullanıcılar yüklenirken hata:', err);
-                        }
-                      }
-                    }}
-                  >
-                    <ThumbUp sx={{ fontSize: 16, color: (() => {
-                      if (themeName === 'molume') {
-                        return '#00ED64'; // Green for Molume
-                      } else if (themeName === 'magnefite') {
-                        return '#7A9470'; // Brighter greenish-gray for Magnefite
-                      } else if (themeName === 'papirus') {
-                        return (theme.palette as any).custom?.positive || '#8D6E63';
-                      }
-                      return theme.palette.text.secondary;
-                    })(), cursor: answer.likesCount > 0 ? 'pointer' : 'default' }} />
-                    <span 
-                      style={{ 
-                        color: theme.palette.text.secondary, 
-                        fontSize: 12,
-                        cursor: answer.likesCount > 0 ? 'pointer' : 'default'
-                      }}
-                    >
-                      {answer.likesCount}
-                    </span>
-                  </Box>
-                </CardContent>
-              </AnswerCard>
             ))
           )}
         </Box>
@@ -1682,6 +1551,15 @@ const QuestionDetail: React.FC = () => {
         open={likesModalOpen}
         onClose={() => dispatch(closeModal())}
         users={likesModalUsers}
+        title={t('users_who_liked', currentLanguage)}
+      />
+
+      {/* Dislikes Modal */}
+      <LikesModal 
+        open={dislikesModalOpen}
+        onClose={() => dispatch(closeDislikesModal())}
+        users={dislikedUsers}
+        title={t('users_who_disliked', currentLanguage)}
       />
 
       {/* Ask Question Modal */}
@@ -1707,9 +1585,15 @@ const QuestionDetail: React.FC = () => {
       {question && question.ancestors && question.ancestors.length > 1 && (
         <AncestorsDrawer
           open={ancestorsDrawerOpen}
-          onClose={() => setAncestorsDrawerOpen(false)}
+          onClose={(event) => {
+            if (event) {
+              event.stopPropagation();
+            }
+            setAncestorsDrawerOpen(false);
+          }}
           ancestors={question.ancestors || []}
           currentQuestionId={question.id}
+          contentType="question"
         />
       )}
     </Layout>

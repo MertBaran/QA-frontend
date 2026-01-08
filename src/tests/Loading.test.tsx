@@ -1,6 +1,6 @@
 /* eslint-env jest */
 import { render, screen } from '@testing-library/react';
-import Loading from './Loading';
+import Loading from '../../src/components/ui/Loading';
 
 describe('Loading Component', () => {
   test('renders loading spinner', () => {
