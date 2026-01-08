@@ -176,7 +176,9 @@ const LikesModal: React.FC<LikesModalProps> = ({
           </List>
         ) : (
           <Typography sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
-            {t('no_likes_yet', currentLanguage)}
+            {title?.includes('Disliked') || title?.includes('Beğenmeyen') 
+              ? t('no_dislikes_yet', currentLanguage)
+              : t('no_likes_yet', currentLanguage)}
           </Typography>
         )}
       </DialogContent>

@@ -48,8 +48,8 @@ import RichTextEditor from '../../components/ui/RichTextEditor';
 import MarkdownRenderer from '../../components/ui/MarkdownRenderer';
 import AncestorsDrawer from '../../components/question/AncestorsDrawer';
 import AnswerCard from '../../components/answer/AnswerCard';
-import { openModal, closeModal } from '../../store/likes/likesSlice';
-import { fetchLikedUsers } from '../../store/likes/likesThunks';
+import { openModal, closeModal, openDislikesModal, closeDislikesModal } from '../../store/likes/likesSlice';
+import { fetchLikedUsers, fetchDislikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
 import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
 import CreateQuestionModal from '../../components/question/CreateQuestionModal';
@@ -159,7 +159,13 @@ const QuestionDetail: React.FC = () => {
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { modalOpen: likesModalOpen, users: likesModalUsers } = useAppSelector(state => state.likes);
+  const { 
+    modalOpen: likesModalOpen, 
+    users: likesModalUsers,
+    dislikesModalOpen,
+    dislikedUsers,
+    dislikesLoading,
+  } = useAppSelector(state => state.likes);
   const { answers } = useAppSelector(state => state.answers);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
@@ -246,6 +252,8 @@ const QuestionDetail: React.FC = () => {
                 key: questionData.thumbnail.key,
                 type: 'question-thumbnail',
                 entityId: questionData.id,
+                visibility: 'public',
+                presignedUrl: false, // Use public URL if available, fallback to presigned if not
               });
               setQuestionThumbnailUrl(thumbnailUrl);
             } catch (error) {
@@ -770,6 +778,36 @@ const QuestionDetail: React.FC = () => {
     // Navigate to the clicked question
     navigate(`/questions/${questionId}`);
     setRelatedQuestionsAnchor(null);
+  };
+
+  // Show liked users for question
+  const handleShowLikedUsersForQuestion = async () => {
+    if (!question || question.likedByUsers.length === 0) return;
+    dispatch(openModal());
+    dispatch(fetchLikedUsers(question.likedByUsers));
+  };
+
+  // Show disliked users for question
+  const handleShowDislikedUsersForQuestion = async () => {
+    if (!question || question.dislikedByUsers.length === 0) return;
+    dispatch(openDislikesModal());
+    dispatch(fetchDislikedUsers(question.dislikedByUsers));
+  };
+
+  // Show liked users for answer
+  const handleShowLikedUsersForAnswer = async (answerId: string) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer || answer.likedByUsers.length === 0) return;
+    dispatch(openModal());
+    dispatch(fetchLikedUsers(answer.likedByUsers));
+  };
+
+  // Show disliked users for answer
+  const handleShowDislikedUsersForAnswer = async (answerId: string) => {
+    const answer = answers.find(a => a.id === answerId);
+    if (!answer || answer.dislikedByUsers.length === 0) return;
+    dispatch(openDislikesModal());
+    dispatch(fetchDislikedUsers(answer.dislikedByUsers));
   };
 
   const handleOpenEditQuestionModal = () => {
@@ -1317,13 +1355,33 @@ const QuestionDetail: React.FC = () => {
                 width: '100%',
                 mt: 2,
               }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 0.5,
+                    cursor: question.likesCount > 0 ? 'pointer' : 'default',
+                    '&:hover': question.likesCount > 0 ? { opacity: 0.7 } : {},
+                  }}
+                  onClick={question.likesCount > 0 ? handleShowLikedUsersForQuestion : undefined}
+                  title={question.likesCount > 0 ? t('users_who_liked', currentLanguage) : ''}
+                >
                   <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                   <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                     {question.likesCount}
                   </Typography>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 0.5,
+                    cursor: question.dislikesCount > 0 ? 'pointer' : 'default',
+                    '&:hover': question.dislikesCount > 0 ? { opacity: 0.7 } : {},
+                  }}
+                  onClick={question.dislikesCount > 0 ? handleShowDislikedUsersForQuestion : undefined}
+                  title={question.dislikesCount > 0 ? t('users_who_disliked', currentLanguage) : ''}
+                >
                   <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                   <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                     {question.dislikesCount}
@@ -1423,6 +1481,8 @@ const QuestionDetail: React.FC = () => {
                   onUndislike={handleUndoDislikeAnswer}
                   onDelete={handleDeleteAnswer}
                   onHelp={handleAskQuestionAboutAnswer}
+                  onShowLikedUsers={handleShowLikedUsersForAnswer}
+                  onShowDislikedUsers={handleShowDislikedUsersForAnswer}
                   questionId={question.id}
                   questionTitle={question.title}
                   showParentInfo={false}
@@ -1491,6 +1551,15 @@ const QuestionDetail: React.FC = () => {
         open={likesModalOpen}
         onClose={() => dispatch(closeModal())}
         users={likesModalUsers}
+        title={t('users_who_liked', currentLanguage)}
+      />
+
+      {/* Dislikes Modal */}
+      <LikesModal 
+        open={dislikesModalOpen}
+        onClose={() => dispatch(closeDislikesModal())}
+        users={dislikedUsers}
+        title={t('users_who_disliked', currentLanguage)}
       />
 
       {/* Ask Question Modal */}

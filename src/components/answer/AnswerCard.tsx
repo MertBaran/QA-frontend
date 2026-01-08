@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -103,6 +103,8 @@ interface AnswerCardProps {
   onUndislike?: (answerId: string) => void;
   onDelete?: (answerId: string) => void;
   onHelp?: (answerId: string) => void;
+  onShowLikedUsers?: (answerId: string) => void;
+  onShowDislikedUsers?: (answerId: string) => void;
   questionId?: string;
   questionTitle?: string;
   showParentInfo?: boolean; // Parent info gösterilsin mi (sadece arama sayfasında true)
@@ -118,6 +120,8 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   onDislike,
   onUndislike,
   onDelete,
+  onShowLikedUsers,
+  onShowDislikedUsers,
   onHelp,
   questionId,
   questionTitle,
@@ -149,6 +153,41 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   const isMagnefite = themeName === 'magnefite';
 
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = React.useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Profile image URL'ini resolve et (key ise)
+  useEffect(() => {
+    if (!answer) return;
+    
+    const profileImage = answer.userInfo?.profile_image || answer.author.avatar;
+    
+    if (profileImage && !profileImage.startsWith('http')) {
+      // Key ise URL resolve et
+      if (profileImage.includes('user-profile-avatars') || profileImage.match(/^\d{4}\/\d{2}\/\d{2}\//)) {
+        const loadProfileImageUrl = async () => {
+          try {
+            const { contentAssetService } = await import('../../services/contentAssetService');
+            const url = await contentAssetService.resolveAssetUrl({
+              key: profileImage,
+              type: 'user-profile-avatar',
+              ownerId: answer.userInfo?._id || answer.author.id,
+              visibility: 'public',
+              presignedUrl: false, // Use public URL if available, fallback to presigned if not
+            });
+            setProfileImageUrl(url);
+          } catch (error) {
+            console.error('Failed to resolve profile image URL:', error);
+            setProfileImageUrl(null);
+          }
+        };
+        loadProfileImageUrl();
+      } else {
+        setProfileImageUrl(null);
+      }
+    } else {
+      setProfileImageUrl(profileImage || null);
+    }
+  }, [answer?.userInfo?.profile_image, answer?.author.avatar, answer?.userInfo?._id, answer?.author.id]);
 
   const handleClick = () => {
     if (answer.questionId) {
@@ -346,7 +385,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
         
         {/* Author Avatar */}
         <Avatar
-          src={answer.userInfo?.profile_image || answer.author.avatar}
+          src={profileImageUrl || answer.userInfo?.profile_image || answer.author.avatar}
           sx={{
             width: 48,
             height: 48,
@@ -414,13 +453,39 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
             gap: 3,
             mt: 2,
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                cursor: answer.likesCount > 0 && onShowLikedUsers ? 'pointer' : 'default',
+                '&:hover': answer.likesCount > 0 && onShowLikedUsers ? { opacity: 0.7 } : {},
+              }}
+              onClick={answer.likesCount > 0 && onShowLikedUsers ? (e) => {
+                e.stopPropagation();
+                onShowLikedUsers(answer.id);
+              } : undefined}
+              title={answer.likesCount > 0 && onShowLikedUsers ? t('users_who_liked', currentLanguage) : ''}
+            >
               <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                 {answer.likesCount}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                cursor: answer.dislikesCount > 0 && onShowDislikedUsers ? 'pointer' : 'default',
+                '&:hover': answer.dislikesCount > 0 && onShowDislikedUsers ? { opacity: 0.7 } : {},
+              }}
+              onClick={answer.dislikesCount > 0 && onShowDislikedUsers ? (e) => {
+                e.stopPropagation();
+                onShowDislikedUsers(answer.id);
+              } : undefined}
+              title={answer.dislikesCount > 0 && onShowDislikedUsers ? t('users_who_disliked', currentLanguage) : ''}
+            >
               <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
               <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                 {answer.dislikesCount}

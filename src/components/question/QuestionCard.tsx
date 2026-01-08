@@ -130,6 +130,41 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
   const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<number>(0);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Profile image URL'ini resolve et (key ise)
+  useEffect(() => {
+    if (!question) return;
+    
+    const profileImage = question.userInfo?.profile_image || question.author.avatar;
+    
+    if (profileImage && !profileImage.startsWith('http')) {
+      // Key ise URL resolve et
+      if (profileImage.includes('user-profile-avatars') || profileImage.match(/^\d{4}\/\d{2}\/\d{2}\//)) {
+        const loadProfileImageUrl = async () => {
+          try {
+            const { contentAssetService } = await import('../../services/contentAssetService');
+            const url = await contentAssetService.resolveAssetUrl({
+              key: profileImage,
+              type: 'user-profile-avatar',
+              ownerId: question.userInfo?._id || question.author.id,
+              visibility: 'public',
+              presignedUrl: false, // Use public URL if available, fallback to presigned if not
+            });
+            setProfileImageUrl(url);
+          } catch (error) {
+            console.error('Failed to resolve profile image URL:', error);
+            setProfileImageUrl(null);
+          }
+        };
+        loadProfileImageUrl();
+      } else {
+        setProfileImageUrl(null);
+      }
+    } else {
+      setProfileImageUrl(profileImage || null);
+    }
+  }, [question?.userInfo?.profile_image, question?.author.avatar, question?.userInfo?._id, question?.author.id]);
 
   // Thumbnail URL'ini oluştur (key varsa ama URL yoksa)
   useEffect(() => {
@@ -298,7 +333,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
         <Box sx={{ flex: 1, paddingX: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
             <Avatar 
-              src={question.userInfo?.profile_image || question.author.avatar} 
+              src={profileImageUrl || question.userInfo?.profile_image || question.author.avatar} 
               sx={{ 
                 width: 32, 
                 height: 32,

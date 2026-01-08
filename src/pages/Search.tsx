@@ -485,6 +485,7 @@ const Search = () => {
     if (!answer || !answer.questionId || !user) return;
 
     // Optimistic update
+    const wasDisliked = answer.dislikedByUsers.includes(user.id);
     setAnswers(prevAnswers =>
       prevAnswers.map(a =>
         a.id === answerId
@@ -492,6 +493,9 @@ const Search = () => {
               ...a,
               likesCount: a.likesCount + 1,
               likedByUsers: [...a.likedByUsers, user.id],
+              // Remove from dislikes if exists
+              dislikesCount: wasDisliked ? Math.max(0, a.dislikesCount - 1) : a.dislikesCount,
+              dislikedByUsers: a.dislikedByUsers.filter(id => id !== user.id),
             }
           : a
       )
@@ -508,6 +512,9 @@ const Search = () => {
                 ...a,
                 likesCount: Math.max(0, a.likesCount - 1),
                 likedByUsers: a.likedByUsers.filter(id => id !== user.id),
+                // Restore dislike if it was there
+                dislikesCount: wasDisliked ? a.dislikesCount + 1 : a.dislikesCount,
+                dislikedByUsers: wasDisliked ? [...a.dislikedByUsers, user.id] : a.dislikedByUsers,
               }
             : a
         )
