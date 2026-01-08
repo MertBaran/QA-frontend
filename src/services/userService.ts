@@ -17,6 +17,10 @@ const transformUserData = (userData: UserData): User => {
     createdAt: userData.createdAt,
     language: userData.language,
     notificationPreferences: userData.notificationPreferences,
+    followersCount: userData.followersCount,
+    followingCount: userData.followingCount,
+    isFollowing: userData.isFollowing,
+    background_asset_key: userData.background_asset_key,
   };
 };
 
@@ -165,6 +169,60 @@ class UserService {
     } catch (error) {
       console.error('Rol kaldırma hatası:', error);
       throw error;
+    }
+  }
+
+  // Follow user
+  async followUser(userId: string): Promise<boolean> {
+    try {
+      const response = await api.post<{ success: boolean; data: { message: string } }>(
+        `/public/users/${userId}/follow`
+      );
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Kullanıcı takip edilirken hata:', error);
+      throw error;
+    }
+  }
+
+  // Unfollow user
+  async unfollowUser(userId: string): Promise<boolean> {
+    try {
+      const response = await api.post<{ success: boolean; data: { message: string } }>(
+        `/public/users/${userId}/unfollow`
+      );
+      return response.data.success || false;
+    } catch (error) {
+      console.error('Kullanıcı takibi bırakılırken hata:', error);
+      throw error;
+    }
+  }
+
+  // Get followers
+  async getFollowers(userId: string): Promise<User[]> {
+    try {
+      const response = await api.get<UsersResponse>(`/public/users/${userId}/followers`);
+      if (response.data.success && response.data.data) {
+        return response.data.data.map(transformUserData);
+      }
+      return [];
+    } catch (error) {
+      console.error('Takipçiler getirilirken hata:', error);
+      return [];
+    }
+  }
+
+  // Get following
+  async getFollowing(userId: string): Promise<User[]> {
+    try {
+      const response = await api.get<UsersResponse>(`/public/users/${userId}/following`);
+      if (response.data.success && response.data.data) {
+        return response.data.data.map(transformUserData);
+      }
+      return [];
+    } catch (error) {
+      console.error('Takip edilenler getirilirken hata:', error);
+      return [];
     }
   }
 }

@@ -10,6 +10,8 @@ import {
   ListItemAvatar,
   ListItemText,
   Avatar,
+  CircularProgress,
+  Box,
 } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
@@ -17,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppSelector } from '../../store/hooks';
 import { t } from '../../utils/translations';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
+import { User } from '../../types/user';
 
 const StyledDialog = styled(Dialog, {
   shouldForwardProp: (prop) => prop !== 'isPapirus',
@@ -53,26 +56,20 @@ const StyledDialog = styled(Dialog, {
   },
 }));
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  profile_image?: string;
-  title?: string;
-}
-
-interface LikesModalProps {
+interface UsersListModalProps {
   open: boolean;
   onClose: () => void;
   users: User[];
-  title?: string;
+  title: string;
+  loading?: boolean;
 }
 
-const LikesModal: React.FC<LikesModalProps> = ({ 
+const UsersListModal: React.FC<UsersListModalProps> = ({ 
   open, 
   onClose, 
   users, 
-  title 
+  title,
+  loading = false,
 }) => {
   const navigate = useNavigate();
   const theme = useTheme();
@@ -124,7 +121,7 @@ const LikesModal: React.FC<LikesModalProps> = ({
     >
       <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6" sx={{ color: theme.palette.text.primary }}>
-          {title || t('users_who_liked', currentLanguage)}
+          {title}
         </Typography>
         <IconButton 
           onClick={onClose}
@@ -134,7 +131,11 @@ const LikesModal: React.FC<LikesModalProps> = ({
         </IconButton>
       </DialogTitle>
       <DialogContent>
-        {users.length > 0 ? (
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : users.length > 0 ? (
           <List>
             {users.map((user) => (
               <ListItem 
@@ -176,9 +177,9 @@ const LikesModal: React.FC<LikesModalProps> = ({
           </List>
         ) : (
           <Typography sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
-            {title?.includes('Disliked') || title?.includes('Beğenmeyen') 
-              ? t('no_dislikes_yet', currentLanguage)
-              : t('no_likes_yet', currentLanguage)}
+            {title.includes('Followers') || title.includes('Takipçiler')
+              ? t('no_followers_yet', currentLanguage)
+              : t('no_following_yet', currentLanguage)}
           </Typography>
         )}
       </DialogContent>
@@ -186,5 +187,4 @@ const LikesModal: React.FC<LikesModalProps> = ({
   );
 };
 
-export default LikesModal;
-
+export default UsersListModal;

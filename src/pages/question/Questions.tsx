@@ -27,7 +27,7 @@ import {
 } from '../../store/questions/questionThunks';
 import { clearError } from '../../store/questions/questionSlice';
 import Layout from '../../components/layout/Layout';
-import { QuestionsListSkeleton } from '../../components/ui/Skeleton';
+import { QuestionsListSkeleton } from '../../components/ui/skeleton';
 import { ErrorAlert } from '../../components/error/ErrorDisplay';
 import { handleError } from '../../utils/errorHandling/enhancedErrorHandler';
 import logger from '../../utils/logger';

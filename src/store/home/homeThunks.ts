@@ -38,8 +38,6 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
             ? 'createdAt'
             : params.sortBy === 'En Popüler'
               ? 'likes'
-              : params.sortBy === 'En Çok Görüntülenen'
-                ? 'views'
                 : params.sortBy === 'En Çok Cevaplanan'
                   ? 'answers'
                   : 'createdAt',

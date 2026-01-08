@@ -1,5 +1,5 @@
 import { ApiResponse } from './api';
-import { UserData } from './question';
+import { UserData, ParentContentInfo, AncestorReference } from './question';
 
 // Backend'den gelecek ham cevap tipi
 export interface AnswerData {
@@ -22,6 +22,12 @@ export interface AnswerData {
   likes: string[];
   dislikes: string[];
   createdAt: string;
+  parent?: {
+    id: string;
+    type: 'question' | 'answer';
+  };
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
   __v?: number;
 }
 
@@ -49,6 +55,10 @@ export interface Answer {
   timeAgo: string;
   questionId?: string;
   questionTitle?: string;
+  parentId?: string;
+  parentType?: 'question' | 'answer';
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
 }
 
 // Cevap oluşturma için tip

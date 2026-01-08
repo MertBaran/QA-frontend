@@ -213,10 +213,9 @@ class SearchService {
     }
   }
 
-  // Hem sorular hem cevaplarda arama
+  // Hem sorular hem cevaplarda arama (her zaman cevapları dahil eder)
   async searchAll(
     searchTerm: string,
-    includeAnswers: boolean = false,
     questionsPage: number = 1,
     questionsLimit: number = 10,
     answersPage: number = 1,
@@ -228,9 +227,7 @@ class SearchService {
     smartOptions?: { linguistic?: boolean; semantic?: boolean },
     language?: string,
   ): Promise<SearchResult> {
-    // Önce cevaplarda arama yap (eğer includeAnswers true ise)
-    let excludeQuestionIds: string[] = [];
-    if (includeAnswers) {
+    // Önce cevaplarda arama yap
       const answersResult = await this.searchAnswers(
         searchTerm,
         answersPage,
@@ -242,13 +239,8 @@ class SearchService {
         smartOptions,
         language,
       );
-      // Cevaplarda geçen soru ID'lerini topla
-      excludeQuestionIds = answersResult.answers
-        .map((answer) => answer.questionId)
-        .filter((id): id is string => !!id);
-    }
 
-    // Sorularda arama yap, cevaplarda geçen soru ID'lerini çıkar
+    // Sorularda arama yap (cevaplarda geçen soru ID'lerini çıkarmadan)
     const questionsResult = await this.searchQuestions(
       searchTerm,
       questionsPage,
@@ -258,24 +250,9 @@ class SearchService {
       typoTolerance,
       smartSearch,
       smartOptions,
-      excludeQuestionIds.length > 0 ? excludeQuestionIds : undefined,
+      undefined, // excludeQuestionIds kaldırıldı - aynı soru hem soru hem cevap sonuçlarında görünebilir
       language,
     );
-
-    // Cevapları tekrar çek (eğer includeAnswers true ise)
-    const answersResult = includeAnswers
-      ? await this.searchAnswers(
-          searchTerm,
-          answersPage,
-          answersLimit,
-          searchMode,
-          matchType,
-          typoTolerance,
-          smartSearch,
-          smartOptions,
-          language,
-        )
-      : { answers: [], pagination: null, warnings: undefined };
 
     // Warnings'i birleştir (questions veya answers'da semantic search kullanılamadıysa)
     const warnings = questionsResult.warnings || answersResult.warnings;

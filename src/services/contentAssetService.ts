@@ -35,7 +35,7 @@ export interface ResolveAssetUrlRequest {
   ownerId?: string;
   entityId?: string;
   visibility?: ContentAssetVisibility;
-  forcePresignedUrl?: boolean;
+  presignedUrl?: boolean;
   expiresInSeconds?: number;
   download?: boolean;
   responseContentType?: string;
@@ -79,7 +79,7 @@ class ContentAssetService {
   }
 
   async deleteAsset(payload: DeleteAssetRequest): Promise<void> {
-    await api.post(`${BASE_PATH}/delete`, payload);
+    await api.delete(`${BASE_PATH}/`, { data: payload });
   }
 }
 
