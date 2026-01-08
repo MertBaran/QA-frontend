@@ -12,7 +12,7 @@ export const registerUser = createAsyncThunk<
   async (userData, { rejectWithValue, getState }) => {
     try {
       const response = await authService.register(userData);
-      localStorage.setItem('token', response.token);
+      localStorage.setItem('access_token', response.token);
       return response;
     } catch (error: any) {
       handleApiError(error, {
