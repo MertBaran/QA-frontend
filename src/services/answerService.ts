@@ -73,12 +73,41 @@ export const transformAnswerData = (answerData: AnswerData): Answer => {
 };
 
 class AnswerService {
-  // Soruya ait cevapları getir
-  async getAnswersByQuestion(questionId: string): Promise<Answer[]> {
+  // Soruya ait cevapları getir (pagination ile)
+  async getAnswersByQuestion(
+    questionId: string,
+    page: number = 1,
+    limit: number = 5
+  ): Promise<{
+    data: Answer[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const response = await api.get<AnswersResponse>(`/questions/${questionId}/answers`);
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          data: AnswerData[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+        };
+      }>(`/questions/${questionId}/answers`, {
+        params: { page, limit },
+      });
       if (response.data.success && response.data.data) {
-        const answers = response.data.data.map(transformAnswerData);
+        const answers = response.data.data.data.map(transformAnswerData);
         // Debug log for specific answer
         const debugAnswer = answers.find(a => a.id === '6951cc1f0ffdbcb4e9208825');
         if (debugAnswer) {
@@ -89,15 +118,61 @@ class AnswerService {
             parentId: debugAnswer.parentId,
             parentType: debugAnswer.parentType,
             parentContentInfo: debugAnswer.parentContentInfo,
-            rawData: response.data.data.find((a: any) => a._id === '6951cc1f0ffdbcb4e9208825'),
+            rawData: response.data.data.data.find((a: any) => a._id === '6951cc1f0ffdbcb4e9208825'),
           });
         }
-        return answers;
+        return {
+          data: answers,
+          pagination: response.data.data.pagination,
+        };
       }
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
     } catch (error) {
       console.error('Cevaplar getirilirken hata:', error);
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
+    }
+  }
+
+  // Bir cevabın hangi sayfada olduğunu bul
+  async getAnswerPageNumber(
+    questionId: string,
+    answerId: string,
+    limit: number = 5
+  ): Promise<number | null> {
+    try {
+      const response = await api.get<{
+        success: boolean;
+        data: { page: number | null };
+      }>(`/questions/${questionId}/answers/${answerId}/page`, {
+        params: { limit },
+      });
+      if (response.data.success && response.data.data) {
+        return response.data.data.page;
+      }
+      return null;
+    } catch (error) {
+      console.error('Cevap sayfa numarası getirilirken hata:', error);
+      return null;
     }
   }
 

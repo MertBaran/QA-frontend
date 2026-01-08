@@ -21,6 +21,7 @@ import ReCaptchaComponent from '../../components/auth/ReCaptcha';
 import axios from 'axios';
 import { getCurrentUser } from '../../store/auth/authThunks';
 import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
+import { showErrorToast } from '../../utils/notificationUtils';
 
 const Login = () => {
   const dispatch = useAppDispatch();
@@ -165,13 +166,13 @@ const Login = () => {
       );
       // JWT'yi kaydet
       const { access_token } = response.data;
-      localStorage.setItem('token', access_token);
+      localStorage.setItem('access_token', access_token);
       // Kullanıcı bilgisini güncelle
       await dispatch(getCurrentUser());
       navigate('/');
     } catch (err: any) {
       console.log(err);
-      alert(
+      showErrorToast(
         err.response?.data?.message || 'Google ile giriş başarısız oldu.'
       );
     }
@@ -287,7 +288,7 @@ const Login = () => {
           <GoogleLoginButton
             onSuccess={handleGoogleLogin}
             onError={() => {
-              alert(t('google_login_failed', currentLanguage));
+              showErrorToast(t('google_login_failed', currentLanguage));
             }}
           />
           <Typography align="center" sx={{ my: 2 }}>{t('or', currentLanguage)}</Typography>

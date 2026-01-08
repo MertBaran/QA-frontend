@@ -211,4 +211,27 @@ export const authService = {
     });
     return response.data;
   },
+
+  requestPasswordChange: async (oldPassword: string | undefined, newPassword: string): Promise<ApiResponse<null>> => {
+    const response = await api.post<ApiResponse<null>>('/auth/change-password/request', {
+      oldPassword,
+      newPassword,
+    });
+    return response.data;
+  },
+
+  verifyPasswordChangeCode: async (code: string): Promise<ApiResponse<{ verificationToken: string }>> => {
+    const response = await api.post<ApiResponse<{ verificationToken: string }>>('/auth/change-password/verify', {
+      code,
+    });
+    return response.data;
+  },
+
+  confirmPasswordChange: async (verificationToken: string, newPassword: string): Promise<ApiResponse<null>> => {
+    const response = await api.post<ApiResponse<null>>('/auth/change-password/confirm', {
+      verificationToken,
+      newPassword,
+    });
+    return response.data;
+  },
 };

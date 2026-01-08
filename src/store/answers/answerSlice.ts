@@ -75,10 +75,22 @@ const answerSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(getAnswersByQuestion.fulfilled, (state, action: PayloadAction<Answer[]>) => {
+      .addCase(getAnswersByQuestion.fulfilled, (state, action: PayloadAction<{
+        data: Answer[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+          hasNext: boolean;
+          hasPrev: boolean;
+        };
+      }>) => {
         state.loading = false;
-        state.answers = action.payload;
-        state.totalAnswers = action.payload.length;
+        state.answers = action.payload.data;
+        state.totalAnswers = action.payload.pagination.total;
+        state.currentPage = action.payload.pagination.page;
+        state.answersPerPage = action.payload.pagination.limit;
       })
       .addCase(getAnswersByQuestion.rejected, (state, action) => {
         state.loading = false;

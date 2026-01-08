@@ -18,7 +18,7 @@ export const loginUser = createAsyncThunk<
 >('auth/login', async (credentials, { rejectWithValue, getState, dispatch }) => {
   try {
     const response = await authService.login(credentials);
-    localStorage.setItem('token', response.token);
+    localStorage.setItem('access_token', response.token);
 
     // Login sonrası admin permission'ları kontrol et
     try {
