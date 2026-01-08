@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -24,7 +24,11 @@ import {
   Tabs,
   Tab,
   Pagination,
+  Slider,
+  Snackbar,
 } from '@mui/material';
+import Cropper from 'react-easy-crop';
+import { Area } from 'react-easy-crop';
 import {
   Edit,
   PhotoCamera,
@@ -34,6 +38,8 @@ import {
   Link,
   CalendarToday,
   LocationOn,
+  Wallpaper,
+  Delete,
 } from '@mui/icons-material';
 import Layout from '../../components/layout/Layout';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -51,12 +57,15 @@ import { ProfilePageSkeleton, QuestionsListSkeleton, AnswersListSkeleton } from 
 import { User } from '../../types/user';
 import { Question } from '../../types/question';
 import { Answer } from '../../types/answer';
+import { followUser, unfollowUser, getFollowers, getFollowing } from '../../store/follow/followThunks';
+import { openFollowersModal, closeFollowersModal, openFollowingModal, closeFollowingModal } from '../../store/follow/followSlice';
+import UsersListModal from '../../components/ui/UsersListModal';
+import { contentAssetService, uploadFileToPresignedUrl } from '../../services/contentAssetService';
+import api from '../../services/api';
 
 interface ProfileStats {
   totalQuestions: number;
   totalAnswers: number;
-  totalLikes: number;
-  profileViews: number;
 }
 
 interface UserActivity {
@@ -72,17 +81,35 @@ const Profile = () => {
   const { userId } = useParams<{ userId?: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
+  const dispatch = useAppDispatch();
   const { user, isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const { 
+    followersModalOpen, 
+    followingModalOpen, 
+    followers, 
+    following, 
+    followersLoading, 
+    followingLoading 
+  } = useAppSelector(state => state.follow);
   // TODO: Kullanıcı bazlı tema yükleme tamamlandığında themeName yerine kullanıcı verisinden gelen tema tercihleri kullanılacak.
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
 
   // State
   const [profileUser, setProfileUser] = useState<User | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  const [backgroundType, setBackgroundType] = useState<'image' | 'video' | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [answersLoading, setAnswersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,8 +119,6 @@ const Profile = () => {
   const [stats, setStats] = useState<ProfileStats>({
     totalQuestions: 0,
     totalAnswers: 0,
-    totalLikes: 0,
-    profileViews: 0,
   });
   const [userQuestions, setUserQuestions] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Answer[]>([]);
@@ -117,6 +142,122 @@ const Profile = () => {
     hasPrev: false,
   });
   const itemsPerPage = 10;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const customBackgroundVideoRef = useRef<HTMLVideoElement | null>(null);
+  const [isReversing, setIsReversing] = useState(false);
+  const [isCustomReversing, setIsCustomReversing] = useState(false);
+  const reverseAnimationFrameRef = useRef<number | null>(null);
+  const reverseStartTimeRef = useRef<number | null>(null);
+  const customReverseAnimationFrameRef = useRef<number | null>(null);
+  const customReverseStartTimeRef = useRef<number | null>(null);
+  
+  // Cleanup reverse animation on unmount
+  useEffect(() => {
+    return () => {
+      if (reverseAnimationFrameRef.current) {
+        cancelAnimationFrame(reverseAnimationFrameRef.current);
+      }
+      if (customReverseAnimationFrameRef.current) {
+        cancelAnimationFrame(customReverseAnimationFrameRef.current);
+      }
+    };
+  }, []);
+  
+  // Reverse animation function for default video
+  const startReverseAnimation = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    setIsReversing(true);
+    const duration = video.duration;
+    
+    // Video'nun sonuna git ve biraz bekleyip reverse başlat
+    video.currentTime = duration;
+    
+    // Kısa bir delay sonra reverse başlat (takılmayı önlemek için)
+    setTimeout(() => {
+      if (!video) return;
+      
+      reverseStartTimeRef.current = Date.now();
+      const startTime = duration;
+      
+      const animate = () => {
+        if (!video || !reverseStartTimeRef.current) return;
+        
+        const elapsed = (Date.now() - reverseStartTimeRef.current) / 1000;
+        const newTime = Math.max(0, startTime - elapsed);
+        
+        // currentTime'ı sadece önemli değişikliklerde güncelle (takılmayı azaltmak için)
+        if (Math.abs(video.currentTime - newTime) > 0.05) {
+          video.currentTime = newTime;
+        }
+        
+        if (newTime > 0.1) {
+          reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          // Reverse bitti, normal oynatmaya dön
+          if (reverseAnimationFrameRef.current) {
+            cancelAnimationFrame(reverseAnimationFrameRef.current);
+            reverseAnimationFrameRef.current = null;
+          }
+          setIsReversing(false);
+          reverseStartTimeRef.current = null;
+          video.currentTime = 0;
+          video.play();
+        }
+      };
+      
+      reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+    }, 50); // 50ms delay - takılmayı önlemek için
+  }, []);
+
+  // Reverse animation function for custom background video
+  const startCustomReverseAnimation = useCallback(() => {
+    const video = customBackgroundVideoRef.current;
+    if (!video) return;
+    
+    setIsCustomReversing(true);
+    const duration = video.duration;
+    
+    // Video'nun sonuna git ve biraz bekleyip reverse başlat
+    video.currentTime = duration;
+    
+    // Kısa bir delay sonra reverse başlat (takılmayı önlemek için)
+    setTimeout(() => {
+      if (!video) return;
+      
+      customReverseStartTimeRef.current = Date.now();
+      const startTime = duration;
+      
+      const animate = () => {
+        if (!video || !customReverseStartTimeRef.current) return;
+        
+        const elapsed = (Date.now() - customReverseStartTimeRef.current) / 1000;
+        const newTime = Math.max(0, startTime - elapsed);
+        
+        // currentTime'ı sadece önemli değişikliklerde güncelle (takılmayı azaltmak için)
+        if (Math.abs(video.currentTime - newTime) > 0.05) {
+          video.currentTime = newTime;
+        }
+        
+        if (newTime > 0.1) {
+          customReverseAnimationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          // Reverse bitti, normal oynatmaya dön
+          if (customReverseAnimationFrameRef.current) {
+            cancelAnimationFrame(customReverseAnimationFrameRef.current);
+            customReverseAnimationFrameRef.current = null;
+          }
+          setIsCustomReversing(false);
+          customReverseStartTimeRef.current = null;
+          video.currentTime = 0;
+          video.play();
+        }
+      };
+      
+      customReverseAnimationFrameRef.current = requestAnimationFrame(animate);
+    }, 50); // 50ms delay - takılmayı önlemek için
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -187,9 +328,6 @@ const Profile = () => {
           setStats({
         totalQuestions: questionsPagination.totalItems,
         totalAnswers: answersPagination.total,
-        totalLikes: userQuestions.reduce((sum, q) => sum + q.likesCount, 0) + 
-                    userAnswers.reduce((sum, a) => sum + a.likesCount, 0),
-            profileViews: 0,
           });
     }
   }, [questionsPagination.totalItems, answersPagination.total, userQuestions, userAnswers, questionsLoading, answersLoading]);
@@ -207,12 +345,65 @@ const Profile = () => {
           // Fetch specific user profile
           targetUser = await userService.getUserById(userId);
         } else {
-          // Use current user
-          targetUser = user;
+          // Fetch current user's profile to ensure we have latest data including background_asset_key
+          if (user?.id) {
+            targetUser = await userService.getUserById(user.id);
+          } else {
+            // Fallback to user state if no ID available
+            targetUser = user;
+          }
         }
         
         if (targetUser) {
-          setProfileUser(targetUser);
+          // Resolve profile_image URL if it's a Cloudflare key
+          let profileImageUrl = targetUser.profile_image;
+          if (targetUser.profile_image && !targetUser.profile_image.startsWith('http')) {
+            try {
+              // Check if it looks like a Cloudflare key (contains path structure or starts with date pattern)
+              if (targetUser.profile_image.includes('user-profile-avatars') || targetUser.profile_image.match(/^\d{4}\/\d{2}\/\d{2}\//) || targetUser.profile_image.includes('/')) {
+                const url = await contentAssetService.resolveAssetUrl({
+                  key: targetUser.profile_image,
+                  type: 'user-profile-avatar',
+                  ownerId: targetUser.id,
+                  visibility: 'public',
+                  presignedUrl: false, // Use public URL if available, fallback to presigned if not
+                });
+                profileImageUrl = url;
+              }
+            } catch (error) {
+              console.error('Failed to resolve profile image URL:', error);
+              // Keep original value if resolution fails
+            }
+          }
+          
+          setProfileUser({ ...targetUser, profile_image: profileImageUrl });
+          setProfileImageUrl(profileImageUrl);
+          
+          // Load background URL if exists
+          if (targetUser.background_asset_key) {
+            try {
+              const url = await contentAssetService.resolveAssetUrl({
+                key: targetUser.background_asset_key,
+                type: 'user-profile-background',
+                ownerId: targetUser.id,
+                visibility: 'public',
+                presignedUrl: false, // Use public URL if available, fallback to presigned if not
+              });
+              setBackgroundUrl(url);
+              // Try to determine type from URL or default to video
+              // We'll set it when uploading, but for existing ones, try to detect
+              const isImage = url.match(/\.(gif|jpg|jpeg|png|webp)(\?|$)/i);
+              setBackgroundType(isImage ? 'image' : 'video');
+            } catch (error) {
+              console.error('Failed to resolve background URL:', error);
+              setBackgroundUrl(null);
+              setBackgroundType(null);
+            }
+          } else {
+            setBackgroundUrl(null);
+            setBackgroundType(null);
+          }
+          
           setFormData({
             name: targetUser.name || '',
             email: targetUser.email || '',
@@ -251,7 +442,6 @@ const Profile = () => {
       const updateData = {
         name: formData.name,
         email: formData.email,
-        title: formData.title,
         about: formData.about,
         place: formData.place,
         website: formData.website,
@@ -271,18 +461,337 @@ const Profile = () => {
     }
   };
 
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Follow handlers
+  const handleFollow = async () => {
+    if (!profileUser || !user) return;
+    
+    // Optimistic update
+    const previousUser = { ...profileUser };
+    setProfileUser({
+      ...profileUser,
+      isFollowing: true,
+      followersCount: (profileUser.followersCount || 0) + 1,
+    });
+    
+    try {
+      await dispatch(followUser(profileUser.id)).unwrap();
+      // Refresh user data to get accurate counts
+      const updatedUser = await userService.getUserById(profileUser.id);
+      if (updatedUser) {
+        setProfileUser(updatedUser);
+      }
+    } catch (error) {
+      console.error('Follow error:', error);
+      // Revert on error
+      setProfileUser(previousUser);
+    }
+  };
+
+  const handleUnfollow = async () => {
+    if (!profileUser || !user) return;
+    
+    // Optimistic update
+    const previousUser = { ...profileUser };
+    setProfileUser({
+      ...profileUser,
+      isFollowing: false,
+      followersCount: Math.max(0, (profileUser.followersCount || 0) - 1),
+    });
+    
+    try {
+      await dispatch(unfollowUser(profileUser.id)).unwrap();
+      // Refresh user data to get accurate counts
+      const updatedUser = await userService.getUserById(profileUser.id);
+      if (updatedUser) {
+        setProfileUser(updatedUser);
+      }
+    } catch (error) {
+      console.error('Unfollow error:', error);
+      // Revert on error
+      setProfileUser(previousUser);
+    }
+  };
+
+  const handleShowFollowers = async () => {
+    if (!profileUser) return;
+    dispatch(openFollowersModal());
+    dispatch(getFollowers(profileUser.id));
+  };
+
+  const handleShowFollowing = async () => {
+    if (!profileUser) return;
+    dispatch(openFollowingModal());
+    dispatch(getFollowing(profileUser.id));
+  };
+
+  const handleImageFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !profileUser) return;
+
+    // Validate file type (image only)
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Lütfen geçerli bir görsel dosyası seçin (jpeg, png, gif, webp)');
+      return;
+    }
+
+    // Validate file size (max 5MB for profile images)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      setError('Dosya boyutu 5MB\'dan küçük olmalıdır');
+      return;
+    }
+
+    // Create image URL for crop modal
+    const imageUrl = URL.createObjectURL(file);
+    setImageToCrop(imageUrl);
+    setCropModalOpen(true);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+  };
+
+  const createImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', (error) => reject(error));
+      image.src = url;
+    });
+  };
+
+  const getCroppedImg = async (
+    imageSrc: string,
+    pixelCrop: Area
+  ): Promise<Blob> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('No 2d context');
+    }
+
+    const maxSize = Math.max(image.width, image.height);
+    const safeArea = 2 * ((maxSize / 2) * Math.sqrt(2));
+
+    canvas.width = safeArea;
+    canvas.height = safeArea;
+
+    ctx.translate(safeArea / 2, safeArea / 2);
+    ctx.translate(-safeArea / 2, -safeArea / 2);
+
+    ctx.drawImage(
+      image,
+      safeArea / 2 - image.width * 0.5,
+      safeArea / 2 - image.height * 0.5
+    );
+
+    const data = ctx.getImageData(0, 0, safeArea, safeArea);
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.putImageData(
+      data,
+      Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
+      Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg', 0.95);
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!imageToCrop || !croppedAreaPixels || !profileUser) return;
+
+    try {
+      setImageUploadLoading(true);
+      setError(null);
+
+      // 1. Crop the image
+      const croppedBlob = await getCroppedImg(imageToCrop, croppedAreaPixels);
+      const croppedFile = new File([croppedBlob], 'profile-image.jpg', { type: 'image/jpeg' });
+
+      // 2. Get presigned URL
+      const presigned = await contentAssetService.createPresignedUpload({
+        type: 'user-profile-avatar',
+        filename: croppedFile.name,
+        mimeType: croppedFile.type,
+        contentLength: croppedFile.size,
+        ownerId: profileUser.id,
+        visibility: 'public',
+      });
+
+      // 3. Upload cropped file to Cloudflare
+      await uploadFileToPresignedUrl(presigned, croppedFile);
+
+      // 4. Update user's profile_image
+      const response = await api.put<{ success: boolean; data: { profile_image: string } }>(
+        '/auth/profile-image',
+        { profileImageKey: presigned.key }
+      );
+
+      if (response.data.success) {
+        // Resolve the new profile image URL
+        const newProfileImageUrl = await contentAssetService.resolveAssetUrl({
+          key: presigned.key,
+          type: 'user-profile-avatar',
+          ownerId: profileUser.id,
+          visibility: 'public',
+          presignedUrl: false, // Use public URL if available, fallback to presigned if not
+        });
+
+        // Update local state with the resolved URL
+        setProfileUser(prev => prev ? { ...prev, profile_image: newProfileImageUrl } : null);
+        setProfileImageUrl(newProfileImageUrl);
+        
+        setSuccess('Profil fotoğrafı başarıyla yüklendi');
+        setCropModalOpen(false);
+        
+        // Cleanup
+        if (imageToCrop) {
+          URL.revokeObjectURL(imageToCrop);
+        }
+        setImageToCrop(null);
+      }
+    } catch (error: any) {
+      console.error('Profile image upload error:', error);
+      setError(error.message || 'Profil fotoğrafı yüklenirken bir hata oluştu');
+    } finally {
+      setImageUploadLoading(false);
+    }
+  };
+
+  const handleCropCancel = () => {
+    setCropModalOpen(false);
+    if (imageToCrop) {
+      URL.revokeObjectURL(imageToCrop);
+    }
+    setImageToCrop(null);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCroppedAreaPixels(null);
+  };
+
+  const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profileUser) return;
+
+      // Validate file type (video or image)
+      const validTypes = ['video/mp4', 'video/webm', 'video/ogg', 'image/gif', 'image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        setError('Lütfen geçerli bir video (mp4, webm, ogg) veya görsel (gif, jpeg, png, webp) dosyası seçin');
+        return;
+      }
+
+      // Determine file type
+      const isImage = file.type.startsWith('image/');
+      const fileType = isImage ? 'image' : 'video';
+
+    // Validate file size (max 20MB)
+    const maxSize = 20 * 1024 * 1024; // 20MB
+    if (file.size > maxSize) {
+      setError('Dosya boyutu 20MB\'dan küçük olmalıdır');
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
-      
-      // TODO: Backend'de image upload endpoint'i var ama frontend'de implement edilmemiş
-      setSuccess(t('image_upload_success', currentLanguage));
+
+      // 1. Get presigned URL
+      const presigned = await contentAssetService.createPresignedUpload({
+        type: 'user-profile-background',
+        filename: file.name,
+        mimeType: file.type,
+        contentLength: file.size,
+        ownerId: profileUser.id,
+        visibility: 'public',
+      });
+
+      // 2. Upload file to Cloudflare
+      await uploadFileToPresignedUrl(presigned, file);
+
+      // 3. Update user's background_asset_key
+      const response = await api.put<{ success: boolean; data: { background_asset_key: string | null } }>(
+        '/auth/background',
+        { backgroundAssetKey: presigned.key }
+      );
+
+      if (response.data.success) {
+        // Update local state
+        const newKey = response.data.data.background_asset_key;
+        setProfileUser(prev => prev ? { ...prev, background_asset_key: newKey || undefined } : null);
+        
+        // Update background URL
+        if (newKey) {
+          try {
+            const url = await contentAssetService.resolveAssetUrl({
+              key: newKey,
+              type: 'user-profile-background',
+              ownerId: profileUser.id,
+              visibility: 'public',
+              presignedUrl: false, // Use public URL if available, fallback to presigned if not
+            });
+            setBackgroundUrl(url);
+            setBackgroundType(fileType);
+          } catch (error) {
+            console.error('Failed to resolve background URL:', error);
+            setBackgroundUrl(null);
+            setBackgroundType(null);
+          }
+        } else {
+          setBackgroundUrl(null);
+          setBackgroundType(null);
+        }
+        
+        setSuccess('Arka plan başarıyla yüklendi');
+      }
     } catch (error: any) {
-      setError(error.message || t('image_upload_error', currentLanguage));
+      console.error('Background upload error:', error);
+      setError(error.message || 'Arka plan yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackgroundDelete = async () => {
+    if (!profileUser || !profileUser.background_asset_key) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Delete from Cloudflare
+      await contentAssetService.deleteAsset({
+        key: profileUser.background_asset_key,
+        type: 'user-profile-background',
+        ownerId: profileUser.id,
+      });
+
+      // Update user's background_asset_key to null
+      const response = await api.put<{ success: boolean; data: { background_asset_key: string | null } }>(
+        '/auth/background',
+        { backgroundAssetKey: null }
+      );
+
+      if (response.data.success) {
+        // Update local state
+        setProfileUser(prev => prev ? { ...prev, background_asset_key: undefined } : null);
+        setBackgroundUrl(null);
+        setBackgroundType(null);
+        setSuccess('Arka plan başarıyla silindi');
+      }
+    } catch (error: any) {
+      console.error('Background delete error:', error);
+      setError(error.message || 'Arka plan silinirken bir hata oluştu');
     } finally {
       setLoading(false);
     }
@@ -357,26 +866,90 @@ const Profile = () => {
       {/* Magnefite Video Background */}
       {isMagnefite && (
         <>
-          <Box
-            component="video"
-            autoPlay
-            loop
-            muted
-            playsInline
-            aria-hidden
-            src={magnefiteBackgroundVideo}
-            sx={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
-              pointerEvents: 'none',
-              zIndex: 0,
-            }}
-          />
+          {backgroundUrl ? (
+            // User's custom background
+            backgroundType === 'image' ? (
+              <Box
+                component="img"
+                alt="Profile background"
+                src={backgroundUrl}
+                onError={(e) => {
+                  console.error('Background image failed to load:', backgroundUrl);
+                  setBackgroundUrl(null);
+                  setBackgroundType(null);
+                }}
+                sx={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              />
+            ) : (
+              <Box
+                component="video"
+                ref={customBackgroundVideoRef}
+                autoPlay
+                muted
+                playsInline
+                aria-hidden
+                src={backgroundUrl}
+                onError={(e) => {
+                  console.error('Background video failed to load:', backgroundUrl);
+                  setBackgroundUrl(null);
+                  setBackgroundType(null);
+                }}
+                onEnded={() => {
+                  if (!isCustomReversing) {
+                    startCustomReverseAnimation();
+                  }
+                }}
+                sx={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              />
+            )
+          ) : (
+            // Default video background
+            <Box
+              component="video"
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              aria-hidden
+              src={magnefiteBackgroundVideo}
+              onEnded={() => {
+                if (!isReversing) {
+                  startReverseAnimation();
+                }
+              }}
+              sx={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+                pointerEvents: 'none',
+                zIndex: 0,
+              }}
+            />
+          )}
           <Box
             sx={{
               position: 'fixed',
@@ -386,7 +959,7 @@ const Profile = () => {
               bottom: 0,
               background: mode === 'dark'
                 ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
-                : 'linear-gradient(180deg, rgba(209, 212, 216, 0.78) 0%, rgba(209, 212, 216, 0.72) 50%, rgba(209, 212, 216, 0.88) 100%)',
+                : 'linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.15) 100%)',
               pointerEvents: 'none',
               zIndex: 0,
             }}
@@ -419,16 +992,6 @@ const Profile = () => {
           <Typography variant="h4" sx={{ color: 'white', mb: 2 }}>
             {t('profile', currentLanguage)}
           </Typography>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          {success && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {success}
-            </Alert>
-          )}
         </Box>
 
         <Grid container spacing={3}>
@@ -470,7 +1033,7 @@ const Profile = () => {
                 {/* Profil Fotoğrafı */}
                 <Box sx={{ position: 'relative', mb: 3 }}>
                   <Avatar
-                    src={profileUser.profile_image}
+                    src={profileImageUrl || profileUser.profile_image}
                     sx={{ width: 120, height: 120, mx: 'auto', mb: 2 }}
                   />
                   {isOwnProfile && (
@@ -480,7 +1043,7 @@ const Profile = () => {
                         style={{ display: 'none' }}
                         id="profile-image-upload"
                         type="file"
-                        onChange={handleImageUpload}
+                        onChange={handleImageFileSelect}
                       />
                       <label htmlFor="profile-image-upload">
                         <IconButton
@@ -545,50 +1108,105 @@ const Profile = () => {
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
-                      <Typography variant="h6" sx={{ 
-                        color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' 
-                      }}>
-                        {stats.totalLikes}
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                          cursor: profileUser.followersCount && profileUser.followersCount > 0 ? 'pointer' : 'default',
+                          '&:hover': profileUser.followersCount && profileUser.followersCount > 0 ? { opacity: 0.7 } : {},
+                        }}
+                        onClick={profileUser.followersCount && profileUser.followersCount > 0 ? handleShowFollowers : undefined}
+                      >
+                        {profileUser.followersCount || 0}
                       </Typography>
                       <Typography variant="body2" sx={{ 
                         color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                       }}>
-                        {t('likes', currentLanguage)}
+                        {t('followers', currentLanguage)}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>
-                      <Typography variant="h6" sx={{ 
-                        color: theme.palette.mode === 'dark' ? 'white' : '#1A202C' 
-                      }}>
-                        {stats.profileViews}
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                          cursor: profileUser.followingCount && profileUser.followingCount > 0 ? 'pointer' : 'default',
+                          '&:hover': profileUser.followingCount && profileUser.followingCount > 0 ? { opacity: 0.7 } : {},
+                        }}
+                        onClick={profileUser.followingCount && profileUser.followingCount > 0 ? handleShowFollowing : undefined}
+                      >
+                        {profileUser.followingCount || 0}
                       </Typography>
                       <Typography variant="body2" sx={{ 
                         color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                       }}>
-                        {t('views', currentLanguage)}
+                        {t('following', currentLanguage)}
                       </Typography>
                     </Grid>
                   </Grid>
                 </Box>
 
-                {/* Düzenle Butonu - Sadece kendi profili için */}
-                {isOwnProfile && (
+                {/* Follow/Unfollow Butonu - Başkasının profili için */}
+                {!isOwnProfile && user && (
                   <Button
-                    variant="outlined"
-                    startIcon={<Edit />}
-                    onClick={() => setIsEditing(true)}
+                    variant={profileUser.isFollowing === true ? "contained" : "contained"}
+                    onClick={profileUser.isFollowing === true ? handleUnfollow : handleFollow}
                     sx={{ 
-                      mt: 3, 
-                      color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                      borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                      '&:hover': {
+                      mt: 3,
+                      ...(profileUser.isFollowing === true ? {
+                        // Unfollow butonu - kırmızımsı renk
+                        color: 'white',
+                        backgroundColor: theme.palette.mode === 'dark' 
+                          ? 'rgba(239, 68, 68, 0.8)' // Koyu modda daha açık kırmızı
+                          : '#EF4444', // Açık modda kırmızı
+                        borderColor: theme.palette.mode === 'dark' 
+                          ? 'rgba(239, 68, 68, 0.8)'
+                          : '#EF4444',
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark'
+                            ? 'rgba(239, 68, 68, 0.9)'
+                            : '#DC2626', // Daha koyu kırmızı hover
+                          borderColor: theme.palette.mode === 'dark'
+                            ? 'rgba(239, 68, 68, 0.9)'
+                            : '#DC2626',
+                        }
+                      } : {
+                        // Follow butonu - normal renk
+                        color: 'white',
                         borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
-                        backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
-                      }
+                        backgroundColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                        '&:hover': {
+                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.9)' : '#2D3748',
+                          borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                        }
+                      })
                     }}
                   >
-                    {t('edit_profile', currentLanguage)}
+                    {profileUser.isFollowing === true ? t('unfollow', currentLanguage) : t('follow', currentLanguage)}
                   </Button>
+                )}
+
+                {/* Düzenle Butonu - Sadece kendi profili için */}
+                {isOwnProfile && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      startIcon={<Edit />}
+                      onClick={() => setIsEditing(true)}
+                      sx={{ 
+                        mt: 3, 
+                        mr: 1,
+                        color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                        borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                        '&:hover': {
+                          borderColor: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                          backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                        }
+                      }}
+                    >
+                      {t('edit_profile', currentLanguage)}
+                    </Button>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1056,36 +1674,36 @@ const Profile = () => {
         </Grid>
 
         {/* Profil Düzenleme Dialog'u */}
-                <Dialog
+        <Dialog
           open={isEditing}
           onClose={() => setIsEditing(false)}
           maxWidth="md"
           fullWidth
-          sx={{ zIndex: 99999 }}
-                      PaperProps={{
-              sx: {
-                bgcolor: theme.palette.mode === 'dark' ? '#1E3A47' : '#FFFFFF',
-                borderRadius: 3,
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.15)',
-                border: theme.palette.mode === 'dark' 
-                  ? '1px solid rgba(255, 255, 255, 0.1)' 
-                  : '1px solid rgba(0, 0, 0, 0.05)',
-              },
-            }}
+          PaperProps={{
+            sx: {
+              bgcolor: theme.palette.background.paper,
+              borderRadius: 3,
+              boxShadow: theme.palette.mode === 'dark'
+                ? '0 20px 60px rgba(0, 0, 0, 0.5)'
+                : '0 20px 60px rgba(0, 0, 0, 0.15)',
+              border: theme.palette.mode === 'dark' 
+                ? '1px solid rgba(255, 255, 255, 0.1)' 
+                : '1px solid rgba(0, 0, 0, 0.05)',
+            },
+          }}
         >
           <DialogTitle sx={{ 
             color: theme.palette.mode === 'dark' ? 'white' : '#1A202C', 
             fontWeight: 600, 
             borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`, 
             pb: 2,
-            mb: 4
+            mb: 2
           }}>
             {t('edit_profile', currentLanguage)}
           </DialogTitle>
           <DialogContent sx={{ 
             color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : '#4A5568', 
-            pt: 4,
-            mt: 2
+            pt: 2,
           }}>
             <Grid container spacing={2}>
               <Grid item xs={12}>
@@ -1095,6 +1713,13 @@ const Profile = () => {
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -1104,15 +1729,14 @@ const Profile = () => {
                   value={formData.email}
                   onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label={t('title', currentLanguage)}
-                  value={formData.title}
-                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
+                  disabled
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -1124,6 +1748,13 @@ const Profile = () => {
                   multiline
                   rows={3}
                   InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1133,6 +1764,13 @@ const Profile = () => {
                   value={formData.place}
                   onChange={(e) => setFormData(prev => ({ ...prev, place: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1142,8 +1780,76 @@ const Profile = () => {
                   value={formData.website}
                   onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'rgba(0, 0, 0, 0.02)',
+                    },
+                  }}
                 />
               </Grid>
+              
+              {/* Arka Plan Yükleme - Sadece Magnefite temasında */}
+              {isMagnefite && (
+                <Grid item xs={12}>
+                  <Box sx={{ 
+                    pt: 2, 
+                    borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                    mt: 1
+                  }}>
+                    <Typography variant="subtitle2" sx={{ 
+                      mb: 2,
+                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : '#4A5568',
+                    }}>
+                      Arka Plan
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <input
+                        accept="video/*,image/gif,image/jpeg,image/png,image/webp"
+                        style={{ display: 'none' }}
+                        id="background-upload-modal"
+                        type="file"
+                        onChange={handleBackgroundUpload}
+                      />
+                      <label htmlFor="background-upload-modal">
+                        <Button
+                          component="span"
+                          variant="outlined"
+                          startIcon={<Wallpaper />}
+                          sx={{ 
+                            color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+                            borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
+                            '&:hover': {
+                              borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)',
+                            }
+                          }}
+                        >
+                          {profileUser?.background_asset_key ? 'Arka Plan Değiştir' : 'Arka Plan Ekle'}
+                        </Button>
+                      </label>
+                      {profileUser?.background_asset_key && (
+                        <Button
+                          variant="outlined"
+                          startIcon={<Delete />}
+                          onClick={handleBackgroundDelete}
+                          sx={{ 
+                            color: theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.9)' : '#EF4444',
+                            borderColor: theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.5)' : '#EF4444',
+                            '&:hover': {
+                              borderColor: theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.8)' : '#DC2626',
+                              backgroundColor: theme.palette.mode === 'dark' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
+                            }
+                          }}
+                        >
+                          Arka Planı Sil
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+                </Grid>
+              )}
             </Grid>
           </DialogContent>
           <DialogActions sx={{ 
@@ -1165,6 +1871,138 @@ const Profile = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Followers Modal */}
+        <UsersListModal
+          open={followersModalOpen}
+          onClose={() => dispatch(closeFollowersModal())}
+          users={followers}
+          title={t('followers', currentLanguage)}
+          loading={followersLoading}
+        />
+
+        {/* Following Modal */}
+        <UsersListModal
+          open={followingModalOpen}
+          onClose={() => dispatch(closeFollowingModal())}
+          users={following}
+          title={t('following', currentLanguage)}
+          loading={followingLoading}
+        />
+
+        {/* Crop Modal */}
+        <Dialog
+          open={cropModalOpen}
+          onClose={handleCropCancel}
+          maxWidth="sm"
+          fullWidth
+          PaperProps={{
+            sx: {
+              bgcolor: theme.palette.mode === 'dark' 
+                ? 'rgba(30, 30, 30, 0.95)' 
+                : 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(10px)',
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
+            fontWeight: 600,
+            borderBottom: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+            pb: 2,
+            mb: 2
+          }}>
+            {t('crop_image', currentLanguage) || 'Fotoğrafı Düzenle'}
+          </DialogTitle>
+          <DialogContent>
+            {imageToCrop && (
+              <Box sx={{ position: 'relative', width: '100%', height: 400, mb: 3 }}>
+                <Cropper
+                  image={imageToCrop}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={(croppedArea, croppedAreaPixels) => {
+                    setCroppedAreaPixels(croppedAreaPixels);
+                  }}
+                  style={{
+                    containerStyle: {
+                      width: '100%',
+                      height: '100%',
+                      position: 'relative',
+                    },
+                  }}
+                />
+              </Box>
+            )}
+            <Box sx={{ px: 2 }}>
+              <Typography variant="body2" sx={{ mb: 1, color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' }}>
+                {t('zoom', currentLanguage) || 'Yakınlaştır'}
+              </Typography>
+              <Slider
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                onChange={(e, value) => setZoom(value as number)}
+                sx={{ mb: 2 }}
+              />
+            </Box>
+            {imageUploadLoading && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 2 }}>
+                <CircularProgress size={24} sx={{ mr: 2 }} />
+                <Typography variant="body2" sx={{ color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' }}>
+                  {t('uploading', currentLanguage) || 'Yükleniyor...'}
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2, borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}` }}>
+            <Button onClick={handleCropCancel} disabled={imageUploadLoading}>
+              {t('cancel', currentLanguage)}
+            </Button>
+            <Button 
+              onClick={handleCropComplete} 
+              variant="contained" 
+              disabled={imageUploadLoading || !croppedAreaPixels}
+            >
+              {t('save', currentLanguage) || 'Kaydet'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Success/Error Snackbars */}
+        <Snackbar
+          open={!!success}
+          autoHideDuration={4000}
+          onClose={() => setSuccess(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert 
+            onClose={() => setSuccess(null)} 
+            severity="success" 
+            sx={{ width: '100%' }}
+          >
+            {success}
+          </Alert>
+        </Snackbar>
+
+        <Snackbar
+          open={!!error}
+          autoHideDuration={6000}
+          onClose={() => setError(null)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert 
+            onClose={() => setError(null)} 
+            severity="error" 
+            sx={{ width: '100%' }}
+          >
+            {error}
+          </Alert>
+        </Snackbar>
       </Container>
     </Layout>
   );
