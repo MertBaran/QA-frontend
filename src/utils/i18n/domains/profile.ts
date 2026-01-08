@@ -54,6 +54,16 @@ export const profile = {
     en: 'Error loading profile',
     de: 'Fehler beim Laden des Profils',
   },
+  error_loading_questions: {
+    tr: 'Sorular yüklenirken hata oluştu',
+    en: 'Error loading questions',
+    de: 'Fehler beim Laden der Fragen',
+  },
+  error_loading_answers: {
+    tr: 'Cevaplar yüklenirken hata oluştu',
+    en: 'Error loading answers',
+    de: 'Fehler beim Laden der Antworten',
+  },
   profile_updated_success: {
     tr: 'Profil başarıyla güncellendi',
     en: 'Profile updated successfully',

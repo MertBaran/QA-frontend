@@ -20,6 +20,10 @@ export interface UserData {
     sms: boolean;
     webhook: boolean;
   };
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+  background_asset_key?: string;
 }
 
 // Frontend'de kullanılacak dönüştürülmüş user tipi
@@ -42,6 +46,10 @@ export interface User {
     sms: boolean;
     webhook: boolean;
   };
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+  background_asset_key?: string;
 }
 
 // Kullanıcı kayıt için tip

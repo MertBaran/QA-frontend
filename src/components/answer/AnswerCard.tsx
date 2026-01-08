@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -9,12 +9,17 @@ import {
 } from '@mui/material';
 import {
   ThumbUp,
+  ThumbDown,
   Comment,
+  AccountTree,
+  Quiz,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { Answer } from '../../types/answer';
 import ParentInfoChip from '../ui/ParentInfoChip';
+import AncestorsDrawer from '../question/AncestorsDrawer';
 import MarkdownRenderer from '../ui/MarkdownRenderer';
+import ActionButtons from '../ui/ActionButtons';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
@@ -89,27 +94,100 @@ const StyledPaper = styled(Box, {
 
 interface AnswerCardProps {
   answer: Answer;
+  isAlternateTexture?: boolean;
+  relatedQuestionsCount?: number;
+  onShowRelatedQuestions?: (e: React.MouseEvent<Element>, answerId: string) => void;
   onLike?: (answerId: string) => void;
   onUnlike?: (answerId: string) => void;
-  isAlternateTexture?: boolean;
+  onDislike?: (answerId: string) => void;
+  onUndislike?: (answerId: string) => void;
+  onDelete?: (answerId: string) => void;
+  onHelp?: (answerId: string) => void;
+  onShowLikedUsers?: (answerId: string) => void;
+  onShowDislikedUsers?: (answerId: string) => void;
+  questionId?: string;
+  questionTitle?: string;
+  showParentInfo?: boolean; // Parent info gösterilsin mi (sadece arama sayfasında true)
 }
 
 const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   answer,
+  isAlternateTexture = false,
+  relatedQuestionsCount = 0,
+  onShowRelatedQuestions,
   onLike,
   onUnlike,
-  isAlternateTexture = false,
+  onDislike,
+  onUndislike,
+  onDelete,
+  onShowLikedUsers,
+  onShowDislikedUsers,
+  onHelp,
+  questionId,
+  questionTitle,
+  showParentInfo = true, // Default true, soru detay sayfasında false olacak
 }, ref) => {
+  // Debug log for specific answer
+  if (answer.id === '6951cc1f0ffdbcb4e9208825') {
+    console.log('AnswerCard Debug:', {
+      answerId: answer.id,
+      ancestors: answer.ancestors,
+      ancestorsLength: answer.ancestors?.length,
+      parentId: answer.parentId,
+      parentType: answer.parentType,
+      parentContentInfo: answer.parentContentInfo,
+      shouldShowButton: (answer.ancestors && answer.ancestors.length > 0) || 
+                        (answer.parentContentInfo && answer.parentContentInfo.type === 'answer' && answer.parentContentInfo.questionId) || 
+                        (answer.parentId && answer.parentContentInfo && answer.ancestors?.some(a => a.depth > 0)),
+    });
+  }
+  
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
 
-  const isLiked = user ? answer.likedByUsers.includes(user.id) : false;
+  const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = React.useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+
+  // Profile image URL'ini resolve et (key ise)
+  useEffect(() => {
+    if (!answer) return;
+    
+    const profileImage = answer.userInfo?.profile_image || answer.author.avatar;
+    
+    if (profileImage && !profileImage.startsWith('http')) {
+      // Key ise URL resolve et
+      if (profileImage.includes('user-profile-avatars') || profileImage.match(/^\d{4}\/\d{2}\/\d{2}\//)) {
+        const loadProfileImageUrl = async () => {
+          try {
+            const { contentAssetService } = await import('../../services/contentAssetService');
+            const url = await contentAssetService.resolveAssetUrl({
+              key: profileImage,
+              type: 'user-profile-avatar',
+              ownerId: answer.userInfo?._id || answer.author.id,
+              visibility: 'public',
+              presignedUrl: false, // Use public URL if available, fallback to presigned if not
+            });
+            setProfileImageUrl(url);
+          } catch (error) {
+            console.error('Failed to resolve profile image URL:', error);
+            setProfileImageUrl(null);
+          }
+        };
+        loadProfileImageUrl();
+      } else {
+        setProfileImageUrl(null);
+      }
+    } else {
+      setProfileImageUrl(profileImage || null);
+    }
+  }, [answer?.userInfo?.profile_image, answer?.author.avatar, answer?.userInfo?._id, answer?.author.id]);
 
   const handleClick = () => {
     if (answer.questionId) {
@@ -117,15 +195,6 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
       navigate(`/questions/${answer.questionId}#answer-${answer.id}`, {
         state: { from }
       });
-    }
-  };
-
-  const handleLikeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isLiked) {
-      onUnlike?.(answer.id);
-    } else {
-      onLike?.(answer.id);
     }
   };
 
@@ -143,6 +212,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   };
 
   return (
+    <Box sx={{ position: 'relative' }}>
     <StyledPaper 
       ref={ref} 
       isPapirus={isPapirus}
@@ -150,9 +220,81 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
       isAlternateTexture={isAlternateTexture}
       onClick={handleClick}
     >
-      {/* Parent Question Info */}
-      {answer.questionId && (
-        <Box sx={{ mb: 2 }}>
+        {/* Parent Info - Answer'ın parent'ı (question veya answer) with Ancestors Button */}
+      {showParentInfo && answer.parentId && answer.parentContentInfo && (
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, position: 'relative' }}>
+          {((answer.ancestors && answer.ancestors.length > 0) || (answer.parentContentInfo && answer.parentContentInfo.type === 'answer' && answer.parentContentInfo.questionId) || (answer.parentId && answer.parentContentInfo && answer.ancestors?.some(a => a.depth > 0))) && (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAncestorsDrawerOpen(true);
+              }}
+              sx={{
+                color: themeName === 'molume' 
+                  ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A')
+                  : themeName === 'magnefite'
+                  ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
+                  : `${theme.palette.primary.main}CC`,
+                '&:hover': {
+                  color: themeName === 'molume' 
+                    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A')
+                    : themeName === 'magnefite'
+                    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
+                    : theme.palette.primary.main,
+                  bgcolor: themeName === 'molume' 
+                    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') + '22'
+                    : themeName === 'magnefite'
+                    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') + '22'
+                    : `${theme.palette.primary.main}22`,
+                }
+              }}
+              title={t('show_all_ancestors', currentLanguage)}
+            >
+              <AccountTree />
+            </IconButton>
+          )}
+          <ParentInfoChip 
+            parentId={answer.parentId}
+            parentContentInfo={answer.parentContentInfo}
+          />
+        </Box>
+      )}
+      
+      {/* Parent Question Info - Answer'ın ait olduğu soru */}
+      {showParentInfo && answer.questionId && !answer.parentId && (
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, position: 'relative' }}>
+          {answer.ancestors && answer.ancestors.length > 0 && (
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAncestorsDrawerOpen(true);
+              }}
+              sx={{
+                color: themeName === 'molume' 
+                  ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A')
+                  : themeName === 'magnefite'
+                  ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
+                  : `${theme.palette.primary.main}CC`,
+                '&:hover': {
+                  color: themeName === 'molume' 
+                    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A')
+                    : themeName === 'magnefite'
+                    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
+                    : theme.palette.primary.main,
+                  bgcolor: themeName === 'molume' 
+                    ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') + '22'
+                    : themeName === 'magnefite'
+                    ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') + '22'
+                    : `${theme.palette.primary.main}22`,
+                }
+              }}
+              title={t('show_all_ancestors', currentLanguage)}
+            >
+              <AccountTree />
+            </IconButton>
+          )}
           <ParentInfoChip 
             parentId={answer.questionId}
             parentContentInfo={{
@@ -178,9 +320,72 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
           zIndex: 1,
         }}
       >
+        {/* Action Buttons - Sağ Üst Köşe */}
+        {onLike && onUnlike && (
+          <Box className="action-buttons-container" sx={{ 
+            position: 'absolute',
+            top: theme => theme.spacing(1),
+            right: theme => theme.spacing(2),
+            display: 'flex',
+            gap: 0.5,
+            alignItems: 'center',
+            zIndex: 20,
+          }}>
+            <ActionButtons
+              targetType="answer"
+              targetId={answer.id}
+              targetData={{
+                title: questionTitle || '',
+                content: answer.content,
+                author: answer.author?.name,
+                authorId: answer.author?.id,
+                created_at: answer.createdAt,
+                url: questionId 
+                  ? window.location.origin + '/questions/' + questionId + '#answer-' + answer.id
+                  : window.location.href,
+              }}
+              position="relative"
+              showBookmark={true}
+              showLike={true}
+              showDislike={true}
+              showDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
+              showHelp={true}
+              isLiked={answer.likedByUsers.includes(user?.id || '')}
+              isDisliked={answer.dislikedByUsers.includes(user?.id || '')}
+              canDelete={!!(user && (answer.author.id === user.id || answer.userInfo?._id === user.id || answer.author.id === user.id?.toString()))}
+              isBookmarked={!!bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)}
+              bookmarkId={bookmarks.find((b: any) => b.target_type === 'answer' && b.target_id === answer.id)?._id || null}
+              onLike={(e) => {
+                e.stopPropagation();
+                onLike(answer.id);
+              }}
+              onUnlike={(e) => {
+                e.stopPropagation();
+                onUnlike(answer.id);
+              }}
+              onDislike={(e) => {
+                e.stopPropagation();
+                onDislike?.(answer.id);
+              }}
+              onUndislike={(e) => {
+                e.stopPropagation();
+                onUndislike?.(answer.id);
+              }}
+              onDelete={(e) => {
+                e.stopPropagation();
+                onDelete?.(answer.id);
+              }}
+              onHelp={(e) => {
+                e.stopPropagation();
+                onHelp?.(answer.id);
+              }}
+            />
+          </Box>
+        )}
+        
         {/* Author Avatar */}
         <Avatar
-          src={answer.userInfo?.profile_image || answer.author.avatar}
+          src={profileImageUrl || answer.userInfo?.profile_image || answer.author.avatar}
           sx={{
             width: 48,
             height: 48,
@@ -241,37 +446,96 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
             <MarkdownRenderer content={answer.content} />
           </Box>
 
-          {/* Actions */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <IconButton
-                size="small"
-                onClick={handleLikeClick}
-                sx={{
-                  color: isLiked ? theme.palette.primary.main : theme.palette.text.secondary,
-                  '&:hover': {
-                    color: theme.palette.primary.main,
-                    backgroundColor: `${theme.palette.primary.main}11`,
-                  },
-                }}
-              >
-                <ThumbUp fontSize="small" />
-              </IconButton>
-              <Typography variant="body2" color="text.secondary">
+          {/* Stats Container - Alt Kısım */}
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 3,
+            mt: 2,
+          }}>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                cursor: answer.likesCount > 0 && onShowLikedUsers ? 'pointer' : 'default',
+                '&:hover': answer.likesCount > 0 && onShowLikedUsers ? { opacity: 0.7 } : {},
+              }}
+              onClick={answer.likesCount > 0 && onShowLikedUsers ? (e) => {
+                e.stopPropagation();
+                onShowLikedUsers(answer.id);
+              } : undefined}
+              title={answer.likesCount > 0 && onShowLikedUsers ? t('users_who_liked', currentLanguage) : ''}
+            >
+              <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                 {answer.likesCount}
               </Typography>
             </Box>
-
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
-              <Comment fontSize="small" />
-              <Typography variant="body2" color="text.secondary">
-                {t('answer', currentLanguage)}
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                cursor: answer.dislikesCount > 0 && onShowDislikedUsers ? 'pointer' : 'default',
+                '&:hover': answer.dislikesCount > 0 && onShowDislikedUsers ? { opacity: 0.7 } : {},
+              }}
+              onClick={answer.dislikesCount > 0 && onShowDislikedUsers ? (e) => {
+                e.stopPropagation();
+                onShowDislikedUsers(answer.id);
+              } : undefined}
+              title={answer.dislikesCount > 0 && onShowDislikedUsers ? t('users_who_disliked', currentLanguage) : ''}
+            >
+              <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                {answer.dislikesCount}
               </Typography>
             </Box>
+            {user && relatedQuestionsCount > 0 && onShowRelatedQuestions && (
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 0.5,
+                  cursor: 'pointer',
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShowRelatedQuestions(e, answer.id);
+                }}
+                title={t('related_questions', currentLanguage)}
+              >
+                <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                  {relatedQuestionsCount}
+                </Typography>
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
+      
+      {/* Ancestors Drawer */}
+      {((answer.ancestors && answer.ancestors.length > 0) || (answer.parentContentInfo && answer.parentContentInfo.type === 'answer' && answer.parentContentInfo.questionId) || (answer.parentId && answer.parentContentInfo && answer.ancestors?.some(a => a.depth > 0))) && (
+        <AncestorsDrawer
+          open={ancestorsDrawerOpen}
+          onClose={(event) => {
+            if (event) {
+              event.stopPropagation();
+            }
+            setAncestorsDrawerOpen(false);
+          }}
+          ancestors={answer.ancestors || (answer.parentId ? [{
+            id: answer.parentId,
+            type: (answer.parentType || 'answer') as 'question' | 'answer',
+            depth: 0,
+          }] : [])}
+          currentQuestionId={answer.id}
+          contentType="answer"
+        />
+      )}
     </StyledPaper>
+    </Box>
   );
 });
 
