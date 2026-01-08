@@ -25,8 +25,8 @@ import { useAppSelector } from '../../store/hooks';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 
 const StyledPaper = styled(Box, {
-  shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isMagnefite' && prop !== 'isAlternateTexture',
-})<{ isPapirus?: boolean; isMagnefite?: boolean; isAlternateTexture?: boolean }>(({ theme, isPapirus, isMagnefite, isAlternateTexture }) => {
+  shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isMagnefite' && prop !== 'isAlternateTexture' && prop !== 'isHighlighted',
+})<{ isPapirus?: boolean; isMagnefite?: boolean; isAlternateTexture?: boolean; isHighlighted?: boolean }>(({ theme, isPapirus, isMagnefite, isAlternateTexture, isHighlighted }) => {
   // Magnefite'da hover için gri kullan
   const hoverColor = isMagnefite 
     ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray
@@ -39,10 +39,13 @@ const StyledPaper = styled(Box, {
   borderRadius: 16,
   padding: theme.spacing(4),
   marginBottom: theme.spacing(3),
-  border: `1px solid ${theme.palette.primary.main}33`,
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 4px 20px rgba(0, 0, 0, 0.2)'
-    : '0 4px 20px rgba(0, 0, 0, 0.1)',
+  border: isHighlighted ? `1px solid ${hoverColor}99` : `1px solid ${theme.palette.primary.main}33`,
+  boxShadow: isHighlighted 
+    ? `0 12px 40px ${hoverColor}66`
+    : (theme.palette.mode === 'dark'
+      ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+      : '0 4px 20px rgba(0, 0, 0, 0.1)'),
+  transform: isHighlighted ? 'translateY(-4px)' : 'none',
   transition: 'all 0.3s ease',
   position: 'relative',
   overflow: 'hidden',
@@ -82,9 +85,10 @@ const StyledPaper = styled(Box, {
     right: 0,
     height: '3px',
     background: `linear-gradient(90deg, ${hoverColor} 0%, ${theme.palette.primary.dark} 50%, ${hoverColor} 100%)`,
-    opacity: 0,
+    opacity: isHighlighted ? 1 : 0,
     transition: 'opacity 0.3s ease',
     zIndex: 2,
+    borderRadius: '16px 16px 0 0',
   },
   '&:hover::before': {
     opacity: 1,
@@ -108,6 +112,7 @@ interface AnswerCardProps {
   questionId?: string;
   questionTitle?: string;
   showParentInfo?: boolean; // Parent info gösterilsin mi (sadece arama sayfasında true)
+  isHighlighted?: boolean; // Highlight efekti için
 }
 
 const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
@@ -126,6 +131,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   questionId,
   questionTitle,
   showParentInfo = true, // Default true, soru detay sayfasında false olacak
+  isHighlighted = false,
 }, ref) => {
   // Debug log for specific answer
   if (answer.id === '6951cc1f0ffdbcb4e9208825') {
@@ -218,6 +224,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
       isPapirus={isPapirus}
       isMagnefite={isMagnefite} 
       isAlternateTexture={isAlternateTexture}
+      isHighlighted={isHighlighted}
       onClick={handleClick}
     >
         {/* Parent Info - Answer'ın parent'ı (question veya answer) with Ancestors Button */}

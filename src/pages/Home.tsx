@@ -283,7 +283,7 @@ const Home = () => {
     const result = await dispatch(deleteQuestion(questionId));
     if (deleteQuestion.rejected.match(result)) {
       // TODO: Add rollback logic if needed
-      alert(t('delete_failed', currentLanguage));
+      showErrorToast(t('delete_failed', currentLanguage));
     }
   };
 
