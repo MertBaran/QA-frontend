@@ -119,10 +119,50 @@ export const common = {
     en: 'Users Who Liked',
     de: 'Benutzer, die gemocht haben',
   },
+  users_who_disliked: {
+    tr: 'Beğenmeyen Kullanıcılar',
+    en: 'Users Who Disliked',
+    de: 'Benutzer, die nicht gemocht haben',
+  },
   no_likes_yet: {
     tr: 'Henüz beğeni yok',
     en: 'No likes yet',
     de: 'Noch keine Likes',
+  },
+  no_dislikes_yet: {
+    tr: 'Henüz beğenmeyen yok',
+    en: 'No dislikes yet',
+    de: 'Noch keine Dislikes',
+  },
+  follow: {
+    tr: 'Takip Et',
+    en: 'Follow',
+    de: 'Folgen',
+  },
+  unfollow: {
+    tr: 'Takibi Bırak',
+    en: 'Unfollow',
+    de: 'Nicht mehr folgen',
+  },
+  followers: {
+    tr: 'Takipçiler',
+    en: 'Followers',
+    de: 'Follower',
+  },
+  following: {
+    tr: 'Takip Edilenler',
+    en: 'Following',
+    de: 'Folgt',
+  },
+  no_followers_yet: {
+    tr: 'Henüz takipçi yok',
+    en: 'No followers yet',
+    de: 'Noch keine Follower',
+  },
+  no_following_yet: {
+    tr: 'Henüz takip edilen yok',
+    en: 'Not following anyone yet',
+    de: 'Folgt noch niemandem',
   },
   ancestors: {
     tr: 'Sorunun Soyu',
