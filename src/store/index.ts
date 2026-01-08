@@ -13,6 +13,7 @@ import confirmReducer from './confirm/confirmSlice';
 import likesReducer from './likes/likesSlice';
 import answerReducer from './answers/answerSlice';
 import homeReducer from './home/homeSlice';
+import followReducer from './follow/followSlice';
 
 // Persist configuration for auth slice
 const authPersistConfig = {
@@ -62,6 +63,7 @@ const store = configureStore({
     likes: likesReducer,
     answers: answerReducer,
     home: homeReducer,
+    follow: followReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

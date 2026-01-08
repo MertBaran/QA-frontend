@@ -3,7 +3,7 @@ import { Container, Box, Button, Pagination, Fade, Typography } from '@mui/mater
 import { Add } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../components/layout/Layout';
-import { HomePageSkeleton } from '../components/ui/Skeleton';
+import { HomePageSkeleton } from '../components/ui/skeleton';
 import FilterModal from '../components/ui/FilterModal';
 import LikesModal from '../components/ui/LikesModal';
 import { closeModal } from '../store/likes/likesSlice';
@@ -283,7 +283,7 @@ const Home = () => {
     const result = await dispatch(deleteQuestion(questionId));
     if (deleteQuestion.rejected.match(result)) {
       // TODO: Add rollback logic if needed
-      alert(t('delete_failed', currentLanguage));
+      showErrorToast(t('delete_failed', currentLanguage));
     }
   };
 
@@ -369,9 +369,6 @@ const Home = () => {
                 <Fade in timeout={800 + index * 200} key={question.id}>
                   <QuestionCard
                     question={question}
-                    onLike={handleLikeQuestion}
-                    onUnlike={handleUnlikeQuestion}
-                    onDelete={handleDeleteQuestion}
                     isAlternateTexture={index % 2 === 1} // Çift sıralar için alternatif texture
                   />
                 </Fade>

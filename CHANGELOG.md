@@ -5,6 +5,74 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-01-08
+
+### Added
+
+- **Follow/Unfollow Users**: Users can now follow and unfollow other users
+  - Follow/unfollow buttons on user profile pages
+  - Display followers and following counts
+  - Clickable counts to view lists of followers/following
+  - UsersListModal component to display user lists
+  - Redux state management for follow operations
+- **Profile Image Upload**: Users can now upload and change their profile pictures
+  - Profile image upload with cropping support (react-easy-crop)
+  - Zoom and crop controls for image adjustment
+  - Automatic deletion of old profile images when new one is uploaded
+  - Instant UI update after upload without page refresh
+  - Loading indicators during upload process
+  - Profile images stored on Cloudflare R2
+- **Custom Profile Background**: Users can upload custom backgrounds for their profile pages (Magnefite theme)
+  - Support for images (GIF, JPEG, PNG, WebP) and videos (MP4, WebM, OGG)
+  - Maximum file size: 20MB
+  - Ping-pong video playback (forward and reverse loop)
+  - Automatic deletion of old backgrounds when new one is uploaded
+  - Background upload/delete controls in profile edit modal
+- **Likes/Dislikes User Lists**: View users who liked or disliked content
+  - Click like/dislike icons on QuestionDetail page to see user lists
+  - UsersListModal displays lists of users who liked or disliked
+  - Works for both questions and answers
+- **Profile Edit Modal Improvements**: Enhanced profile editing experience
+  - Dark mode theme support
+  - Removed title field
+  - Background upload controls integrated into edit modal
+  - Improved form layout and spacing
+
+### Changed
+
+- **Profile Page**: Major UI/UX improvements
+  - Removed "Total Likes" and "Profile Views" statistics
+  - Improved overlay opacity for better background visibility in light mode
+  - Better profile image and background resolution from Cloudflare keys
+  - Success/error messages displayed as Snackbar notifications (top-right)
+- **Asset Service**: Improved asset management
+  - Renamed `forcePresignedUrl` to `presignedUrl` for better semantics
+  - Updated `deleteAsset` to use DELETE HTTP method
+  - Better URL resolution with public URL support
+- **Question and Answer Cards**: Enhanced interaction icons
+  - Answer count icon uses rotated Comment icon (180 degrees)
+  - Related questions icon changed to Quiz icon
+  - Profile images resolved from Cloudflare keys
+  - Improved icon alignment and spacing
+- **ActionButtons**: Updated icons
+  - "Ask Question" button uses ContactSupport icon instead of HelpOutline
+
+### Fixed
+
+- **Like/Dislike Behavior**: When a user likes content they previously disliked, the dislike is now automatically removed
+- **Profile Image Display**: Profile images now correctly display after page refresh
+- **Background Display**: Custom backgrounds now persist after page refresh
+- **Background Delete**: Fixed 404 error when deleting backgrounds
+- **ActionButtons Positioning**: Fixed positioning issues in Papyrus theme
+
+### Technical Improvements
+
+- Added react-easy-crop dependency for profile image cropping
+- Improved profile image and background URL resolution
+- Better error handling in profile upload operations
+- Enhanced Redux state management for follow operations
+- Improved TypeScript type safety
+
 ## [1.6.0] - 2025-01-XX
 
 ### Extraordinary Searching Structure v1

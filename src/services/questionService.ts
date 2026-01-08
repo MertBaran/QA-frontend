@@ -146,7 +146,6 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     dislikesCount: questionData.dislikes.length,
     dislikedByUsers: questionData.dislikes,
     answers: questionData.answers.length,
-    views: Math.floor(Math.random() * 1000) + 50, // Backend'de view sistemi yok, geçici
     timeAgo,
     isTrending,
     category: questionData.category || inferredCategory,
@@ -396,17 +395,52 @@ class QuestionService {
     }
   }
 
-  // Kullanıcıya ait soruları getir
-  async getQuestionsByUser(userId: string): Promise<Question[]> {
+  // Kullanıcıya ait soruları getir (pagination ile)
+  async getQuestionsByUser(
+    userId: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<PaginatedQuestionsResponse> {
     try {
-      const response = await api.get<QuestionsResponse>(`/questions/user/${userId}`);
+      // Sorular için daha uzun timeout (30 saniye)
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          data: QuestionData[];
+          pagination: {
+            currentPage: number;
+            totalPages: number;
+            totalItems: number;
+            itemsPerPage: number;
+            hasNextPage: boolean;
+            hasPreviousPage: boolean;
+          };
+        };
+      }>(`/questions/user/${userId}`, {
+        params: { page, limit },
+        timeout: 30000,
+      });
       if (response.data.success && response.data.data) {
-        return response.data.data.map(transformQuestionData);
+        return {
+          data: response.data.data.data.map(transformQuestionData),
+          pagination: response.data.data.pagination,
+        };
       }
-      return [];
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          totalPages: 0,
+          totalItems: 0,
+          itemsPerPage: limit,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
     } catch (error) {
       console.error('Kullanıcı soruları getirilirken hata:', error);
-      return [];
+      // Hata durumunda throw et ki component'te yakalanabilsin
+      throw error;
     }
   }
 
@@ -457,9 +491,6 @@ class QuestionService {
         break;
       case 'En Popüler':
         filtered.sort((a, b) => b.likesCount - a.likesCount);
-        break;
-      case 'En Çok Görüntülenen':
-        filtered.sort((a, b) => b.views - a.views);
         break;
       case 'En Çok Cevaplanan':
         filtered.sort((a, b) => b.answers - a.answers);

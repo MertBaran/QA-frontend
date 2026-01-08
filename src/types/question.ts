@@ -105,7 +105,6 @@ export interface Question {
   dislikesCount: number;
   dislikedByUsers: string[];
   answers: number;
-  views: number;
   timeAgo: string;
   isTrending: boolean;
   category: string;
