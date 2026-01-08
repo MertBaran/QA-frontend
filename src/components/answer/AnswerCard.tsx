@@ -283,7 +283,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
       >
         {/* Action Buttons - Sağ Üst Köşe */}
         {onLike && onUnlike && (
-          <Box sx={{ 
+          <Box className="action-buttons-container" sx={{ 
             position: 'absolute',
             top: theme => theme.spacing(1),
             right: theme => theme.spacing(2),

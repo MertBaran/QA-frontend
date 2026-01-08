@@ -145,14 +145,11 @@ const AnswerItem = styled(ListItem, {
   borderBottom: `1px solid ${theme.palette.divider}`,
   padding: theme.spacing(2),
   transition: 'all 0.2s ease',
-    backgroundColor: theme.palette.mode === 'dark'
-      ? `${parentColor}11`
-      : `${parentColor}08`,
   '&:hover': {
       backgroundColor: theme.palette.mode === 'dark'
-        ? `${parentColor}33`
-        : `${parentColor}22`,
-      borderLeft: `3px solid ${parentDark}`,
+        ? `${parentColor}22`
+        : `${parentColor}11`,
+      borderLeft: `3px solid ${parentColor}`,
   },
   };
 });

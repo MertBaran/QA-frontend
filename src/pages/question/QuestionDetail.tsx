@@ -93,9 +93,13 @@ const QuestionCard = styled(Paper, {
       pointerEvents: 'none',
       zIndex: 0,
     },
-    '& > *': {
+    '& > *:not(.action-buttons-container)': {
       position: 'relative',
       zIndex: 1,
+    },
+    '& > .action-buttons-container': {
+      position: 'absolute',
+      zIndex: 100,
     },
   } : {}),
 }));
@@ -132,6 +136,19 @@ const ActionButton = styled(Button, {
     },
   };
 });
+
+const ActionButtonsContainer = styled(Box)(({ theme }) => ({
+  position: 'absolute',
+  top: theme.spacing(4),
+  right: theme.spacing(2),
+  display: 'flex',
+  gap: theme.spacing(0.5),
+  alignItems: 'center',
+  zIndex: 100,
+  '&.action-buttons-container': {
+    position: 'absolute',
+  },
+}));
 
 const QuestionDetail: React.FC = () => {
   const theme = useTheme();
@@ -1006,15 +1023,7 @@ const QuestionDetail: React.FC = () => {
         <Box sx={{ position: 'relative' }}>
         <QuestionCard isPapirus={isPapirus}>
           {/* Action Buttons - Sağ Üst Köşe - Doğrudan QuestionCard içinde */}
-          <Box sx={{ 
-            position: 'absolute',
-            top: theme => theme.spacing(4), // QuestionCard padding ile aynı hizada
-            right: theme => theme.spacing(2),
-            display: 'flex',
-            gap: 0.5,
-            alignItems: 'center',
-            zIndex: 20,
-          }}>
+          <ActionButtonsContainer className="action-buttons-container">
             <ActionButtons
               targetType="question"
               targetId={question.id}
@@ -1055,14 +1064,14 @@ const QuestionDetail: React.FC = () => {
                 handleOpenEditQuestionModal();
               }}
             />
-          </Box>
+          </ActionButtonsContainer>
 
           {/* Parent Question/Answer Info with Ancestors Button */}
           {(question.parentQuestionId || question.parentAnswerId) && (() => {
             const parentId = question.parentQuestionId || question.parentAnswerId;
             
             return (
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 500px)' }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 200px)', pr: 20 }}>
                 {question.ancestors && question.ancestors.length > 1 && (
                   <IconButton
                     size="small"
