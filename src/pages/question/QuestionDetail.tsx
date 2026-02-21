@@ -45,8 +45,8 @@ import ParentInfoChip from '../../components/ui/ParentInfoChip';
 import { QuestionDetailSkeleton } from '../../components/ui/skeleton';
 import AskQuestionModal from '../../components/question/AskQuestionModal';
 import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
-import RichTextEditor from '../../components/ui/RichTextEditor';
-import MarkdownRenderer from '../../components/ui/MarkdownRenderer';
+import RichTextEditor, { CONTENT_MAX_LENGTH } from '../../components/ui/RichTextEditor';
+import ExpandableMarkdown from '../../components/ui/ExpandableMarkdown';
 import AncestorsDrawer from '../../components/question/AncestorsDrawer';
 import AnswerCard from '../../components/answer/AnswerCard';
 import { openModal, closeModal, openDislikesModal, closeDislikesModal } from '../../store/likes/likesSlice';
@@ -58,52 +58,63 @@ import { contentAssetService, uploadFileToPresignedUrl } from '../../services/co
 import { updateQuestion as updateQuestionThunk } from '../../store/questions/questionThunks';
 import { updateQuestionInList } from '../../store/home/homeSlice';
 import { showSuccessToast, showErrorToast } from '../../utils/notificationUtils';
+import { fetchUserBookmarks } from '../../store/bookmarks/bookmarkThunks';
 
 const QuestionCard = styled(Paper, {
-  shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isAnswerWriting',
-})<{ isPapirus?: boolean; isAnswerWriting?: boolean }>(({ theme, isPapirus, isAnswerWriting }) => ({
-  position: 'relative',
-  background: theme.palette.mode === 'dark'
-    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
-  border: `1px solid ${theme.palette.primary.main}33`,
-  borderRadius: 16,
-  padding: theme.spacing(4),
-  marginBottom: theme.spacing(3),
-  color: theme.palette.text.primary,
-  backdropFilter: 'blur(10px)',
-  boxShadow: theme.palette.mode === 'dark'
-    ? '0 8px 32px rgba(0, 0, 0, 0.3)'
-    : '0 8px 32px rgba(0, 0, 0, 0.1)',
-  overflow: 'hidden',
-  ...(isPapirus ? {
-    '&::before': {
-      content: '""',
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundImage: isAnswerWriting 
-        ? (theme.palette.mode === 'dark' ? `url(${papyrusWholeDark})` : `url(${papyrusWhole})`)
-        : `url(${papyrusHorizontal1})`,
-      backgroundSize: isAnswerWriting ? '105%' : 'cover',
-      backgroundPosition: isAnswerWriting ? 'center 15%' : 'center',
-      backgroundRepeat: 'no-repeat',
-      opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
-      pointerEvents: 'none',
-      zIndex: 0,
-    },
-    '& > *:not(.action-buttons-container)': {
-      position: 'relative',
-      zIndex: 1,
-    },
-    '& > .action-buttons-container': {
-      position: 'absolute',
-      zIndex: 100,
-    },
-  } : {}),
-}));
+  shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isAnswerWriting' && prop !== 'isMagnefite',
+})<{ isPapirus?: boolean; isAnswerWriting?: boolean; isMagnefite?: boolean }>(({ theme, isPapirus, isAnswerWriting, isMagnefite }) => {
+  // Magnefite light modunda daha koyu background
+  const getBackground = () => {
+    if (isMagnefite && theme.palette.mode === 'light') {
+      return 'linear-gradient(135deg, #B5BAC0 0%, #A8AEB6 100%)';
+    }
+    return theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  };
+
+  return {
+    position: 'relative',
+    background: getBackground(),
+    border: `1px solid ${theme.palette.primary.main}33`,
+    borderRadius: 16,
+    padding: theme.spacing(4),
+    marginBottom: theme.spacing(3),
+    color: theme.palette.text.primary,
+    backdropFilter: 'blur(10px)',
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+      : '0 8px 32px rgba(0, 0, 0, 0.1)',
+    overflow: 'hidden',
+    ...(isPapirus ? {
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundImage: isAnswerWriting
+          ? (theme.palette.mode === 'dark' ? `url(${papyrusWholeDark})` : `url(${papyrusWhole})`)
+          : `url(${papyrusHorizontal1})`,
+        backgroundSize: isAnswerWriting ? '105%' : 'cover',
+        backgroundPosition: isAnswerWriting ? 'center 15%' : 'center',
+        backgroundRepeat: 'no-repeat',
+        opacity: theme.palette.mode === 'dark' ? 0.12 : 0.15,
+        pointerEvents: 'none',
+        zIndex: 0,
+      },
+      '& > *:not(.action-buttons-container)': {
+        position: 'relative',
+        zIndex: 1,
+      },
+      '& > .action-buttons-container': {
+        position: 'absolute',
+        zIndex: 100,
+      },
+    } : {}),
+  }
+});
 
 
 
@@ -121,16 +132,16 @@ const ActionButton = styled(Button, {
   const primaryLight = isMagnefite
     ? (theme.palette.mode === 'dark' ? '#D1D5DB' : '#9CA3AF') // Lighter gray
     : theme.palette.primary.light;
-  
+
   return {
     background: `linear-gradient(135deg, ${primaryColor} 0%, ${primaryDark} 100%)`,
     color: 'white', // Always white text
-  borderRadius: 8,
-  textTransform: 'none',
-  fontWeight: 600,
-  '&:hover': {
+    borderRadius: 8,
+    textTransform: 'none',
+    fontWeight: 600,
+    '&:hover': {
       background: `linear-gradient(135deg, ${primaryDark} 0%, ${primaryLight} 100%)`,
-  },
+    },
     '&:disabled': {
       background: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)',
       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
@@ -160,8 +171,8 @@ const QuestionDetail: React.FC = () => {
   const { user } = useAppSelector(state => state.auth);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   const { currentLanguage } = useAppSelector(state => state.language);
-  const { 
-    modalOpen: likesModalOpen, 
+  const {
+    modalOpen: likesModalOpen,
     users: likesModalUsers,
     dislikesModalOpen,
     dislikedUsers,
@@ -171,7 +182,7 @@ const QuestionDetail: React.FC = () => {
   const { name: themeName, mode } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
   const isMagnefite = themeName === 'magnefite';
-  
+
   const [question, setQuestion] = useState<Question | null>(null);
   const [questionThumbnailUrl, setQuestionThumbnailUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -180,30 +191,30 @@ const QuestionDetail: React.FC = () => {
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [answerValidationError, setAnswerValidationError] = useState<string>('');
   const [highlightedAnswerId, setHighlightedAnswerId] = useState<string | null>(null);
-  
+
   // Parent question/answer state
   const [parentQuestion, setParentQuestion] = useState<Question | null>(null);
   const [parentAnswer, setParentAnswer] = useState<Answer | null>(null);
   const [parentAnswerQuestion, setParentAnswerQuestion] = useState<Question | null>(null);
-  
+
   // Ask question modal states
   const [askQuestionModalOpen, setAskQuestionModalOpen] = useState(false);
   const [askQuestionMode, setAskQuestionMode] = useState<'question' | 'answer' | null>(null);
   const [targetQuestionId, setTargetQuestionId] = useState<string | null>(null);
   const [targetAnswerId, setTargetAnswerId] = useState<string | null>(null);
-  
+
   // Related questions popover states
   const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
   const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
   const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
   const [currentRelatedTargetId, setCurrentRelatedTargetId] = useState<string | null>(null);
   const [currentRelatedMode, setCurrentRelatedMode] = useState<'question' | 'answer' | null>(null);
-  
+
   // Related questions count per answer
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
   // Related questions count for the main question
   const [questionRelatedQuestionsCount, setQuestionRelatedQuestionsCount] = useState<number>(0);
-  
+
   // Ancestors drawer state
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
 
@@ -231,20 +242,20 @@ const QuestionDetail: React.FC = () => {
   useEffect(() => {
     const loadQuestionData = async () => {
       if (!id) return;
-      
+
       try {
         setError(null);
         setLoadingQuestion(true);
-        
+
         // Soru ve cevapları paralel olarak yükle
         const [questionData] = await Promise.all([
           questionService.getQuestionById(id),
           dispatch(getAnswersByQuestion({ questionId: id, page: answersPage, limit: answersLimit }))
         ]);
-        
+
         if (questionData) {
           setQuestion(questionData);
-          
+
           // Thumbnail URL'ini oluştur
           if (questionData.thumbnail?.url) {
             // URL zaten varsa direkt kullan
@@ -290,32 +301,32 @@ const QuestionDetail: React.FC = () => {
           } else {
             setQuestionProfileImageUrl(null);
           }
-          
+
           setLoadingQuestion(false); // Ana soru yüklendi, loading'i kapat
-          
+
           // Parent question/answer yükle (background'da, blocking yapmadan)
           const parentId = questionData.parentQuestionId || questionData.parentAnswerId;
           if (parentId) {
             // Parent yükleme işlemini async olarak yap, blocking yapmasın
             Promise.resolve().then(async () => {
               try {
-            const parentQ = await questionService.getQuestionById(parentId);
-            if (parentQ) {
-              setParentQuestion(parentQ);
-            } else {
-              const parentA = await answerService.getAnswerById(parentId);
-              if (parentA) {
-                setParentAnswer(parentA);
-                
-                // Load the question that this answer belongs to
-                if (parentA.questionId) {
-                  const answerQ = await questionService.getQuestionById(parentA.questionId);
-                  if (answerQ) {
-                    setParentAnswerQuestion(answerQ);
+                const parentQ = await questionService.getQuestionById(parentId);
+                if (parentQ) {
+                  setParentQuestion(parentQ);
+                } else {
+                  const parentA = await answerService.getAnswerById(parentId);
+                  if (parentA) {
+                    setParentAnswer(parentA);
+
+                    // Load the question that this answer belongs to
+                    if (parentA.questionId) {
+                      const answerQ = await questionService.getQuestionById(parentA.questionId);
+                      if (answerQ) {
+                        setParentAnswerQuestion(answerQ);
+                      }
+                    }
                   }
                 }
-              }
-            }
               } catch (err) {
                 console.error('Parent content yüklenirken hata:', err);
                 // Parent yüklenemezse hata verme, sadece log
@@ -326,7 +337,7 @@ const QuestionDetail: React.FC = () => {
           setError('Soru bulunamadı');
           setLoadingQuestion(false);
         }
-        
+
         // Load related questions count for the main question immediately
         if (questionData) {
           try {
@@ -337,7 +348,7 @@ const QuestionDetail: React.FC = () => {
             setQuestionRelatedQuestionsCount(0);
           }
         }
-        
+
         logger.user.action('question_detail_loaded', { questionId: id });
       } catch (err) {
         console.error('Soru detayı yüklenirken hata:', err);
@@ -350,11 +361,18 @@ const QuestionDetail: React.FC = () => {
     loadQuestionData();
   }, [id, dispatch, answersPage]);
 
+  // Fetch bookmarks once on mount if authenticated (so QuestionDetail can show bookmark state)
+  useEffect(() => {
+    if (user && bookmarks.length === 0) {
+      dispatch(fetchUserBookmarks());
+    }
+  }, [user, bookmarks.length, dispatch]);
+
   // Load related questions count for each answer
   useEffect(() => {
     const loadRelatedCounts = async () => {
       if (!answers || answers.length === 0) return;
-      
+
       const counts: Record<string, number> = {};
       for (const answer of answers) {
         try {
@@ -367,7 +385,7 @@ const QuestionDetail: React.FC = () => {
       }
       setRelatedQuestionsCount(counts);
     };
-    
+
     loadRelatedCounts();
   }, [answers]);
 
@@ -377,12 +395,12 @@ const QuestionDetail: React.FC = () => {
       const hash = window.location.hash;
       if (hash && hash.startsWith('#answer-')) {
         const answerId = hash.substring('#answer-'.length);
-        
+
         if (!id) return;
-        
+
         // Cevabın hangi sayfada olduğunu bul
         const pageNumber = await answerService.getAnswerPageNumber(id, answerId, answersLimit);
-        
+
         if (pageNumber) {
           // Eğer cevap mevcut sayfada değilse, o sayfaya git
           if (pageNumber !== answersPage) {
@@ -397,7 +415,7 @@ const QuestionDetail: React.FC = () => {
               const element = document.getElementById(`answer-${answerId}`);
               if (element) {
                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                
+
                 // Remove highlight after animation
                 setTimeout(() => {
                   setHighlightedAnswerId(null);
@@ -414,13 +432,13 @@ const QuestionDetail: React.FC = () => {
         setHighlightedAnswerId(null);
       }
     };
-    
+
     // Check hash on mount and when hash changes
     handleHashChange();
-    
+
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashChange);
-    
+
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
@@ -431,10 +449,10 @@ const QuestionDetail: React.FC = () => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#answer-')) {
       const answerId = hash.substring('#answer-'.length);
-      
+
       // Cevap mevcut sayfada mı kontrol et
       const answerExists = answers.some(a => a.id === answerId);
-      
+
       if (answerExists) {
         // Cevap mevcut sayfada, highlight et
         setHighlightedAnswerId(answerId);
@@ -442,7 +460,7 @@ const QuestionDetail: React.FC = () => {
           const element = document.getElementById(`answer-${answerId}`);
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
+
             // Remove highlight after animation
             setTimeout(() => {
               setHighlightedAnswerId(null);
@@ -457,13 +475,17 @@ const QuestionDetail: React.FC = () => {
   // Cevap gönder
   const handleSubmitAnswer = async () => {
     if (!id || !newAnswer.trim() || !user) return;
-    
+    if (newAnswer.length > CONTENT_MAX_LENGTH) {
+      setAnswerValidationError(t('validation_answer_max', currentLanguage));
+      return;
+    }
+
     try {
       setSubmittingAnswer(true);
       setAnswerValidationError('');
-      
-      await dispatch(createAnswer({ questionId: id, answerData: { content: newAnswer } }));
-      
+
+      await dispatch(createAnswer({ questionId: id, answerData: { content: newAnswer.slice(0, CONTENT_MAX_LENGTH) } }));
+
       setNewAnswer('');
       setAnswerValidationError('');
       // Yeni cevap eklendiğinde ilk sayfaya dön ve cevapları yeniden yükle
@@ -474,10 +496,10 @@ const QuestionDetail: React.FC = () => {
       logger.user.action('answer_submitted', { questionId: id });
     } catch (err: any) {
       console.error('Cevap gönderilirken hata:', err);
-      
+
       // Backend'den gelen validasyon hatalarını işle
       if (err.response?.data?.errors) {
-        const contentError = err.response.data.errors.find((error: any) => 
+        const contentError = err.response.data.errors.find((error: any) =>
           error.path && error.path[0] === 'content'
         );
         if (contentError) {
@@ -502,7 +524,7 @@ const QuestionDetail: React.FC = () => {
   // Soru beğen/beğenme
   const handleLikeQuestion = async () => {
     if (!id || !user || !question) return;
-    
+
     // Optimistic update
     const previousQuestion = { ...question };
     setQuestion(prev => prev ? {
@@ -513,7 +535,7 @@ const QuestionDetail: React.FC = () => {
       dislikesCount: prev.dislikedByUsers.includes(user.id) ? Math.max(0, prev.dislikesCount - 1) : prev.dislikesCount,
       dislikedByUsers: prev.dislikedByUsers.filter(id => id !== user.id)
     } : null);
-    
+
     try {
       const success = await questionService.likeQuestion(id);
       if (!success) {
@@ -530,7 +552,7 @@ const QuestionDetail: React.FC = () => {
   // Soru beğenmeyi kaldır
   const handleUnlikeQuestion = async () => {
     if (!id || !user || !question) return;
-    
+
     // Optimistic update
     const previousQuestion = { ...question };
     setQuestion(prev => prev ? {
@@ -538,7 +560,7 @@ const QuestionDetail: React.FC = () => {
       likesCount: Math.max(0, prev.likesCount - 1),
       likedByUsers: prev.likedByUsers.filter(id => id !== user.id)
     } : null);
-    
+
     try {
       const success = await questionService.unlikeQuestion(id);
       if (!success) {
@@ -555,7 +577,7 @@ const QuestionDetail: React.FC = () => {
   // Soru beğenmeme
   const handleDislikeQuestion = async () => {
     if (!id || !user || !question) return;
-    
+
     // Optimistic update
     const previousQuestion = { ...question };
     setQuestion(prev => prev ? {
@@ -566,7 +588,7 @@ const QuestionDetail: React.FC = () => {
       likesCount: prev.likedByUsers.includes(user.id) ? Math.max(0, prev.likesCount - 1) : prev.likesCount,
       likedByUsers: prev.likedByUsers.filter(id => id !== user.id)
     } : null);
-    
+
     try {
       const success = await questionService.dislikeQuestion(id);
       if (!success) {
@@ -583,7 +605,7 @@ const QuestionDetail: React.FC = () => {
   // Soru beğenmemeyi kaldır
   const handleUndoDislikeQuestion = async () => {
     if (!id || !user || !question) return;
-    
+
     // Optimistic update
     const previousQuestion = { ...question };
     setQuestion(prev => prev ? {
@@ -591,7 +613,7 @@ const QuestionDetail: React.FC = () => {
       dislikesCount: Math.max(0, prev.dislikesCount - 1),
       dislikedByUsers: prev.dislikedByUsers.filter(id => id !== user.id)
     } : null);
-    
+
     try {
       const success = await questionService.undoDislikeQuestion(id);
       if (!success) {
@@ -608,10 +630,10 @@ const QuestionDetail: React.FC = () => {
   // Cevap beğen/beğenme
   const handleLikeAnswer = async (answerId: string) => {
     if (!user) return;
-    
+
     const answer = answers.find(a => a.id === answerId);
     if (!answer) return;
-    
+
     // Optimistic update
     const previousAnswer = { ...answer };
     dispatch(updateAnswerInList({
@@ -624,7 +646,7 @@ const QuestionDetail: React.FC = () => {
         dislikedByUsers: answer.dislikedByUsers.filter(id => id !== user.id)
       }
     }));
-    
+
     try {
       const success = await dispatch(likeAnswer({ answerId, questionId: id! }));
       if (!success) {
@@ -646,10 +668,10 @@ const QuestionDetail: React.FC = () => {
   // Cevap beğenmeyi kaldır
   const handleUnlikeAnswer = async (answerId: string) => {
     if (!user) return;
-    
+
     const answer = answers.find(a => a.id === answerId);
     if (!answer) return;
-    
+
     // Optimistic update
     const previousAnswer = { ...answer };
     dispatch(updateAnswerInList({
@@ -659,7 +681,7 @@ const QuestionDetail: React.FC = () => {
         likedByUsers: answer.likedByUsers.filter(id => id !== user.id)
       }
     }));
-    
+
     try {
       const success = await dispatch(unlikeAnswer({ answerId, questionId: id! }));
       if (!success) {
@@ -682,10 +704,10 @@ const QuestionDetail: React.FC = () => {
   // Cevap beğenmeme
   const handleDislikeAnswer = async (answerId: string) => {
     if (!user) return;
-    
+
     const answer = answers.find(a => a.id === answerId);
     if (!answer) return;
-    
+
     // Optimistic update
     const previousAnswer = { ...answer };
     dispatch(updateAnswerInList({
@@ -698,7 +720,7 @@ const QuestionDetail: React.FC = () => {
         likedByUsers: answer.likedByUsers.filter(id => id !== user.id)
       }
     }));
-    
+
     try {
       const success = await answerService.dislikeAnswer(answerId, id!);
       if (!success) {
@@ -721,10 +743,10 @@ const QuestionDetail: React.FC = () => {
   // Cevap beğenmemeyi kaldır
   const handleUndoDislikeAnswer = async (answerId: string) => {
     if (!user) return;
-    
+
     const answer = answers.find(a => a.id === answerId);
     if (!answer) return;
-    
+
     // Optimistic update
     const previousAnswer = { ...answer };
     dispatch(updateAnswerInList({
@@ -734,7 +756,7 @@ const QuestionDetail: React.FC = () => {
         dislikedByUsers: answer.dislikedByUsers.filter(id => id !== user.id)
       }
     }));
-    
+
     try {
       const success = await answerService.undoDislikeAnswer(answerId, id!);
       if (!success) {
@@ -757,14 +779,14 @@ const QuestionDetail: React.FC = () => {
   // Soru sil
   const handleDeleteQuestion = async () => {
     if (!id) return;
-    
+
     const { confirmService } = await import('../../services/confirmService');
     const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
-    
+
     if (!confirmed) {
       return;
     }
-    
+
     try {
       await questionService.deleteQuestion(id);
       navigate('/');
@@ -777,17 +799,17 @@ const QuestionDetail: React.FC = () => {
   // Cevap sil
   const handleDeleteAnswer = async (answerId: string) => {
     if (!id) return;
-    
+
     const { confirmService } = await import('../../services/confirmService');
     const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
-    
+
     if (!confirmed) {
       return;
     }
-    
+
     // Optimistic update: UI'dan hemen sil
     dispatch(removeAnswerFromList(answerId));
-    
+
     try {
       await dispatch(deleteAnswer({ answerId, questionId: id! }));
     } catch (error) {
@@ -816,7 +838,7 @@ const QuestionDetail: React.FC = () => {
 
   const handleSubmitRelatedQuestion = async (data: any) => {
     if (!user) return;
-    
+
     const questionData = {
       ...data,
       parent: {
@@ -838,7 +860,7 @@ const QuestionDetail: React.FC = () => {
     setCurrentRelatedTargetId(targetId);
     setCurrentRelatedMode(mode);
     setLoadingRelatedQuestions(true);
-    
+
     try {
       const questions = await questionService.getQuestionsByParent(targetId);
       setRelatedQuestions(questions);
@@ -924,6 +946,8 @@ const QuestionDetail: React.FC = () => {
 
     if (editQuestionForm.content.trim().length < 20) {
       errors.content = t('validation_content_min', currentLanguage);
+    } else if (editQuestionForm.content.length > CONTENT_MAX_LENGTH) {
+      errors.content = t('validation_content_max', currentLanguage);
     }
 
     setEditValidationErrors(errors);
@@ -975,7 +999,7 @@ const QuestionDetail: React.FC = () => {
 
       const updatePayload: UpdateQuestionData = {
         title: editQuestionForm.title,
-        content: editQuestionForm.content,
+        content: editQuestionForm.content.slice(0, CONTENT_MAX_LENGTH),
         category: editQuestionForm.category || undefined,
         tags: tagsArray,
       };
@@ -995,7 +1019,7 @@ const QuestionDetail: React.FC = () => {
       if (updateQuestionThunk.fulfilled.match(result)) {
         const updatedQuestion = result.payload;
         setQuestion(updatedQuestion);
-        
+
         // Thumbnail state'ini güncelle
         if (removeThumbnail && !thumbnailFile) {
           // Thumbnail kaldırıldıysa
@@ -1032,7 +1056,7 @@ const QuestionDetail: React.FC = () => {
         } else {
           setQuestionThumbnailUrl(null);
         }
-        
+
         setEditModalOpen(false);
         setEditValidationErrors({});
         setQuestionThumbnailPreviewOpen(false);
@@ -1073,8 +1097,8 @@ const QuestionDetail: React.FC = () => {
             variant="outlined"
             startIcon={<ArrowBack />}
             onClick={() => navigate('/')}
-            sx={{ 
-              color: theme.palette.text.primary, 
+            sx={{
+              color: theme.palette.text.primary,
               borderColor: theme.palette.divider,
               '&:hover': {
                 borderColor: theme.palette.primary.main,
@@ -1082,8 +1106,8 @@ const QuestionDetail: React.FC = () => {
               }
             }}
           >
-                      {t('back', currentLanguage)}
-        </Button>
+            {t('back', currentLanguage)}
+          </Button>
         </Container>
       </Layout>
     );
@@ -1124,9 +1148,9 @@ const QuestionDetail: React.FC = () => {
               navigate(-1);
             }
           }}
-          sx={{ 
-            mb: 3, 
-            color: theme.palette.text.primary, 
+          sx={{
+            mb: 3,
+            color: theme.palette.text.primary,
             borderColor: theme.palette.divider,
             '&:hover': {
               borderColor: theme.palette.primary.main,
@@ -1139,360 +1163,361 @@ const QuestionDetail: React.FC = () => {
 
         {/* Soru Detayı */}
         <Box sx={{ position: 'relative' }}>
-        <QuestionCard isPapirus={isPapirus}>
-          {/* Action Buttons - Sağ Üst Köşe - Doğrudan QuestionCard içinde */}
-          <ActionButtonsContainer className="action-buttons-container">
-            <ActionButtons
-              targetType="question"
-              targetId={question.id}
-              targetData={{
-                title: question.title,
-                content: question.content,
-                author: question.author?.name,
-                authorId: question.author?.id,
-                created_at: question.createdAt,
-                url: window.location.origin + '/questions/' + question.id,
-              }}
-              position="relative"
-              showBookmark={true}
-              showLike={true}
-              showDislike={true}
-              showDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
-              showHelp={true}
-              showEdit={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
-              isLiked={question.likedByUsers.includes(user?.id || '')}
-              isDisliked={question.dislikedByUsers.includes(user?.id || '')}
-              canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
-              isBookmarked={!!bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)}
-              bookmarkId={bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)?._id || null}
-              onLike={handleLikeQuestion}
-              onUnlike={handleUnlikeQuestion}
-              onDislike={handleDislikeQuestion}
-              onUndislike={handleUndoDislikeQuestion}
-              onDelete={(e) => {
-                e.stopPropagation();
-                handleDeleteQuestion();
-              }}
-              onHelp={(e) => {
-                e.stopPropagation();
-                handleAskQuestionAboutQuestion();
-              }}
-              onEdit={(e) => {
-                e.stopPropagation();
-                handleOpenEditQuestionModal();
-              }}
-            />
-          </ActionButtonsContainer>
+          <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
+            {/* Action Buttons - Sağ Üst Köşe - Doğrudan QuestionCard içinde */}
+            <ActionButtonsContainer className="action-buttons-container">
+              <ActionButtons
+                targetType="question"
+                targetId={question.id}
+                targetData={{
+                  title: question.title,
+                  content: question.content,
+                  author: question.author?.name,
+                  authorId: question.author?.id,
+                  created_at: question.createdAt,
+                  url: window.location.origin + '/questions/' + question.id,
+                }}
+                position="relative"
+                showBookmark={true}
+                showLike={true}
+                showDislike={true}
+                showDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
+                showHelp={true}
+                showEdit={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
+                isLiked={question.likedByUsers.includes(user?.id || '')}
+                isDisliked={question.dislikedByUsers.includes(user?.id || '')}
+                canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
+                isBookmarked={!!bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)}
+                bookmarkId={bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)?._id || null}
+                onLike={handleLikeQuestion}
+                onUnlike={handleUnlikeQuestion}
+                onDislike={handleDislikeQuestion}
+                onUndislike={handleUndoDislikeQuestion}
+                onDelete={(e) => {
+                  e.stopPropagation();
+                  handleDeleteQuestion();
+                }}
+                onHelp={(e) => {
+                  e.stopPropagation();
+                  handleAskQuestionAboutQuestion();
+                }}
+                onEdit={(e) => {
+                  e.stopPropagation();
+                  handleOpenEditQuestionModal();
+                }}
+              />
+            </ActionButtonsContainer>
 
-          {/* Parent Question/Answer Info with Ancestors Button */}
-          {(question.parentQuestionId || question.parentAnswerId) && (() => {
-            const parentId = question.parentQuestionId || question.parentAnswerId;
-            
-            return (
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 200px)', pr: 20 }}>
-                {question.ancestors && question.ancestors.length > 1 && (
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setAncestorsDrawerOpen(true);
-                    }}
-                    sx={{
-                      color: themeName === 'molume' 
-                        ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
-                        : themeName === 'magnefite'
-                        ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                        : `${theme.palette.primary.main}CC`,
-                      '&:hover': {
-                        color: themeName === 'molume' 
+            {/* Parent Question/Answer Info with Ancestors Button */}
+            {(question.parentQuestionId || question.parentAnswerId) && (() => {
+              const parentId = question.parentQuestionId || question.parentAnswerId;
+
+              return (
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, mb: 2, maxWidth: 'calc(100% - 200px)', pr: 20 }}>
+                  {question.ancestors && question.ancestors.length > 1 && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAncestorsDrawerOpen(true);
+                      }}
+                      sx={{
+                        color: themeName === 'molume'
                           ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
                           : themeName === 'magnefite'
-                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                          : theme.palette.primary.main,
-                        bgcolor: themeName === 'molume' 
-                          ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') + '22' // Brighter purple in dark mode
-                          : themeName === 'magnefite'
-                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') + '22' // Gray for Magnefite
-                          : `${theme.palette.primary.main}22`,
-                      }
-                    }}
-                    title={t('show_all_ancestors', currentLanguage)}
-                  >
-                    <AccountTree />
-                  </IconButton>
-                )}
-              <ParentInfoChip 
-                parentQuestion={parentQuestion}
-                parentAnswer={parentAnswer}
-                parentId={parentId!}
-                parentAnswerQuestion={parentAnswerQuestion}
-              />
-              </Box>
-            );
-          })()}
-          
-          <Box sx={{ mb: 3 }}>
-            <Box sx={{ flex: 1, width: '100%' }}>
+                            ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                            : `${theme.palette.primary.main}CC`,
+                        '&:hover': {
+                          color: themeName === 'molume'
+                            ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') // Brighter purple in dark mode
+                            : themeName === 'magnefite'
+                              ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                              : theme.palette.primary.main,
+                          bgcolor: themeName === 'molume'
+                            ? (theme.palette.mode === 'dark' ? '#7A4A75' : '#5E315A') + '22' // Brighter purple in dark mode
+                            : themeName === 'magnefite'
+                              ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') + '22' // Gray for Magnefite
+                              : `${theme.palette.primary.main}22`,
+                        }
+                      }}
+                      title={t('show_all_ancestors', currentLanguage)}
+                    >
+                      <AccountTree />
+                    </IconButton>
+                  )}
+                  <ParentInfoChip
+                    parentQuestion={parentQuestion}
+                    parentAnswer={parentAnswer}
+                    parentId={parentId!}
+                    parentAnswerQuestion={parentAnswerQuestion}
+                  />
+                </Box>
+              );
+            })()}
 
-              {/* Yazar Bilgisi */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, position: 'relative' }}>
-                <Avatar 
-                  src={questionProfileImageUrl || question.userInfo?.profile_image || question.author.avatar} 
-                  sx={{ 
-                    width: 40, 
-                    height: 40,
-                    cursor: 'pointer',
-                    '&:hover': { opacity: 0.8 }
-                  }}
-                  onClick={() => navigate(`/profile/${question.author.id}`)}
-                />
-                <Box>
-                  <Typography 
-                    variant="subtitle1" 
-                    sx={{ 
-                      color: isMagnefite 
-                        ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                        : theme.palette.text.primary, 
-                      fontWeight: 600,
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ flex: 1, width: '100%' }}>
+
+                {/* Yazar Bilgisi */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, position: 'relative' }}>
+                  <Avatar
+                    src={questionProfileImageUrl || question.userInfo?.profile_image || question.author.avatar}
+                    sx={{
+                      width: 40,
+                      height: 40,
                       cursor: 'pointer',
-                      '&:hover': { 
-                        color: isMagnefite 
-                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                          : theme.palette.primary.main 
-                      }
+                      '&:hover': { opacity: 0.8 }
                     }}
                     onClick={() => navigate(`/profile/${question.author.id}`)}
-                  >
-                    {question.userInfo?.name || question.author.name}
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                    {question.timeAgo}
-                  </Typography>
-                </Box>
-              </Box>
-
-              {/* Kategori */}
-              <Box sx={{ mb: 2 }}>
-                <Chip 
-                  label={question.category} 
-                  size="small" 
-                  sx={(theme) => {
-                    const chipColor = isMagnefite 
-                      ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                      : theme.palette.primary.main;
-                    return {
-                      bgcolor: `${chipColor}33`, 
-                      color: chipColor,
-                    fontSize: '0.75rem',
-                    };
-                  }} 
-                />
-              </Box>
-
-              {/* Soru Başlığı, İçeriği ve Thumbnail */}
-              <Box sx={{ 
-                display: 'flex',
-                gap: 2,
-                alignItems: 'flex-start',
-                mb: 4,
-                width: '100%',
-              }}>
-                {/* Başlık ve İçerik Container */}
-                <Box sx={{ 
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      fontWeight: 700, 
-                      color: theme.palette.text.primary,
-                      mb: 3,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 3,
-                      WebkitBoxOrient: 'vertical',
-                      wordBreak: 'break-word',
-                      pr: 10, // ActionButtons için sağdan boşluk bırak
-                    }}
-                  >
-                    {question.title}
-                  </Typography>
-
-                  <Box sx={{ 
-                    overflow: 'hidden',
-                    wordWrap: 'break-word',
-                    wordBreak: 'break-word',
-                    pr: 10, // ActionButtons için sağdan boşluk bırak
-                  }}>
-                    <MarkdownRenderer content={question.content} />
+                  />
+                  <Box>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        color: isMagnefite
+                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                          : theme.palette.text.primary,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: isMagnefite
+                            ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                            : theme.palette.primary.main
+                        }
+                      }}
+                      onClick={() => navigate(`/profile/${question.author.id}`)}
+                    >
+                      {question.userInfo?.name || question.author.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                      {question.timeAgo}
+                    </Typography>
                   </Box>
                 </Box>
 
-                {/* Thumbnail Container - Dikey olarak ortalanmış */}
-                {(questionThumbnailUrl || question?.thumbnail?.url) && (
+                {/* Kategori */}
+                <Box sx={{ mb: 2 }}>
+                  <Chip
+                    label={question.category}
+                    size="small"
+                    sx={(theme) => {
+                      const chipColor = isMagnefite
+                        ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                        : theme.palette.primary.main;
+                      return {
+                        bgcolor: `${chipColor}33`,
+                        color: chipColor,
+                        fontSize: '0.75rem',
+                      };
+                    }}
+                  />
+                </Box>
+
+                {/* Soru Başlığı, İçeriği ve Thumbnail */}
+                <Box sx={{
+                  display: 'flex',
+                  gap: 2,
+                  alignItems: 'flex-start',
+                  mb: 4,
+                  width: '100%',
+                }}>
+                  {/* Başlık ve İçerik Container */}
+                  <Box sx={{
+                    flex: 1,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}>
+                    <Typography
+                      variant="h4"
+                      sx={{
+                        fontWeight: 700,
+                        color: theme.palette.text.primary,
+                        mb: 3,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                        wordBreak: 'break-word',
+                        pr: 10, // ActionButtons için sağdan boşluk bırak
+                      }}
+                    >
+                      {question.title}
+                    </Typography>
+
+                    <Box sx={{
+                      overflow: 'hidden',
+                      wordWrap: 'break-word',
+                      wordBreak: 'break-word',
+                      pr: 10,
+                      maxWidth: '100%',
+                    }}>
+                      <ExpandableMarkdown content={question.content} maxLength={600} maxHeight={420} />
+                    </Box>
+                  </Box>
+
+                  {/* Thumbnail Container - Dikey olarak ortalanmış */}
+                  {(questionThumbnailUrl || question?.thumbnail?.url) && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        alignSelf: 'stretch',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Box
+                        sx={(theme) => ({
+                          width: 60,
+                          height: 60,
+                          borderRadius: 1.5,
+                          overflow: 'hidden',
+                          border: `1px solid ${theme.palette.divider}`,
+                          boxShadow: theme.palette.mode === 'dark'
+                            ? '0 2px 8px rgba(0,0,0,0.2)'
+                            : '0 2px 8px rgba(0,0,0,0.1)',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s ease',
+                          backgroundColor: theme.palette.background.paper,
+                          '&:hover': {
+                            transform: 'scale(1.05)',
+                          },
+                        })}
+                        onClick={() => setQuestionThumbnailPreviewOpen(true)}
+                      >
+                        <img
+                          src={questionThumbnailUrl || question?.thumbnail?.url || ''}
+                          alt={question.title}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={async (e) => {
+                            const img = e.currentTarget;
+                            const currentSrc = img.src;
+
+                            // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene (URL expire olmuş olabilir)
+                            if (question?.thumbnail?.key) {
+                              try {
+                                const newUrl = await contentAssetService.resolveAssetUrl({
+                                  key: question.thumbnail.key,
+                                  type: 'question-thumbnail',
+                                  entityId: question.id,
+                                });
+                                if (newUrl && newUrl !== currentSrc) {
+                                  setQuestionThumbnailUrl(newUrl);
+                                  img.src = newUrl;
+                                  return; // Yeniden yükleme başarılı
+                                }
+                              } catch (error) {
+                                logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
+                              }
+                            }
+
+                            // Başarısız olursa gizle
+                            img.style.display = 'none';
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Tag'ler */}
+                {question.tags.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+                    {question.tags.map((tag) => (
+                      <Chip
+                        key={tag}
+                        label={tag}
+                        size="small"
+                        variant="outlined"
+                        sx={(theme) => {
+                          const tagColor = isMagnefite
+                            ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
+                            : theme.palette.primary.main;
+                          const tagDark = isMagnefite
+                            ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Darker gray for Magnefite
+                            : theme.palette.primary.dark;
+                          return {
+                            borderRadius: 2,
+                            borderColor: tagColor,
+                            color: tagColor,
+                            bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
+                            '&:hover': {
+                              background: `${tagColor}22`,
+                              borderColor: tagDark,
+                            }
+                          };
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* Stats Container - Alt Kısım */}
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 3,
+                  width: '100%',
+                  mt: 2,
+                }}>
                   <Box
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
-                      alignSelf: 'stretch',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Box
-                      sx={(theme) => ({
-                        width: 60,
-                        height: 60,
-                        borderRadius: 1.5,
-                        overflow: 'hidden',
-                        border: `1px solid ${theme.palette.divider}`,
-                        boxShadow: theme.palette.mode === 'dark'
-                          ? '0 2px 8px rgba(0,0,0,0.2)'
-                          : '0 2px 8px rgba(0,0,0,0.1)',
-                        cursor: 'pointer',
-                        transition: 'transform 0.2s ease',
-                        backgroundColor: theme.palette.background.paper,
-                        '&:hover': {
-                          transform: 'scale(1.05)',
-                        },
-                      })}
-                      onClick={() => setQuestionThumbnailPreviewOpen(true)}
-                    >
-                      <img
-                        src={questionThumbnailUrl || question?.thumbnail?.url || ''}
-                        alt={question.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={async (e) => {
-                          const img = e.currentTarget;
-                          const currentSrc = img.src;
-                          
-                          // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene (URL expire olmuş olabilir)
-                          if (question?.thumbnail?.key) {
-                            try {
-                              const newUrl = await contentAssetService.resolveAssetUrl({
-                                key: question.thumbnail.key,
-                                type: 'question-thumbnail',
-                                entityId: question.id,
-                              });
-                              if (newUrl && newUrl !== currentSrc) {
-                                setQuestionThumbnailUrl(newUrl);
-                                img.src = newUrl;
-                                return; // Yeniden yükleme başarılı
-                              }
-                            } catch (error) {
-                              logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
-                            }
-                          }
-                          
-                          // Başarısız olursa gizle
-                          img.style.display = 'none';
-                        }}
-                      />
-                    </Box>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Tag'ler */}
-              {question.tags.length > 0 && (
-                <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
-                  {question.tags.map((tag) => (
-                    <Chip
-                      key={tag}
-                      label={tag}
-                      size="small"
-                      variant="outlined"
-                      sx={(theme) => {
-                        const tagColor = isMagnefite 
-                          ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray for Magnefite
-                          : theme.palette.primary.main;
-                        const tagDark = isMagnefite 
-                          ? (theme.palette.mode === 'dark' ? '#6B7280' : '#4B5563') // Darker gray for Magnefite
-                          : theme.palette.primary.dark;
-                        return {
-                        borderRadius: 2,
-                          borderColor: tagColor,
-                          color: tagColor,
-                          bgcolor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)',
-                          '&:hover': {
-                            background: `${tagColor}22`,
-                            borderColor: tagDark,
-                          }
-                        };
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
-
-              {/* Stats Container - Alt Kısım */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 3, 
-                width: '100%',
-                mt: 2,
-              }}>
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 0.5,
-                    cursor: question.likesCount > 0 ? 'pointer' : 'default',
-                    '&:hover': question.likesCount > 0 ? { opacity: 0.7 } : {},
-                  }}
-                  onClick={question.likesCount > 0 ? handleShowLikedUsersForQuestion : undefined}
-                  title={question.likesCount > 0 ? t('users_who_liked', currentLanguage) : ''}
-                >
-                  <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                    {question.likesCount}
-                  </Typography>
-                </Box>
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 0.5,
-                    cursor: question.dislikesCount > 0 ? 'pointer' : 'default',
-                    '&:hover': question.dislikesCount > 0 ? { opacity: 0.7 } : {},
-                  }}
-                  onClick={question.dislikesCount > 0 ? handleShowDislikedUsersForQuestion : undefined}
-                  title={question.dislikesCount > 0 ? t('users_who_disliked', currentLanguage) : ''}
-                >
-                  <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-                  <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                    {question.dislikesCount}
-                  </Typography>
-                </Box>
-                {user && questionRelatedQuestionsCount > 0 && (
-                  <Box 
-                    sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
                       gap: 0.5,
-                      cursor: 'pointer',
+                      cursor: question.likesCount > 0 ? 'pointer' : 'default',
+                      '&:hover': question.likesCount > 0 ? { opacity: 0.7 } : {},
                     }}
-                    onClick={(e) => handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, question.id, 'question')}
-                    title={t('related_questions', currentLanguage)}
+                    onClick={question.likesCount > 0 ? handleShowLikedUsersForQuestion : undefined}
+                    title={question.likesCount > 0 ? t('users_who_liked', currentLanguage) : ''}
                   >
-                    <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                    <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                     <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                      {questionRelatedQuestionsCount}
+                      {question.likesCount}
                     </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      cursor: question.dislikesCount > 0 ? 'pointer' : 'default',
+                      '&:hover': question.dislikesCount > 0 ? { opacity: 0.7 } : {},
+                    }}
+                    onClick={question.dislikesCount > 0 ? handleShowDislikedUsersForQuestion : undefined}
+                    title={question.dislikesCount > 0 ? t('users_who_disliked', currentLanguage) : ''}
+                  >
+                    <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                      {question.dislikesCount}
+                    </Typography>
+                  </Box>
+                  {user && questionRelatedQuestionsCount > 0 && (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        cursor: 'pointer',
+                      }}
+                      onClick={(e) => handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, question.id, 'question')}
+                      title={t('related_questions', currentLanguage)}
+                    >
+                      <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                      <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                        {questionRelatedQuestionsCount}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
-                )}
               </Box>
             </Box>
-          </Box>
-        </QuestionCard>
+          </QuestionCard>
         </Box>
 
         {/* Cevap Yazma Bölümü */}
         {user && (
-          <QuestionCard isPapirus={isPapirus} isAnswerWriting={true}>
+          <QuestionCard isPapirus={isPapirus} isAnswerWriting={true} isMagnefite={isMagnefite}>
             <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
               {t('write_answer', currentLanguage)}
             </Typography>
@@ -1501,16 +1526,17 @@ const QuestionDetail: React.FC = () => {
             </Typography>
             <Box sx={{ mb: 2 }}>
               <RichTextEditor
-              value={newAnswer}
-                onChange={(value) => setNewAnswer(value || '')}
+                value={newAnswer}
+                onChange={(value) => setNewAnswer((value || '').slice(0, CONTENT_MAX_LENGTH))}
                 minHeight={300}
-              error={!!answerValidationError}
-              helperText={answerValidationError}
+                maxLength={CONTENT_MAX_LENGTH}
+                error={!!answerValidationError}
+                helperText={answerValidationError}
               />
             </Box>
             <ActionButton
               onClick={handleSubmitAnswer}
-              disabled={!newAnswer.trim() || submittingAnswer}
+              disabled={!newAnswer.trim() || newAnswer.trim().length < 5 || submittingAnswer || newAnswer.length > CONTENT_MAX_LENGTH}
               endIcon={<Send />}
               isMagnefite={isMagnefite}
             >
@@ -1524,14 +1550,14 @@ const QuestionDetail: React.FC = () => {
           <Typography variant="h5" sx={(theme) => ({ mb: 3, color: theme.palette.text.primary, fontWeight: 600 })}>
             {t('answers', currentLanguage)} ({totalAnswers})
           </Typography>
-          
+
           {answers.length === 0 ? (
-            <QuestionCard isPapirus={isPapirus}>
+            <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
               <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
                 {t('no_data', currentLanguage)}
               </Typography>
             </QuestionCard>
-            ) : (
+          ) : (
             <>
               {answers.map((answer) => (
                 <Box
@@ -1597,7 +1623,7 @@ const QuestionDetail: React.FC = () => {
               onError={async (e) => {
                 const img = e.currentTarget;
                 const currentSrc = img.src;
-                
+
                 // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
                 if (question?.thumbnail?.key) {
                   try {
@@ -1615,7 +1641,7 @@ const QuestionDetail: React.FC = () => {
                     logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
                   }
                 }
-                
+
                 img.style.display = 'none';
               }}
             />
@@ -1637,7 +1663,7 @@ const QuestionDetail: React.FC = () => {
       />
 
       {/* Likes Modal */}
-      <LikesModal 
+      <LikesModal
         open={likesModalOpen}
         onClose={() => dispatch(closeModal())}
         users={likesModalUsers}
@@ -1645,7 +1671,7 @@ const QuestionDetail: React.FC = () => {
       />
 
       {/* Dislikes Modal */}
-      <LikesModal 
+      <LikesModal
         open={dislikesModalOpen}
         onClose={() => dispatch(closeDislikesModal())}
         users={dislikedUsers}
