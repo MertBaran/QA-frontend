@@ -374,4 +374,14 @@ export const common = {
     en: 'Answer',
     de: 'Antwort',
   },
+  read_more: {
+    tr: 'Devamını oku',
+    en: 'Read more',
+    de: 'Weiterlesen',
+  },
+  show_less: {
+    tr: 'Daha az göster',
+    en: 'Show less',
+    de: 'Weniger anzeigen',
+  },
 } as const;
