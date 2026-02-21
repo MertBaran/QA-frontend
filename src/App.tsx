@@ -111,6 +111,14 @@ function AppContent() {
             'input::-webkit-calendar-picker-indicator': {
               borderRadius: '4px', // Daha az yuvarlak
             },
+            // react-markdown-editor-lite: .sec-md .input color:#333 override (karanlık modda okunabilirlik)
+            '#root .rc-md-editor .editor-container .sec-md .input': {
+              color: `${theme.palette.text.primary} !important`,
+              backgroundColor: `${theme.palette.background.paper} !important`,
+            },
+            '#root .rc-md-editor .editor-container .sec-html .html-wrap': {
+              color: `${theme.palette.text.primary} !important`,
+            },
           },
         }}
       />

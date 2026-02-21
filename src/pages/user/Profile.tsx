@@ -54,7 +54,7 @@ import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
 import { t } from '../../utils/translations';
-import { ProfilePageSkeleton, QuestionsListSkeleton, AnswersListSkeleton } from '../../components/ui/skeleton';
+import { ProfilePageSkeleton, ProfileQuestionsListSkeleton, ProfileAnswersListSkeleton } from '../../components/ui/skeleton';
 import { User } from '../../types/user';
 import { Question } from '../../types/question';
 import { Answer } from '../../types/answer';
@@ -141,7 +141,7 @@ const Profile = () => {
     totalItems: 0,
     totalPages: 0,
     currentPage: 1,
-    itemsPerPage: 10,
+    itemsPerPage: 5,
     hasNextPage: false,
     hasPreviousPage: false,
   });
@@ -149,11 +149,11 @@ const Profile = () => {
     total: 0,
     totalPages: 0,
     page: 1,
-    limit: 10,
+    limit: 5,
     hasNext: false,
     hasPrev: false,
   });
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const customBackgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isReversing, setIsReversing] = useState(false);
@@ -1157,7 +1157,7 @@ const Profile = () => {
             <Card sx={{ 
               bgcolor: theme.palette.mode === 'dark' 
                 ? 'rgba(255,255,255,0.1)' 
-                : 'rgba(255,255,255,0.8)',
+                : (isMagnefite ? 'rgba(181, 186, 192, 0.95)' : 'rgba(255,255,255,0.8)'),
               backdropFilter: 'blur(10px)',
               border: theme.palette.mode === 'dark' 
                 ? '1px solid rgba(255,255,255,0.1)' 
@@ -1576,7 +1576,7 @@ const Profile = () => {
                       <>
                         {questionsLoading ? (
                           <Box sx={{ mt: 2 }}>
-                            <QuestionsListSkeleton count={3} />
+                            <ProfileQuestionsListSkeleton count={3} />
                           </Box>
                         ) : questionsError ? (
                           <Alert severity="error" sx={{ my: 2 }}>
@@ -1695,7 +1695,7 @@ const Profile = () => {
                       <>
                         {answersLoading ? (
                           <Box sx={{ mt: 2 }}>
-                            <AnswersListSkeleton count={3} />
+                            <ProfileAnswersListSkeleton count={3} />
                           </Box>
                         ) : answersError ? (
                           <Alert severity="error" sx={{ my: 2 }}>
