@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Chip, Box, Avatar, Typography } from '@mui/material';
+import { Chip, Box, Typography } from '@mui/material';
 import { KeyboardArrowRight } from '@mui/icons-material';
+import ProfileAvatar from './ProfileAvatar';
 import { Question, ParentContentInfo } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { t } from '../../utils/translations';
@@ -104,8 +105,10 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, maxWidth: '100%', overflow: 'hidden' }}>
               {parentContentInfo.userInfo && (
                 <>
-                  <Avatar 
+                  <ProfileAvatar 
                     src={parentContentInfo.userInfo.profile_image} 
+                    ownerId={parentContentInfo.userInfo._id}
+                    fallbackName={parentContentInfo.userInfo.name}
                     sx={{ 
                       width: 20, 
                       height: 20, 
@@ -184,8 +187,10 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
         <Chip
           label={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Avatar 
+              <ProfileAvatar 
                 src={parentQuestion.userInfo?.profile_image || parentQuestion.author.avatar} 
+                ownerId={parentQuestion.userInfo?._id || parentQuestion.author.id}
+                fallbackName={parentQuestion.userInfo?.name || parentQuestion.author.name}
                 sx={{ 
                   width: 20, 
                   height: 20, 
@@ -324,8 +329,10 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
           <Chip
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Avatar 
+                <ProfileAvatar 
                   src={parentAnswer.userInfo?.profile_image || parentAnswer.author.avatar} 
+                  ownerId={parentAnswer.userInfo?._id || parentAnswer.author.id}
+                  fallbackName={parentAnswer.userInfo?.name || parentAnswer.author.name}
                   sx={{ 
                     width: 20, 
                     height: 20, 
