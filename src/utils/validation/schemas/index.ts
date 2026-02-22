@@ -1,5 +1,5 @@
 // Export auth schemas
-export { loginSchema, registerSchema, passwordChangeSchema, passwordChangeCodeSchema } from './authSchemas';
+export { loginSchema, registerSchema, createPasswordChangeSchema, passwordChangeCodeSchema } from './authSchemas';
 
 // Future schemas can be added here:
 // export { questionSchema, answerSchema } from './questionSchemas';

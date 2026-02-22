@@ -36,10 +36,18 @@ const StyledPaper = styled(Box, {
     ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray
     : theme.palette.primary.main;
   
+  // Magnefite light modunda daha koyu background
+  const getBackground = () => {
+    if (isMagnefite && theme.palette.mode === 'light') {
+      return 'linear-gradient(135deg, #B5BAC0 0%, #A8AEB6 100%)';
+    }
+    return theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  };
+
   return {
-  background: theme.palette.mode === 'dark'
-    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+  background: getBackground(),
   borderRadius: 16,
   padding: theme.spacing(4),
   marginBottom: theme.spacing(3),
@@ -424,17 +432,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                 {question.title}
               </Typography>
 
-              <Box sx={{ 
-                overflow: 'hidden',
-                wordBreak: 'break-all',
-                overflowWrap: 'break-word',
-                '& .wmde-markdown': {
-                  overflow: 'hidden',
-                  wordBreak: 'break-all',
-                  overflowWrap: 'break-word',
-                  maxWidth: '100%',
-                },
-              }}>
+              <Box sx={{ overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                 <MarkdownRenderer content={`${question.content.slice(0, 280)}${question.content.length > 280 ? '...' : ''}`} />
               </Box>
             </Box>

@@ -7,9 +7,9 @@ import {
   ListItem,
   ListItemText,
   CircularProgress,
-  Avatar,
   useTheme,
 } from '@mui/material';
+import ProfileAvatar from '../ui/ProfileAvatar';
 import { styled } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import { t } from '../../utils/translations';
@@ -148,8 +148,10 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
                   }
                 }}
               >
-                <Avatar 
+                <ProfileAvatar 
                   src={question.userInfo?.profile_image || question.author.avatar} 
+                  ownerId={question.userInfo?._id || question.author.id}
+                  fallbackName={question.userInfo?.name || question.author.name}
                   sx={{ 
                     width: 32, 
                     height: 32, 

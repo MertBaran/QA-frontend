@@ -1,4 +1,5 @@
 import * as yup from 'yup';
+import { t } from '../../translations';
 
 // Login validation schema
 export const loginSchema = yup.object({
@@ -16,21 +17,19 @@ export const loginSchema = yup.object({
 // Password validation regex: min 8 chars, uppercase, lowercase, number, special char
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]).{8,}$/;
 
-export const passwordChangeSchema = yup.object({
-  oldPassword: yup.string().optional(),
-  newPassword: yup
-    .string()
-    .required('New password is required')
-    .min(8, 'Password must be at least 8 characters')
-    .matches(
-      passwordRegex,
-      'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'
-    ),
-  confirmPassword: yup
-    .string()
-    .required('Please confirm your password')
-    .oneOf([yup.ref('newPassword')], 'Passwords must match'),
-});
+export const createPasswordChangeSchema = (lang: string) =>
+  yup.object({
+    oldPassword: yup.string().optional(),
+    newPassword: yup
+      .string()
+      .required(t('new_password_required', lang))
+      .min(8, t('password_requirements', lang))
+      .matches(passwordRegex, t('password_requirements', lang)),
+    confirmPassword: yup
+      .string()
+      .required(t('confirm_password_required', lang))
+      .oneOf([yup.ref('newPassword')], t('passwords_must_match', lang)),
+  });
 
 export const passwordChangeCodeSchema = yup.object({
   code: yup
@@ -57,10 +56,10 @@ export const registerSchema = yup.object({
     .required('Email adresi zorunludur'),
   password: yup
     .string()
-    .min(6, 'Şifre en az 6 karakter olmalıdır')
+    .min(8, 'Şifre en az 8 karakter olmalıdır')
     .matches(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Şifre en az bir küçük harf, bir büyük harf ve bir rakam içermelidir'
+      passwordRegex,
+      'En az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter (!@#$%^&* vb.) içermelidir'
     )
     .required('Şifre zorunludur'),
   confirmPassword: yup

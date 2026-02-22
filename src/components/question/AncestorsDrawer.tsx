@@ -8,9 +8,9 @@ import {
   ListItem,
   ListItemText,
   CircularProgress,
-  Avatar,
   Chip,
 } from '@mui/material';
+import ProfileAvatar from '../ui/ProfileAvatar';
 import { Close, QuestionAnswer, Help } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -649,8 +649,10 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                                 };
                               }} 
                             />
-                            <Avatar 
+                            <ProfileAvatar 
                               src={(parentItem.data as Question).userInfo?.profile_image || (parentItem.data as Question).author.avatar} 
+                              ownerId={(parentItem.data as Question).userInfo?._id || (parentItem.data as Question).author.id}
+                              fallbackName={(parentItem.data as Question).userInfo?.name || (parentItem.data as Question).author.name}
                               sx={{ 
                                 width: 28, 
                                 height: 28,
@@ -780,8 +782,10 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                                 };
                               }} 
                             />
-                            <Avatar 
+                            <ProfileAvatar 
                               src={(parentItem.data as Answer).userInfo?.profile_image || (parentItem.data as Answer).author.avatar} 
+                              ownerId={(parentItem.data as Answer).userInfo?._id || (parentItem.data as Answer).author.id}
+                              fallbackName={(parentItem.data as Answer).userInfo?.name || (parentItem.data as Answer).author.name}
                               sx={{ 
                                 width: 28, 
                                 height: 28,
@@ -916,8 +920,10 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                                 };
                               }} 
                             />
-                            <Avatar 
+                            <ProfileAvatar 
                               src={(item.data as Question).userInfo?.profile_image || (item.data as Question).author.avatar} 
+                              ownerId={(item.data as Question).userInfo?._id || (item.data as Question).author.id}
+                              fallbackName={(item.data as Question).userInfo?.name || (item.data as Question).author.name}
                               sx={{ 
                                 width: 28, 
                                 height: 28,
@@ -1042,8 +1048,10 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                                 };
                               }} 
                             />
-                            <Avatar 
+                            <ProfileAvatar 
                               src={(item.data as Answer).userInfo?.profile_image || (item.data as Answer).author.avatar} 
+                              ownerId={(item.data as Answer).userInfo?._id || (item.data as Answer).author.id}
+                              fallbackName={(item.data as Answer).userInfo?.name || (item.data as Answer).author.name}
                               sx={{ 
                                 width: 28, 
                                 height: 28,

@@ -44,6 +44,11 @@ export const answers = {
     en: 'Answer must be at least 5 characters',
     de: 'Antwort muss mindestens 5 Zeichen lang sein',
   },
+  validation_answer_max: {
+    tr: 'Cevap en fazla 8000 karakter olabilir',
+    en: 'Answer must be at most 8000 characters',
+    de: 'Antwort darf maximal 8000 Zeichen haben',
+  },
   answer_validation_min: {
     tr: 'Cevap en az 5 karakter olmalıdır',
     en: 'Answer must be at least 5 characters',

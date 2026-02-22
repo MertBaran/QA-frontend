@@ -10,7 +10,7 @@ export const authService = {
       success: boolean;
       access_token: string;
       data: UserData;
-    }>('/auth/register', registerData);
+    }>('/auth/register', registerData, { timeout: 30000 });
 
     if (!response.data.success || !response.data.data) {
       throw new Error('Register response data is missing');

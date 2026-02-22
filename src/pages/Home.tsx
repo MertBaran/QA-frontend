@@ -12,6 +12,7 @@ import HomeHeader from '../components/home/HomeHeader';
 import ActiveFilters from '../components/home/ActiveFilters';
 import ItemsPerPageSelector from '../components/home/ItemsPerPageSelector';
 import CreateQuestionModal from '../components/question/CreateQuestionModal';
+import { CONTENT_MAX_LENGTH } from '../components/ui/RichTextEditor';
 import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import papyrusGenis2Dark from '../asset/textures/papyrus_genis_2_dark.png';
@@ -32,6 +33,7 @@ import {
   setItemsPerPage,
   updateQuestionInList,
   removeQuestionFromList,
+  setValidationErrors,
 } from '../store/home/homeSlice';
 import { likeQuestion, unlikeQuestion, deleteQuestion } from '../store/questions/questionThunks';
 import { fetchUserBookmarks } from '../store/bookmarks/bookmarkThunks';
@@ -184,6 +186,10 @@ const Home = () => {
     if (!newQuestion.title.trim() || !newQuestion.content.trim()) {
       return;
     }
+    if (newQuestion.content.length > CONTENT_MAX_LENGTH) {
+      dispatch(setValidationErrors({ content: t('validation_content_max', currentLanguage) }));
+      return;
+    }
 
     try {
       let thumbnailKey: string | undefined;
@@ -209,7 +215,7 @@ const Home = () => {
 
       const questionData = {
         title: newQuestion.title,
-        content: newQuestion.content,
+        content: newQuestion.content.slice(0, CONTENT_MAX_LENGTH),
         category: newQuestion.category || 'General',
         tags: newQuestion.tags
           .split(',')
@@ -456,7 +462,12 @@ const Home = () => {
         onClose={handleCloseCreateQuestionModal}
         onSubmit={handleCreateQuestion}
         question={newQuestion}
-        onQuestionChange={(field, value) => dispatch(updateNewQuestionField({ field, value }))}
+        onQuestionChange={(field, value) =>
+          dispatch(updateNewQuestionField({
+            field,
+            value: field === 'content' ? (value || '').slice(0, CONTENT_MAX_LENGTH) : (value || ''),
+          }))
+        }
         validationErrors={validationErrors}
         isSubmitting={isSubmitting}
         currentLanguage={currentLanguage}
