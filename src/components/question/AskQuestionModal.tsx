@@ -14,7 +14,7 @@ import { styled } from '@mui/material/styles';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { CreateQuestionData } from '../../types/question';
-import RichTextEditor from '../ui/RichTextEditor';
+import RichTextEditor, { CONTENT_MAX_LENGTH } from '../ui/RichTextEditor';
 import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 
@@ -127,11 +127,16 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
       return;
     }
 
+    if (questionContent.length > CONTENT_MAX_LENGTH) {
+      setError(t('validation_content_max', currentLanguage));
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
     try {
-      await onSubmit({ title: questionTitle, content: questionContent });
+      await onSubmit({ title: questionTitle, content: questionContent.slice(0, CONTENT_MAX_LENGTH) });
       setQuestionTitle('');
       setQuestionContent('');
       onClose();
@@ -253,10 +258,12 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
             {t('question_content', currentLanguage)}
           </Typography>
           <RichTextEditor
-          value={questionContent}
-            onChange={(value) => setQuestionContent(value || '')}
+            value={questionContent}
+            onChange={(value) => setQuestionContent((value || '').slice(0, CONTENT_MAX_LENGTH))}
             minHeight={300}
-          error={error.includes('content')}
+            maxLength={CONTENT_MAX_LENGTH}
+            error={error.includes('content')}
+            helperText={error.includes('content') ? error : undefined}
           />
         </Box>
 
@@ -276,7 +283,7 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
           </Button>
           <ActionButton
             onClick={handleSubmit}
-            disabled={submitting || !questionTitle.trim() || !questionContent.trim()}
+            disabled={submitting || !questionTitle.trim() || !questionContent.trim() || questionContent.length > CONTENT_MAX_LENGTH}
             sx={{ flex: 1 }}
             endIcon={submitting ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <Send />}
           >

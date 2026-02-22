@@ -30,6 +30,33 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
     try {
       logger.user.action('fetch_home_questions', params);
 
+      // When savedOnly: fetch bookmarks first, pass IDs to API for correct server-side pagination
+      let savedIds: string | undefined;
+      if (params.savedOnly === 'true') {
+        try {
+          const bookmarks = await bookmarkService.getUserBookmarks();
+          const ids = bookmarks
+            .filter((b) => b.target_type === 'question')
+            .map((b) => b.target_id)
+            .filter(Boolean);
+          if (ids.length > 0) {
+            savedIds = ids.join(',');
+          } else {
+            return {
+              questions: [],
+              totalQuestions: 0,
+              totalPages: 0,
+            };
+          }
+        } catch {
+          return {
+            questions: [],
+            totalQuestions: 0,
+            totalPages: 0,
+          };
+        }
+      }
+
       const result = await questionService.getQuestionsPaginatedWithParents({
         page: params.page,
         limit: params.limit,
@@ -45,28 +72,14 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
         search: params.search,
         category: params.category,
         tags: params.tags,
+        savedIds,
       });
-
-      let data = result.data;
-
-      // Saved only filter: filter by bookmarked questions
-      if (params.savedOnly === 'true') {
-        try {
-          const bookmarks = await bookmarkService.getUserBookmarks();
-          const savedQuestionIds = new Set(
-            bookmarks.filter((b) => b.target_type === 'question').map((b) => b.target_id),
-          );
-          data = data.filter((q) => savedQuestionIds.has(q.id));
-        } catch {
-          // silent failure
-        }
-      }
 
       logger.user.action('home_page_loaded');
       logger.performance.measure('home_page_load', 1500, { component: 'Home' });
 
       return {
-        questions: data,
+        questions: result.data,
         totalQuestions: result.pagination.totalItems,
         totalPages: result.pagination.totalPages,
       };

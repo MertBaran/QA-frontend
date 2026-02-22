@@ -244,6 +244,7 @@ class QuestionService {
     search?: string;
     category?: string;
     tags?: string;
+    savedIds?: string; // Comma-separated question IDs for bookmarked filter
   }): Promise<PaginatedQuestionsResponse> {
     try {
       const response = await api.get<{

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ChangeEvent, FocusEvent, FormEvent } from 'react';
 import {
   Box,
   Container,
@@ -27,7 +28,7 @@ import { clearError } from '../../store/auth/authSlice';
 import { t } from '../../utils/translations';
 import { useFormValidation, registerSchema } from '../../utils/validation';
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
 import { showErrorToast } from '../../utils/notificationUtils';
 import { getCurrentUser } from '../../store/auth/authThunks';
 
@@ -51,15 +52,15 @@ const Register = () => {
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError, validateField, touched } =
     useFormValidation(registerSchema);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      handleChange(name, value, updated);
+      void handleChange(name, value, updated);
       
       // If password changed and confirmPassword is touched, re-validate confirmPassword
       if (name === 'password' && touched['confirmPassword']) {
-        validateField('confirmPassword', updated.confirmPassword, updated);
+        void validateField('confirmPassword', updated.confirmPassword, updated);
       }
       // If confirmPassword changed and password is touched, we already validated it above
       
@@ -67,20 +68,20 @@ const Register = () => {
     });
   };
 
-  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    handleBlur(name, value, formData);
+    void handleBlur(name, value, formData);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    void (async () => {
+      // Clear any previous errors
+      dispatch(clearError());
 
-    // Clear any previous errors
-    dispatch(clearError());
+      const isValid = await validateForm(formData);
+      if (!isValid) return;
 
-    const isValid = await validateForm(formData);
-
-    if (isValid) {
       const userData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -88,8 +89,21 @@ const Register = () => {
         password: formData.password,
       };
 
-      dispatch(registerUser(userData));
-    }
+      try {
+        await dispatch(registerUser(userData)).unwrap();
+        // Auth state güncellendi; garanti olsun diye current user'ı çek ve yönlendir
+        await dispatch(getCurrentUser()).unwrap();
+        navigate('/');
+      } catch (err: unknown) {
+        const msg =
+          typeof err === 'string'
+            ? err
+            : err instanceof Error
+              ? err.message
+              : undefined;
+        if (msg) showErrorToast(msg);
+      }
+    })();
   };
 
   const handleClickShowPassword = () => {
@@ -107,14 +121,15 @@ const Register = () => {
         { token: credential }
       );
       // JWT'yi kaydet
-      const { access_token } = response.data;
+      const { access_token } = response.data as { access_token: string };
       localStorage.setItem('access_token', access_token);
       // Kullanıcı bilgisini güncelle
-      await dispatch(getCurrentUser());
+      await dispatch(getCurrentUser()).unwrap();
       navigate('/');
-    } catch (err: any) {
-      console.log(err);
-      const errorMessage = err.response?.data?.message || 'Google ile kayıt başarısız oldu.';
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      const errorMessage =
+        axiosErr.response?.data?.message || 'Google ile kayıt başarısız oldu.';
       showErrorToast(errorMessage);
     }
   };
@@ -151,7 +166,7 @@ const Register = () => {
 
           <Box
             component="form"
-            onSubmit={handleSubmit}
+            onSubmit={(e) => handleSubmit(e)}
             sx={{ mt: 1, width: '100%' }}
           >
             <Grid container spacing={2}>
@@ -345,7 +360,9 @@ const Register = () => {
 
             {/* Google ile Kayıt */}
             <GoogleLoginButton
-              onSuccess={handleGoogleRegister}
+              onSuccess={(credential) => {
+                void handleGoogleRegister(credential);
+              }}
               onError={() => {
                 showErrorToast(t('google_register_failed', currentLanguage) || 'Google ile kayıt başarısız oldu.');
               }}

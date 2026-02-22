@@ -18,7 +18,7 @@ import { styled } from '@mui/material/styles';
 import { Answer } from '../../types/answer';
 import ParentInfoChip from '../ui/ParentInfoChip';
 import AncestorsDrawer from '../question/AncestorsDrawer';
-import MarkdownRenderer from '../ui/MarkdownRenderer';
+import ExpandableMarkdown from '../ui/ExpandableMarkdown';
 import ActionButtons from '../ui/ActionButtons';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
@@ -32,10 +32,18 @@ const StyledPaper = styled(Box, {
     ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280') // Gray
     : theme.palette.primary.main;
   
+  // Magnefite light modunda daha koyu background
+  const getBackground = () => {
+    if (isMagnefite && theme.palette.mode === 'light') {
+      return 'linear-gradient(135deg, #B5BAC0 0%, #A8AEB6 100%)';
+    }
+    return theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  };
+
   return {
-  background: theme.palette.mode === 'dark'
-    ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-    : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+  background: getBackground(),
   borderRadius: 16,
   padding: theme.spacing(4),
   marginBottom: theme.spacing(3),
@@ -449,8 +457,8 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
           </Box>
 
           {/* Answer Content */}
-          <Box sx={{ mb: 2 }}>
-            <MarkdownRenderer content={answer.content} />
+          <Box sx={{ mb: 2, maxWidth: '100%' }}>
+            <ExpandableMarkdown content={answer.content} maxLength={600} maxHeight={420} />
           </Box>
 
           {/* Stats Container - Alt Kısım */}

@@ -14,20 +14,22 @@ export const registerUser = createAsyncThunk<
       const response = await authService.register(userData);
       localStorage.setItem('access_token', response.token);
       return response;
-    } catch (error: any) {
-      handleApiError(error, {
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string; message?: string } }; message?: string };
+      handleApiError(axiosError as Parameters<typeof handleApiError>[0], {
         action: 'register',
-        userData: {
-          email: userData.email,
-        },
+        userData: { email: userData.email },
       });
-      handleReduxError(error, { type: 'auth/register' }, getState(), {
+      handleReduxError(error as Error, { type: 'auth/register' }, getState(), {
         action: 'register',
-        userData: {
-          email: userData.email,
-        },
+        userData: { email: userData.email },
       });
-      return rejectWithValue(error.message || 'Registration failed');
+      const data = axiosError.response?.data;
+      const errorMessage =
+        data?.error || data?.message ||
+        (error instanceof Error ? error.message : undefined) ||
+        'Registration failed';
+      return rejectWithValue(errorMessage);
     }
   }
 );

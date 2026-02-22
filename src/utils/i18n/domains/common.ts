@@ -44,6 +44,21 @@ export const common = {
     en: 'Loading...',
     de: 'Lädt...',
   },
+  maintenance_title: {
+    tr: 'Uygulama Bakımda',
+    en: 'Application Under Maintenance',
+    de: 'Wartung',
+  },
+  maintenance_message: {
+    tr: 'Sistem şu anda bakımda. Lütfen kısa süre sonra tekrar deneyin.',
+    en: 'The system is currently under maintenance. Please try again shortly.',
+    de: 'Das System wird gerade gewartet. Bitte versuchen Sie es in Kürze erneut.',
+  },
+  maintenance_checking: {
+    tr: 'Bağlantı kontrol ediliyor...',
+    en: 'Checking connection...',
+    de: 'Verbindung wird überprüft...',
+  },
   no_data: {
     tr: 'Henüz burada bir şey yok.',
     en: 'Nothing here yet.',
@@ -373,5 +388,15 @@ export const common = {
     tr: 'Cevap',
     en: 'Answer',
     de: 'Antwort',
+  },
+  read_more: {
+    tr: 'Devamını oku',
+    en: 'Read more',
+    de: 'Weiterlesen',
+  },
+  show_less: {
+    tr: 'Daha az göster',
+    en: 'Show less',
+    de: 'Weniger anzeigen',
   },
 } as const;

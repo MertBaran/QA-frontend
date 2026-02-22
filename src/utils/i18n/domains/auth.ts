@@ -95,9 +95,19 @@ export const auth = {
     de: 'Neues Passwort bestätigen',
   },
   password_requirements: {
-    tr: 'En az 8 karakter, büyük harf, küçük harf, rakam ve özel karakter içermelidir',
-    en: 'Must be at least 8 characters with uppercase, lowercase, number, and special character',
-    de: 'Muss mindestens 8 Zeichen mit Großbuchstaben, Kleinbuchstaben, Zahl und Sonderzeichen enthalten',
+    tr: 'En az 8 karakter olmalı ve büyük harf, küçük harf, rakam ve özel karakter içermelidir',
+    en: 'Must be at least 8 characters and contain uppercase, lowercase, number and special character',
+    de: 'Mindestens 8 Zeichen mit Großbuchstaben, Kleinbuchstaben, Zahl und Sonderzeichen',
+  },
+  new_password_required: {
+    tr: 'Yeni şifre gereklidir',
+    en: 'New password is required',
+    de: 'Neues Passwort ist erforderlich',
+  },
+  confirm_password_required: {
+    tr: 'Lütfen şifrenizi onaylayın',
+    en: 'Please confirm your password',
+    de: 'Bitte bestätigen Sie Ihr Passwort',
   },
   request_password_change: {
     tr: 'Şifre Değiştirme Talebi Gönder',
@@ -178,6 +188,16 @@ export const auth = {
     tr: 'Mevcut şifre gereklidir',
     en: 'Current password is required',
     de: 'Aktuelles Passwort ist erforderlich',
+  },
+  google_user_password_note: {
+    tr: 'Google ile kayıt oldunuz. Hesabınıza şifre eklemek için aşağıya yeni bir şifre girin.',
+    en: 'You signed up with Google. Enter a new password below to set a password for your account.',
+    de: 'Sie haben sich mit Google registriert. Geben Sie unten ein neues Passwort ein, um ein Passwort für Ihr Konto festzulegen.',
+  },
+  new_password_must_differ: {
+    tr: 'Yeni şifre mevcut şifrenizden farklı olmalıdır',
+    en: 'New password must be different from current password',
+    de: 'Das neue Passwort muss sich vom aktuellen Passwort unterscheiden',
   },
   passwords_must_match: {
     tr: 'Şifreler eşleşmelidir',

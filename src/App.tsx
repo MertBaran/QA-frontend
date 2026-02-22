@@ -15,6 +15,8 @@ import { useLanguageDetection } from './hooks/useLanguageDetection';
 import { getCurrentUser } from './store/auth/authThunks';
 import { useEffect } from 'react';
 import { getStoredToken } from './utils/tokenUtils';
+import { useBackendHealth } from './hooks/useBackendHealth';
+import MaintenanceScreen from './components/ui/MaintenanceScreen';
 
 // Initialize Sentry
 initSentry();
@@ -22,9 +24,12 @@ initSentry();
 function AppContent() {
   const { name: themeName, mode } = useAppSelector((state) => state.theme);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const backendIsUp = useAppSelector((state) => state.backendStatus.isUp);
   const dispatch = useAppDispatch();
   const theme = getTheme(themeName, mode);
-  
+
+  useBackendHealth();
+
   // Tarayıcı dilini algıla
   useLanguageDetection();
 
@@ -39,6 +44,10 @@ function AppContent() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      {!backendIsUp ? (
+        <MaintenanceScreen />
+      ) : (
+        <>
       <GlobalStyles
         styles={{
           '@global': {
@@ -111,6 +120,14 @@ function AppContent() {
             'input::-webkit-calendar-picker-indicator': {
               borderRadius: '4px', // Daha az yuvarlak
             },
+            // react-markdown-editor-lite: .sec-md .input color:#333 override (karanlık modda okunabilirlik)
+            '#root .rc-md-editor .editor-container .sec-md .input': {
+              color: `${theme.palette.text.primary} !important`,
+              backgroundColor: `${theme.palette.background.paper} !important`,
+            },
+            '#root .rc-md-editor .editor-container .sec-html .html-wrap': {
+              color: `${theme.palette.text.primary} !important`,
+            },
           },
         }}
       />
@@ -123,6 +140,8 @@ function AppContent() {
       >
         <AppRoutes />
       </Router>
+        </>
+      )}
     </ThemeProvider>
   );
 }

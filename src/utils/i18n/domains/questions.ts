@@ -204,6 +204,11 @@ export const questions = {
     en: 'Content must be at least 20 characters',
     de: 'Inhalt muss mindestens 20 Zeichen lang sein',
   },
+  validation_content_max: {
+    tr: 'İçerik en fazla 8000 karakter olabilir',
+    en: 'Content must be at most 8000 characters',
+    de: 'Inhalt darf maximal 8000 Zeichen haben',
+  },
   validation_required: {
     tr: 'Bu alan gereklidir',
     en: 'This field is required',

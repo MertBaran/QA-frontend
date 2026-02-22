@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Box,
   AppBar,
@@ -50,6 +50,61 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isReversing, setIsReversing] = useState(false);
+  const reverseAnimationFrameRef = useRef<number | null>(null);
+  const reverseStartTimeRef = useRef<number | null>(null);
+
+  const startReverseAnimation = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setIsReversing(true);
+    const duration = video.duration;
+
+    video.currentTime = duration;
+
+    setTimeout(() => {
+      if (!video) return;
+
+      reverseStartTimeRef.current = Date.now();
+      const startTime = duration;
+
+      const animate = () => {
+        if (!video || !reverseStartTimeRef.current) return;
+
+        const elapsed = (Date.now() - reverseStartTimeRef.current) / 1000;
+        const newTime = Math.max(0, startTime - elapsed);
+
+        if (Math.abs(video.currentTime - newTime) > 0.05) {
+          video.currentTime = newTime;
+        }
+
+        if (newTime > 0.1) {
+          reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          if (reverseAnimationFrameRef.current) {
+            cancelAnimationFrame(reverseAnimationFrameRef.current);
+            reverseAnimationFrameRef.current = null;
+          }
+          setIsReversing(false);
+          reverseStartTimeRef.current = null;
+          video.currentTime = 0;
+          video.play();
+        }
+      };
+
+      reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+    }, 50);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (reverseAnimationFrameRef.current) {
+        cancelAnimationFrame(reverseAnimationFrameRef.current);
+      }
+    };
+  }, []);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [languageAnchorEl, setLanguageAnchorEl] = useState<null | HTMLElement>(null);
   const navigate = useNavigate();
@@ -159,12 +214,17 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <>
           <Box
             component="video"
+            ref={videoRef}
             autoPlay
-            loop
             muted
             playsInline
             aria-hidden
             src={magnefiteBackgroundVideo}
+            onEnded={() => {
+              if (!isReversing) {
+                startReverseAnimation();
+              }
+            }}
             sx={{
               position: 'fixed',
               top: 0,
@@ -172,7 +232,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: mode === 'dark' ? 'brightness(0.32)' : 'brightness(0.5)',
+              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
               pointerEvents: 'none',
               zIndex: -2,
             }}
@@ -185,8 +245,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               right: 0,
               bottom: 0,
               background: mode === 'dark'
-                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.8) 0%, rgba(15, 15, 15, 0.65) 60%, rgba(15, 15, 15, 0.85) 100%)'
-                : 'linear-gradient(180deg, rgba(209, 212, 216, 0.82) 0%, rgba(209, 212, 216, 0.74) 55%, rgba(209, 212, 216, 0.9) 100%)',
+                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
+                : 'linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.15) 100%)',
               pointerEvents: 'none',
               zIndex: -1,
             }}

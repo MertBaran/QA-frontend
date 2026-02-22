@@ -6,10 +6,18 @@ import papyrusVertical1 from '../../../asset/textures/papyrus_vertical_1.png';
 export const StyledPaper = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isPapirus' && prop !== 'isMagnefite' && prop !== 'isAlternateTexture',
 })<{ isPapirus?: boolean; isMagnefite?: boolean; isAlternateTexture?: boolean }>(({ theme, isPapirus, isMagnefite }) => {
-  return {
-    background: theme.palette.mode === 'dark'
+  // Magnefite light modunda daha koyu background
+  const getBackground = () => {
+    if (isMagnefite && theme.palette.mode === 'light') {
+      return 'linear-gradient(135deg, #B5BAC0 0%, #A8AEB6 100%)';
+    }
+    return theme.palette.mode === 'dark'
       ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  };
+
+  return {
+    background: getBackground(),
     borderRadius: 16,
     padding: theme.spacing(4),
     marginBottom: theme.spacing(3),
@@ -50,10 +58,18 @@ export const AnswerCardStyledPaper = styled(Box, {
     ? (theme.palette.mode === 'dark' ? '#9CA3AF' : '#6B7280')
     : theme.palette.primary.main;
   
-  return {
-    background: theme.palette.mode === 'dark'
+  // Magnefite light modunda daha koyu background
+  const getBackground = () => {
+    if (isMagnefite && theme.palette.mode === 'light') {
+      return 'linear-gradient(135deg, #B5BAC0 0%, #A8AEB6 100%)';
+    }
+    return theme.palette.mode === 'dark'
       ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
-      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+      : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`;
+  };
+  
+  return {
+    background: getBackground(),
     borderRadius: 16,
     padding: theme.spacing(4),
     marginBottom: theme.spacing(3),
