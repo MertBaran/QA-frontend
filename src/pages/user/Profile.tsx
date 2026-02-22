@@ -40,6 +40,7 @@ import {
   LocationOn,
   Wallpaper,
   Delete,
+  Lock,
 } from '@mui/icons-material';
 import Layout from '../../components/layout/Layout';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
@@ -54,7 +55,7 @@ import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
 import { t } from '../../utils/translations';
-import { ProfilePageSkeleton, QuestionsListSkeleton, AnswersListSkeleton } from '../../components/ui/skeleton';
+import { ProfilePageSkeleton, ProfileQuestionsListSkeleton, ProfileAnswersListSkeleton } from '../../components/ui/skeleton';
 import { User } from '../../types/user';
 import { Question } from '../../types/question';
 import { Answer } from '../../types/answer';
@@ -63,8 +64,7 @@ import { openFollowersModal, closeFollowersModal, openFollowingModal, closeFollo
 import UsersListModal from '../../components/ui/UsersListModal';
 import { contentAssetService, uploadFileToPresignedUrl } from '../../services/contentAssetService';
 import api from '../../services/api';
-import PasswordChangeCodeModal from '../../components/ui/PasswordChangeCodeModal';
-import { passwordChangeSchema } from '../../utils/validation';
+import ChangePasswordModal from '../../components/ui/ChangePasswordModal';
 import { showErrorToast, showSuccessToast } from '../../utils/notificationUtils';
 
 interface ProfileStats {
@@ -124,14 +124,7 @@ const Profile = () => {
     totalQuestions: 0,
     totalAnswers: 0,
   });
-  const [passwordChangeCodeModalOpen, setPasswordChangeCodeModalOpen] = useState(false);
-  const [passwordChangeVerificationToken, setPasswordChangeVerificationToken] = useState<string | null>(null);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [passwordErrors, setPasswordErrors] = useState<{
-    newPassword?: string;
-    confirmPassword?: string;
-    currentPassword?: string;
-  }>({});
+  const [changePasswordModalOpen, setChangePasswordModalOpen] = useState(false);
   const [userQuestions, setUserQuestions] = useState<Question[]>([]);
   const [userAnswers, setUserAnswers] = useState<Answer[]>([]);
   const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
@@ -141,7 +134,7 @@ const Profile = () => {
     totalItems: 0,
     totalPages: 0,
     currentPage: 1,
-    itemsPerPage: 10,
+    itemsPerPage: 5,
     hasNextPage: false,
     hasPreviousPage: false,
   });
@@ -149,11 +142,11 @@ const Profile = () => {
     total: 0,
     totalPages: 0,
     page: 1,
-    limit: 10,
+    limit: 5,
     hasNext: false,
     hasPrev: false,
   });
-  const itemsPerPage = 10;
+  const itemsPerPage = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const customBackgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isReversing, setIsReversing] = useState(false);
@@ -279,9 +272,6 @@ const Profile = () => {
     about: '',
     place: '',
     website: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
   });
 
   // Determine if viewing own profile
@@ -423,9 +413,6 @@ const Profile = () => {
             about: targetUser.about || '',
             place: targetUser.place || '',
             website: targetUser.website || '',
-            currentPassword: '',
-            newPassword: '',
-            confirmPassword: '',
           });
           
           // Start loading questions and answers immediately (non-blocking)
@@ -451,9 +438,15 @@ const Profile = () => {
       setError(null);
       setSuccess(null);
 
+      const nameParts = (formData.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
       const updateData = {
-        name: formData.name,
+        firstName: firstName || formData.name,
+        lastName,
         email: formData.email,
+        title: formData.title,
         about: formData.about,
         place: formData.place,
         website: formData.website,
@@ -470,148 +463,6 @@ const Profile = () => {
       setError(error.message || t('profile_update_error', currentLanguage));
     } finally {
       setLoading(false);
-    }
-  };
-
-  // Validate password fields in real-time
-  const validatePasswordFields = async () => {
-    const errors: { newPassword?: string; confirmPassword?: string; currentPassword?: string } = {};
-    
-    try {
-      if (!profileUser?.isGoogleUser && !formData.currentPassword) {
-        errors.currentPassword = t('current_password_required', currentLanguage) || 'Current password is required';
-      }
-      
-      if (formData.newPassword) {
-        try {
-          await passwordChangeSchema.validateAt('newPassword', { newPassword: formData.newPassword });
-        } catch (err: any) {
-          errors.newPassword = err.message || t('password_requirements', currentLanguage) || 'Password does not meet requirements';
-        }
-      }
-      
-      if (formData.confirmPassword) {
-        if (formData.newPassword !== formData.confirmPassword) {
-          errors.confirmPassword = t('passwords_must_match', currentLanguage) || 'Passwords must match';
-        } else {
-          try {
-            await passwordChangeSchema.validateAt('confirmPassword', { 
-              newPassword: formData.newPassword,
-              confirmPassword: formData.confirmPassword 
-            });
-          } catch (err: any) {
-            errors.confirmPassword = err.message;
-          }
-        }
-      }
-    } catch (error) {
-      // Ignore validation errors during typing
-    }
-    
-    setPasswordErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handlePasswordFieldChange = async (field: 'currentPassword' | 'newPassword' | 'confirmPassword', value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    
-    // Debounce validation
-    setTimeout(() => {
-      validatePasswordFields();
-    }, 300);
-  };
-
-  const handleRequestPasswordChange = async () => {
-    // Clear previous errors
-    setPasswordErrors({});
-    
-    try {
-      // Validate password fields
-      await passwordChangeSchema.validate({
-        oldPassword: profileUser?.isGoogleUser ? undefined : formData.currentPassword,
-        newPassword: formData.newPassword,
-        confirmPassword: formData.confirmPassword,
-      }, { abortEarly: false });
-
-      setIsChangingPassword(true);
-      setError(null);
-
-      // Request password change code
-      await authService.requestPasswordChange(
-        profileUser?.isGoogleUser ? undefined : formData.currentPassword,
-        formData.newPassword
-      );
-
-      // Open code verification modal
-      setPasswordChangeCodeModalOpen(true);
-      showSuccessToast(t('password_change_code_sent', currentLanguage) || 'Verification code sent to your email');
-    } catch (error: any) {
-      if (error.name === 'ValidationError') {
-        const validationErrors: { newPassword?: string; confirmPassword?: string; currentPassword?: string } = {};
-        error.inner?.forEach((err: any) => {
-          if (err.path === 'newPassword') {
-            validationErrors.newPassword = err.message;
-          } else if (err.path === 'confirmPassword') {
-            validationErrors.confirmPassword = err.message;
-          } else if (err.path === 'oldPassword') {
-            validationErrors.currentPassword = err.message;
-          }
-        });
-        setPasswordErrors(validationErrors);
-      } else {
-        const errorMessage = error.response?.data?.message || error.message || t('password_change_request_failed', currentLanguage) || 'Failed to request password change';
-        if (errorMessage.includes('Current password') || errorMessage.includes('current password')) {
-          setPasswordErrors({ currentPassword: errorMessage });
-        } else {
-          showErrorToast(errorMessage);
-        }
-      }
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
-  const handleVerifyPasswordChangeCode = async (code: string) => {
-    try {
-      const response = await authService.verifyPasswordChangeCode(code);
-      if (response.success && response.data?.verificationToken) {
-        setPasswordChangeVerificationToken(response.data.verificationToken);
-        setPasswordChangeCodeModalOpen(false);
-        // Now confirm password change
-        await handleConfirmPasswordChange(response.data.verificationToken);
-      }
-    } catch (error: any) {
-      throw error; // Let modal handle the error
-    }
-  };
-
-  const handleResendPasswordChangeCode = async () => {
-    try {
-      await authService.requestPasswordChange(
-        profileUser?.isGoogleUser ? undefined : formData.currentPassword,
-        formData.newPassword
-      );
-      showSuccessToast(t('code_resent', currentLanguage) || 'Code resent successfully');
-    } catch (error: any) {
-      throw error; // Let modal handle the error
-    }
-  };
-
-  const handleConfirmPasswordChange = async (verificationToken: string) => {
-    try {
-      await authService.confirmPasswordChange(verificationToken, formData.newPassword);
-      showSuccessToast(t('password_changed_success', currentLanguage) || 'Password changed successfully');
-      
-      // Reset password fields
-      setFormData(prev => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      }));
-      setPasswordChangeVerificationToken(null);
-    } catch (error: any) {
-      showErrorToast(error.response?.data?.message || error.message || t('password_change_failed', currentLanguage) || 'Failed to change password');
     }
   };
 
@@ -1157,7 +1008,7 @@ const Profile = () => {
             <Card sx={{ 
               bgcolor: theme.palette.mode === 'dark' 
                 ? 'rgba(255,255,255,0.1)' 
-                : 'rgba(255,255,255,0.8)',
+                : (isMagnefite ? 'rgba(181, 186, 192, 0.95)' : 'rgba(255,255,255,0.8)'),
               backdropFilter: 'blur(10px)',
               border: theme.palette.mode === 'dark' 
                 ? '1px solid rgba(255,255,255,0.1)' 
@@ -1576,7 +1427,7 @@ const Profile = () => {
                       <>
                         {questionsLoading ? (
                           <Box sx={{ mt: 2 }}>
-                            <QuestionsListSkeleton count={3} />
+                            <ProfileQuestionsListSkeleton count={3} />
                           </Box>
                         ) : questionsError ? (
                           <Alert severity="error" sx={{ my: 2 }}>
@@ -1695,7 +1546,7 @@ const Profile = () => {
                       <>
                         {answersLoading ? (
                           <Box sx={{ mt: 2 }}>
-                            <AnswersListSkeleton count={3} />
+                            <ProfileAnswersListSkeleton count={3} />
                           </Box>
                         ) : answersError ? (
                           <Alert severity="error" sx={{ my: 2 }}>
@@ -1958,95 +1809,20 @@ const Profile = () => {
                 />
               </Grid>
               
-              {/* Şifre Değiştirme */}
+              {/* Şifre Değiştirme Butonu */}
               <Grid item xs={12}>
                 <Box sx={{ 
                   pt: 2, 
                   borderTop: `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
                   mt: 1
                 }}>
-                  <Typography variant="subtitle2" sx={{ 
-                    mb: 2,
-                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.8)' : '#4A5568',
-                  }}>
-                    {t('change_password', currentLanguage) || 'Change Password'}
-                  </Typography>
-                  
-                  {/* Google kullanıcı değilse eski şifre alanı */}
-                  {!profileUser?.isGoogleUser && (
-                    <TextField
-                      fullWidth
-                      type="password"
-                      label={t('current_password', currentLanguage) || 'Current Password'}
-                      value={formData.currentPassword}
-                      onChange={(e) => handlePasswordFieldChange('currentPassword', e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                      error={!!passwordErrors.currentPassword}
-                      helperText={passwordErrors.currentPassword || ''}
-                      sx={{
-                        mb: 2,
-                        '& .MuiOutlinedInput-root': {
-                          backgroundColor: theme.palette.mode === 'dark' 
-                            ? 'rgba(255, 255, 255, 0.05)' 
-                            : 'rgba(0, 0, 0, 0.02)',
-                        },
-                      }}
-                    />
-                  )}
-                  
-                  <TextField
-                    fullWidth
-                    type="password"
-                    label={t('new_password', currentLanguage) || 'New Password'}
-                    value={formData.newPassword}
-                    onChange={(e) => handlePasswordFieldChange('newPassword', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    error={!!passwordErrors.newPassword}
-                    helperText={passwordErrors.newPassword || (formData.newPassword ? '' : (t('password_requirements', currentLanguage) || 'Min 8 characters, uppercase, lowercase, number, special character'))}
-                    sx={{
-                      mb: 2,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: theme.palette.mode === 'dark' 
-                          ? 'rgba(255, 255, 255, 0.05)' 
-                          : 'rgba(0, 0, 0, 0.02)',
-                      },
-                    }}
-                  />
-                  
-                  <TextField
-                    fullWidth
-                    type="password"
-                    label={t('confirm_new_password', currentLanguage) || 'Confirm New Password'}
-                    value={formData.confirmPassword}
-                    onChange={(e) => handlePasswordFieldChange('confirmPassword', e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    error={!!passwordErrors.confirmPassword}
-                    helperText={passwordErrors.confirmPassword || ''}
-                    sx={{
-                      mb: 2,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: theme.palette.mode === 'dark' 
-                          ? 'rgba(255, 255, 255, 0.05)' 
-                          : 'rgba(0, 0, 0, 0.02)',
-                      },
-                    }}
-                  />
-                  
                   <Button
                     variant="outlined"
-                    onClick={handleRequestPasswordChange}
-                    disabled={
-                      isChangingPassword || 
-                      !formData.newPassword || 
-                      !formData.confirmPassword || 
-                      formData.newPassword !== formData.confirmPassword ||
-                      !!passwordErrors.newPassword ||
-                      !!passwordErrors.confirmPassword ||
-                      (!profileUser?.isGoogleUser && !formData.currentPassword) ||
-                      (!profileUser?.isGoogleUser && !!passwordErrors.currentPassword)
-                    }
+                    startIcon={<Lock />}
+                    onClick={() => {
+                      setChangePasswordModalOpen(true);
+                    }}
                     sx={{ 
-                      mt: 1,
                       color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
                       borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
                       '&:hover': {
@@ -2055,7 +1831,7 @@ const Profile = () => {
                       }
                     }}
                   >
-                    {isChangingPassword ? <CircularProgress size={20} /> : (t('request_password_change', currentLanguage) || 'Request Password Change')}
+                    {t('change_password', currentLanguage) || 'Change Password'}
                   </Button>
                 </Box>
               </Grid>
@@ -2243,16 +2019,11 @@ const Profile = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Password Change Code Modal */}
-        <PasswordChangeCodeModal
-          open={passwordChangeCodeModalOpen}
-          onClose={() => {
-            setPasswordChangeCodeModalOpen(false);
-            setPasswordChangeVerificationToken(null);
-          }}
-          onVerify={handleVerifyPasswordChangeCode}
-          onResend={handleResendPasswordChangeCode}
-          email={profileUser?.email || ''}
+        {/* Change Password Modal */}
+        <ChangePasswordModal
+          open={changePasswordModalOpen}
+          onClose={() => setChangePasswordModalOpen(false)}
+          profileUser={profileUser}
           currentLanguage={currentLanguage}
         />
 

@@ -9,3 +9,5 @@ export { HomePageSkeleton } from './HomePageSkeleton';
 export { UserProfileSkeleton } from './UserProfileSkeleton';
 export { FormSkeleton } from './FormSkeleton';
 export { AnswerSkeleton } from './AnswerSkeleton';
+export { ProfileQuestionsListSkeleton } from './ProfileQuestionsListSkeleton';
+export { ProfileAnswersListSkeleton } from './ProfileAnswersListSkeleton';

@@ -27,7 +27,9 @@ import { t } from '../../utils/translations';
 const AdminDashboard: React.FC = () => {
   const { user, roles } = useAppSelector((state) => state.auth);
   const { currentLanguage } = useAppSelector((state) => state.language);
+  const { name: themeName, mode } = useAppSelector((state) => state.theme);
   const navigate = useNavigate();
+  const isMagnefite = themeName === 'magnefite';
 
   // Mock data - gerçek implementasyonda API'den gelecek
   const stats = {
@@ -103,11 +105,37 @@ const AdminDashboard: React.FC = () => {
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Box>
-          <Typography variant="h4" gutterBottom>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={
+              isMagnefite
+                ? {
+                    textShadow: mode === 'dark'
+                      ? '0 1px 3px rgba(0,0,0,0.8), 0 0 12px rgba(0,0,0,0.5)'
+                      : '0 1px 3px rgba(255,255,255,0.9), 0 0 12px rgba(255,255,255,0.6)',
+                  }
+                : undefined
+            }
+          >
             {t('admin_dashboard', currentLanguage)}
           </Typography>
-          
-          <Typography variant="body1" color="text.secondary" gutterBottom>
+
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            gutterBottom
+            sx={
+              isMagnefite
+                ? {
+                    color: mode === 'dark' ? 'rgba(247, 245, 242, 0.9)' : 'rgba(27, 35, 44, 0.95)',
+                    textShadow: mode === 'dark'
+                      ? '0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)'
+                      : '0 1px 3px rgba(255,255,255,0.9), 0 0 8px rgba(255,255,255,0.6)',
+                  }
+                : undefined
+            }
+          >
             {t('welcome_admin', currentLanguage)} {user?.name}
           </Typography>
         </Box>

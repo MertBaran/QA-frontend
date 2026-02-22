@@ -23,7 +23,10 @@ export const loginUser = createAsyncThunk<
     // Login sonrası admin permission'ları kontrol et
     try {
       const adminPermissions = await authService.checkAdminPermissions();
-      dispatch(setAdminPermissions(adminPermissions));
+      dispatch(setAdminPermissions({
+        hasAdminPermission: adminPermissions.hasAdminPermission,
+        roles: adminPermissions.permissions,
+      }));
       logger.auth.success('Admin permissions checked after login');
     } catch (permissionError) {
       logger.auth.error('Failed to check admin permissions after login', permissionError);
@@ -31,7 +34,7 @@ export const loginUser = createAsyncThunk<
       dispatch(
         setAdminPermissions({
           hasAdminPermission: false,
-          permissions: [],
+          roles: [],
         }),
       );
     }

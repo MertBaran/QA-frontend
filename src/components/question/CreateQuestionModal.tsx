@@ -20,7 +20,7 @@ import {
 import { Image as ImageIcon, Delete, ZoomIn } from '@mui/icons-material';
 import { categories } from '../../types/question';
 import { t } from '../../utils/translations';
-import RichTextEditor from '../ui/RichTextEditor';
+import RichTextEditor, { CONTENT_MAX_LENGTH } from '../ui/RichTextEditor';
 import { useAppSelector } from '../../store/hooks';
 import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
@@ -335,8 +335,9 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
             </Typography>
             <RichTextEditor
               value={question.content}
-              onChange={(value) => onQuestionChange('content', value || '')}
+              onChange={(value) => onQuestionChange('content', (value || '').slice(0, CONTENT_MAX_LENGTH))}
               minHeight={300}
+              maxLength={CONTENT_MAX_LENGTH}
               error={!!validationErrors.content}
               helperText={validationErrors.content}
             />
@@ -545,7 +546,7 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={!question.title.trim() || !question.content.trim() || isSubmitting || !!thumbnailError}
+          disabled={!question.title.trim() || !question.content.trim() || question.content.length > CONTENT_MAX_LENGTH || isSubmitting || !!thumbnailError}
           sx={(theme) => ({
             background:
               theme.palette.mode === 'dark'

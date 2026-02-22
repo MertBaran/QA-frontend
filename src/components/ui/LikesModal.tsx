@@ -9,8 +9,8 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Avatar,
 } from '@mui/material';
+import ProfileAvatar from './ProfileAvatar';
 import { Close } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
@@ -157,13 +157,12 @@ const LikesModal: React.FC<LikesModalProps> = ({
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar 
+                  <ProfileAvatar 
                     src={user.profile_image} 
-                    alt={user.name}
+                    ownerId={user.id}
+                    fallbackName={user.name}
                     sx={{ width: 48, height: 48 }}
-                  >
-                    {user.name.charAt(0).toUpperCase()}
-                  </Avatar>
+                  />
                 </ListItemAvatar>
                 <ListItemText 
                   primary={user.name}
