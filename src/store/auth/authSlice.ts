@@ -1,6 +1,7 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { getCurrentUser, logoutUser } from './authThunks';
 import { loginUser } from './login/loginThunks';
+import { registerUser } from './register/registerThunks';
 import {
   logoutReducer,
   clearErrorReducer,
@@ -10,6 +11,7 @@ import {
 } from './reducers/authReducers';
 import logger from '../../utils/logger';
 import { AuthState } from './authState';
+import { setUserContext } from '../../config/sentry';
 
 const initialState: AuthState = {
   user: null,
@@ -29,12 +31,15 @@ const authSlice = createSlice({
     logout: logoutReducer,
     clearError: clearErrorReducer,
     // Admin permission actions
-    setAdminPermissions: (state, action) => {
+    setAdminPermissions: (
+      state,
+      action: PayloadAction<{ hasAdminPermission: boolean; roles: string[] }>,
+    ) => {
       state.hasAdminPermission = action.payload.hasAdminPermission;
       state.roles = action.payload.roles;
       state.adminPermissionLoading = false;
     },
-    setAdminPermissionLoading: (state, action) => {
+    setAdminPermissionLoading: (state, action: PayloadAction<boolean>) => {
       state.adminPermissionLoading = action.payload;
     },
     clearAdminPermissions: (state) => {
@@ -76,6 +81,30 @@ const authSlice = createSlice({
           error: action.payload,
           isAuthenticated: false,
         });
+      })
+      // Register cases (register sonrası refresh gereksinimini kaldırır)
+      .addCase(registerUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload.user;
+        state.isAuthenticated = true;
+        state.error = null;
+        // Admin permission'ları temizle (yeniden check edilecek)
+        state.hasAdminPermission = false;
+        state.roles = [];
+        setUserContext(action.payload.user);
+      })
+      .addCase(registerUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+        state.user = null;
+        state.isAuthenticated = false;
+        state.hasAdminPermission = false;
+        state.roles = [];
+        setUserContext(null);
       })
       // Get current user cases
       .addCase(getCurrentUser.pending, getCurrentUserPending)

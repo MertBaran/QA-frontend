@@ -152,18 +152,25 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                   {parentContentInfo.title}
                 </Typography>
               ) : parentContentInfo.type === 'answer' ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden', maxWidth: '300px' }}>
-                  <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden', maxWidth: '300px', minWidth: 0 }}>
+                  <Typography
+                    variant="caption"
+                    sx={(theme) => ({
+                      color: theme.palette.mode === 'dark' ? theme.palette.grey[400] : theme.palette.grey[600],
+                      fontWeight: 600,
+                      flexShrink: 0,
+                    })}
+                  >
                     {t('answer', currentLanguage)}
                   </Typography>
                   {parentContentInfo.questionTitle && (
                     <>
-                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
+                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, flexShrink: 0 })}>
                         •
                       </Typography>
-                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' })}>
-                  {parentContentInfo.questionTitle}
-                </Typography>
+                      <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 })}>
+                        {parentContentInfo.questionTitle}
+                      </Typography>
                     </>
                   )}
                 </Box>

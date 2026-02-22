@@ -36,6 +36,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:docker": "PORT=3002 REACT_APP_API_URL=http://localhost:3000/api react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "test:coverage": "react-scripts test --coverage --watchAll=false",

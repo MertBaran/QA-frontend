@@ -30,8 +30,8 @@ export const register = {
     de: 'Haben Sie bereits ein Konto? Anmelden',
   },
   password_requirements: {
-    tr: 'Şifre en az 8 karakter olmalıdır',
-    en: 'Password must be at least 8 characters',
-    de: 'Passwort muss mindestens 8 Zeichen lang sein',
+    tr: 'En az 8 karakter olmalı ve büyük harf, küçük harf, rakam ve özel karakter içermelidir',
+    en: 'Must be at least 8 characters and contain uppercase, lowercase, number and special character',
+    de: 'Mindestens 8 Zeichen mit Großbuchstaben, Kleinbuchstaben, Zahl und Sonderzeichen',
   },
 } as const;

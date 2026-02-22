@@ -15,6 +15,8 @@ import { useLanguageDetection } from './hooks/useLanguageDetection';
 import { getCurrentUser } from './store/auth/authThunks';
 import { useEffect } from 'react';
 import { getStoredToken } from './utils/tokenUtils';
+import { useBackendHealth } from './hooks/useBackendHealth';
+import MaintenanceScreen from './components/ui/MaintenanceScreen';
 
 // Initialize Sentry
 initSentry();
@@ -22,9 +24,12 @@ initSentry();
 function AppContent() {
   const { name: themeName, mode } = useAppSelector((state) => state.theme);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const backendIsUp = useAppSelector((state) => state.backendStatus.isUp);
   const dispatch = useAppDispatch();
   const theme = getTheme(themeName, mode);
-  
+
+  useBackendHealth();
+
   // Tarayıcı dilini algıla
   useLanguageDetection();
 
@@ -39,6 +44,10 @@ function AppContent() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      {!backendIsUp ? (
+        <MaintenanceScreen />
+      ) : (
+        <>
       <GlobalStyles
         styles={{
           '@global': {
@@ -131,6 +140,8 @@ function AppContent() {
       >
         <AppRoutes />
       </Router>
+        </>
+      )}
     </ThemeProvider>
   );
 }
