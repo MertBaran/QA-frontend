@@ -16,7 +16,6 @@ import {
   ListItem,
   ListItemText,
   Divider,
-  InputBase,
   Badge,
   Tooltip,
   Container,
@@ -26,19 +25,19 @@ import {
   Logout,
   Person,
   QuestionAnswer,
-  Search as SearchIcon,
   Notifications,
   TrendingUp,
   Home,
   AdminPanelSettings,
-  HelpOutline,
-  FindInPage,
+  Settings,
+  Search as SearchIcon,
+  FilterList,
 } from '@mui/icons-material';
 import preferLanguageIconBlack from '../../asset/icons/home/prefer_language_black.png';
 import preferLanguageIconWhite from '../../asset/icons/home/prefer_language_white.png';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
-import { styled, alpha } from '@mui/material/styles';
-import { useNavigate } from 'react-router-dom';
+import { alpha } from '@mui/material/styles';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { logoutUser } from '../../store/auth/authThunks';
 import { setLanguage } from '../../store/language/languageSlice';
@@ -47,72 +46,28 @@ import ThemeToggle from '../ui/ThemeToggle';
 import ThemeSelector from '../ui/ThemeSelector';
 import { t } from '../../utils/translations';
 import { contentAssetService } from '../../services/contentAssetService';
-
-// Styled search component
-const Search = styled('div')(({ theme }) => ({
-  position: 'relative',
-  borderRadius: 4, // Daha az yuvarlak (önceden 12 idi)
-  backgroundColor: theme.palette.mode === 'dark' 
-    ? alpha(theme.palette.common.white, 0.15)
-    : alpha(theme.palette.common.black, 0.05),
-  '&:hover': {
-    backgroundColor: theme.palette.mode === 'dark'
-      ? alpha(theme.palette.common.white, 0.25)
-      : alpha(theme.palette.common.black, 0.08),
-  },
-  marginRight: 0,
-  marginLeft: 0,
-  width: '100%',
-  flex: 1,
-  border: `1px solid ${theme.palette.divider}`,
-}));
-
-const SearchIconWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 1.5),
-  position: 'absolute',
-  right: 0,
-  top: '50%',
-  transform: 'translateY(-50%)',
-  pointerEvents: 'auto', // Tıklanabilir yap
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: theme.palette.text.secondary,
-  zIndex: 1,
-  cursor: 'pointer',
-  '&:hover': {
-    color: theme.palette.primary.main,
-  },
-}));
-
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  width: '100%',
-  '& .MuiInputBase-input': {
-    padding: theme.spacing(1, 1.5, 1, 1.5),
-    paddingRight: `calc(${theme.spacing(4)} + 8px)`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    '&::placeholder': {
-      color: theme.palette.text.secondary,
-      opacity: 1,
-    },
-  },
-}));
-
-
+import { useSettingsModal } from '../../contexts/SettingsModalContext';
+import InquireButton from './header/InquireButton';
+import QueryButton from './header/QueryButton';
+import HeaderSearchField, { MIN_SEARCH_LENGTH } from './header/HeaderSearchField';
+import { headerTrioCssVars } from './header/headerTrioMotion';
+import { showInfoToast } from '../../utils/notificationUtils';
+import { setFilterModalOpen } from '../../store/home/homeSlice';
 
 const Header = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchErrorFlash, setSearchErrorFlash] = useState(false);
   const [languageAnchorEl, setLanguageAnchorEl] = useState<null | HTMLElement>(null);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
+  const openSettingsModal = useSettingsModal()?.openSettingsModal;
   const { user, isAuthenticated, hasAdminPermission } = useAppSelector(
     (state) => ({
       user: state.auth.user as User | null,
@@ -163,7 +118,20 @@ const Header = () => {
   }, [user?.profile_image, user?.id]);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName, mode } = useAppSelector(state => state.theme);
+  const { filterModalOpen, activeFilters } = useAppSelector(state => state.home);
   const isPapirus = themeName === 'papirus';
+
+  const handleOpenFilter = () => {
+    dispatch(setFilterModalOpen(true));
+    if (location.pathname.startsWith('/search')) return;
+    const params = new URLSearchParams();
+    const q = searchQuery.trim();
+    if (q.length >= MIN_SEARCH_LENGTH) {
+      params.set('q', q);
+    }
+    const qs = params.toString();
+    navigate(qs ? `/search?${qs}` : '/search');
+  };
 
   const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -195,13 +163,39 @@ const Header = () => {
     setMobileOpen(false);
   };
 
+  // /search?q=... ile gelince header alanını senkron tut
+  useEffect(() => {
+    if (!location.pathname.startsWith('/search')) return;
+    const q = new URLSearchParams(location.search).get('q');
+    if (q != null && q !== searchQuery) {
+      setSearchQuery(q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- yalnız URL değişince senkronla
+  }, [location.pathname, location.search]);
+
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedQuery = searchQuery.trim();
-    // Minimum 3 karakter kontrolü
-    if (trimmedQuery && trimmedQuery.length >= 3) {
-      navigate(`/search?q=${encodeURIComponent(trimmedQuery)}`);
+    if (trimmedQuery.length < MIN_SEARCH_LENGTH) {
+      setSearchErrorFlash(true);
+      showInfoToast(t('min_search_length', currentLanguage));
+      return;
     }
+    setSearchErrorFlash(false);
+
+    // /search üzerindeyse mevcut filtreleri koru; aynı q için yeniden tetiklemek üzere _t ekle
+    const params = location.pathname.startsWith('/search')
+      ? new URLSearchParams(location.search)
+      : new URLSearchParams();
+    const currentQ = params.get('q');
+    if (currentQ === trimmedQuery) {
+      params.set('_t', Date.now().toString());
+    } else {
+      params.delete('_t');
+    }
+    params.set('q', trimmedQuery);
+    params.delete('includeAnswers');
+    navigate(`/search?${params.toString()}`);
   };
 
   const handleLanguageMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -292,7 +286,7 @@ const Header = () => {
         <Person sx={(theme) => ({ mr: 1, color: theme.palette.primary.main })} />
         {t('profile', currentLanguage)}
       </MenuItem>
-      
+
       {/* Admin Panel Link - Sadece admin yetkisi olan kullanıcılar için */}
       {hasAdminPermission && (
         <>
@@ -368,6 +362,10 @@ const Header = () => {
           <TrendingUp sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
           <ListItemText primary="Trending" />
         </ListItem>
+        <ListItem button onClick={() => handleNavigation('/search')} sx={{ py: 2 }}>
+          <SearchIcon sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
+          <ListItemText primary={t('search', currentLanguage)} />
+        </ListItem>
         {isAuthenticated && (
           <ListItem button onClick={() => handleNavigation('/ask')} sx={{ py: 2 }}>
             <QuestionAnswer sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
@@ -382,7 +380,7 @@ const Header = () => {
             <Person sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
             <ListItemText primary={t('profile', currentLanguage)} />
           </ListItem>
-          
+
           {/* Admin Panel Link - Sadece admin yetkisi olan kullanıcılar için */}
           {hasAdminPermission && (
             <ListItem button onClick={() => handleNavigation('/admin/dashboard')} sx={{ py: 2 }}>
@@ -431,192 +429,169 @@ const Header = () => {
           zIndex: (theme) => theme.zIndex.drawer + 1,
         })}
       >
-        <Toolbar sx={{ 
-          minHeight: 70, 
-          position: 'relative',
-          width: '100%',
-          px: 0,
-        }}>
-          {isMobile && (
-            <IconButton
-              color="inherit"
-              aria-label="open drawer"
-              edge="start"
-              onClick={handleMobileDrawerToggle}
-              sx={{ mr: 2, ml: 2 }}
-            >
-              <MenuIcon />
-            </IconButton>
-          )}
-
-          <Typography
-            variant="h5"
-            noWrap
-            component="div"
-            sx={{ 
-              position: 'absolute',
-              left: isMobile ? 56 : 16,
-              cursor: 'pointer',
-              background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              fontWeight: 700,
+        <Toolbar
+          sx={{
+            minHeight: 70,
+            width: '100%',
+            px: { xs: 1, sm: 2 },
+            gap: 1,
+            display: 'flex',
+            alignItems: 'center',
+            ...headerTrioCssVars(theme),
+          }}
+        >
+          {/* Sol: logo / menü — önce buradaki boşluk erir */}
+          <Box
+            sx={{
+              flex: '1 1 0%',
+              minWidth: 0,
+              overflow: 'hidden',
               display: 'flex',
               alignItems: 'center',
-              zIndex: 1,
             }}
-            onClick={() => navigate('/')}
           >
-            <QuestionAnswer sx={{ mr: 1, fontSize: 28 }} />
-            {t('qa_platform', currentLanguage)}
-          </Typography>
+            {isMobile ? (
+              <IconButton
+                color="inherit"
+                aria-label="open drawer"
+                edge="start"
+                onClick={handleMobileDrawerToggle}
+              >
+                <MenuIcon />
+              </IconButton>
+            ) : (
+              <Typography
+                variant="h5"
+                noWrap
+                component="div"
+                sx={{
+                  cursor: 'pointer',
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontWeight: 700,
+                  display: { xs: 'none', xl: 'flex' },
+                  alignItems: 'center',
+                }}
+                onClick={() => navigate('/')}
+              >
+                <QuestionAnswer sx={{ mr: 1, fontSize: 28 }} />
+                {t('qa_platform', currentLanguage)}
+              </Typography>
+            )}
+          </Box>
 
-          <Container 
-            maxWidth="lg" 
-            sx={{ 
-              position: 'relative',
-              width: '100%',
-              margin: '0 auto',
+          {/* Orta: soru listesi ile aynı maxWidth="lg" hizası */}
+          <Container
+            maxWidth="lg"
+            disableGutters
+            sx={{
+              flex: '0 1 1200px',
+              maxWidth: 1200,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              px: { xs: 2, sm: 3 },
+              containerType: 'inline-size',
+              // Arama min genişliğe indikten sonra butonlar da sıkışır
+              '@container (max-width: 520px)': {
+                '& .header-nav-btn': {
+                  flex: '0 1 auto',
+                  minWidth: 0,
+                },
+                '& .header-nav-btn .MuiButton-root': {
+                  px: 1.25,
+                  minWidth: 0,
+                },
+              },
             }}
           >
             {!isMobile && (
-              <Box sx={{ 
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative',
-                zIndex: 1,
-              }}>
-              {/* Orta: İnquire ve Query butonları yan yana */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 1.5,
-              }}>
-                <Button
-                  variant="contained"
+              <>
+                <InquireButton
+                  label={t('inquire', currentLanguage)}
+                  active={location.pathname.startsWith('/inquire')}
                   onClick={() => navigate('/inquire')}
-                  startIcon={<HelpOutline sx={{ fontSize: '1.1rem' }} />}
-                  sx={{
-                    borderRadius: 2,
-                    backgroundColor: theme.palette.primary.main,
-                    color: theme.palette.primary.contrastText || 'white',
-                    textTransform: 'none',
-                    py: 1.2,
-                    px: 2.5,
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    minWidth: '140px',
-                    boxShadow: 'none',
-                    border: `1px solid ${theme.palette.primary.main}`,
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                      boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.3)}`,
-                      transform: 'translateY(-1px)',
-                    },
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  {t('inquire', currentLanguage)}
-                </Button>
-                <Button
-                  variant="outlined"
+                />
+                <QueryButton
+                  label={t('query', currentLanguage)}
+                  active={location.pathname.startsWith('/query')}
                   onClick={() => navigate('/query')}
-                  startIcon={<FindInPage sx={{ fontSize: '1.1rem' }} />}
+                />
+                <Box
                   sx={{
-                    borderRadius: 2,
-                    borderColor: theme.palette.primary.main,
-                    color: theme.palette.primary.main,
-                    textTransform: 'none',
-                    py: 1.2,
-                    px: 2.5,
-                    fontSize: '0.9rem',
-                    fontWeight: 500,
-                    minWidth: '140px',
-                    backgroundColor: 'transparent',
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
-                      borderColor: theme.palette.primary.dark,
-                      color: theme.palette.primary.dark,
-                      transform: 'translateY(-1px)',
-                      boxShadow: `0 2px 8px ${alpha(theme.palette.primary.main, 0.2)}`,
-                    },
-                    transition: 'all 0.2s ease',
+                    flex: '1 1 auto',
+                    minWidth: 72,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.75,
                   }}
                 >
-                  {t('query', currentLanguage)}
-                </Button>
-              </Box>
-            </Box>
-          )}
+                  <HeaderSearchField
+                    value={searchQuery}
+                    placeholder={t('search', currentLanguage)}
+                    searchLabel={t('search', currentLanguage)}
+                    clearLabel={t('clear', currentLanguage)}
+                    onChange={setSearchQuery}
+                    onSubmit={handleSearch}
+                    errorFlash={searchErrorFlash}
+                    onErrorFlashEnd={() => setSearchErrorFlash(false)}
+                  />
+                  <Tooltip title={t('filter', currentLanguage)}>
+                    <IconButton
+                      color="inherit"
+                      aria-label={t('filter', currentLanguage)}
+                      onClick={handleOpenFilter}
+                      sx={{
+                        flexShrink: 0,
+                        width: 42,
+                        height: 42,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: filterModalOpen || activeFilters.length > 0
+                          ? 'primary.main'
+                          : 'divider',
+                        color: filterModalOpen || activeFilters.length > 0
+                          ? 'primary.main'
+                          : 'text.secondary',
+                        backgroundColor: filterModalOpen
+                          ? (theme) => alpha(theme.palette.primary.main, 0.08)
+                          : 'transparent',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          color: 'primary.main',
+                          backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.08),
+                        },
+                      }}
+                    >
+                      <Badge
+                        color="primary"
+                        variant="dot"
+                        invisible={activeFilters.length === 0}
+                        overlap="circular"
+                      >
+                        <FilterList sx={{ fontSize: 22 }} />
+                      </Badge>
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </>
+            )}
           </Container>
 
-          {/* Right side controls - Container dışında */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: { xs: 2, sm: 3, md: 4 } }}>
-            {/* Arama Bar - Theme Toggle'ın solunda */}
-            {!isMobile && (
-              <form onSubmit={handleSearch} style={{ display: 'flex', minWidth: 0 }}>
-                <Search
-                  sx={{
-                    width: '280px',
-                    backgroundColor: theme.palette.mode === 'dark' 
-                      ? alpha(theme.palette.common.white, 0.05)
-                      : alpha(theme.palette.common.black, 0.03),
-                    border: `1px solid ${theme.palette.divider}`,
-                    borderRadius: '4px', // Daha az yuvarlak (override styled component)
-                    py: 1,
-                    minWidth: 0,
-                    '&:hover': {
-                      backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(theme.palette.common.white, 0.08)
-                        : alpha(theme.palette.common.black, 0.05),
-                      borderColor: theme.palette.primary.main,
-                    },
-                    '&:focus-within': {
-                      borderColor: theme.palette.primary.main,
-                      backgroundColor: theme.palette.mode === 'dark'
-                        ? alpha(theme.palette.common.white, 0.08)
-                        : alpha(theme.palette.common.black, 0.05),
-                    },
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <SearchIconWrapper
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleSearch(e as any);
-                    }}
-                  >
-                    <SearchIcon sx={{ 
-                      color: theme.palette.text.secondary,
-                      fontSize: '1.2rem' 
-                    }} />
-                  </SearchIconWrapper>
-                  <StyledInputBase
-                    placeholder={t('search', currentLanguage)}
-                    inputProps={{ 'aria-label': 'search' }}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    sx={{
-                      width: '100%',
-                      '& .MuiInputBase-input': {
-                        color: theme.palette.text.primary,
-                        fontSize: '0.95rem',
-                        padding: '8px 14px 8px 14px',
-                        paddingRight: '40px',
-                        fontWeight: 400,
-                        '&::placeholder': {
-                          color: theme.palette.text.secondary,
-                          opacity: 1,
-                        },
-                      },
-                    }}
-                  />
-                </Search>
-              </form>
-            )}
-            
+          {/* Sağ kontroller — ikon genişliğinin altına inmez; sol boşluk önce erir */}
+          <Box
+            sx={{
+              flex: '1 1 0%',
+              minWidth: 'fit-content',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 1,
+            }}
+          >
             {/* Theme Toggle - Ampul */}
             <ThemeToggle />
 
@@ -656,6 +631,24 @@ const Header = () => {
                 </Badge>
               </IconButton>
             </Tooltip>
+
+            {isAuthenticated && (
+              <Tooltip title={t('settings', currentLanguage)}>
+                <IconButton
+                  color="inherit"
+                  onClick={() => openSettingsModal?.()}
+                  sx={{
+                    borderRadius: 2,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    '&:hover': {
+                      background: 'rgba(255,255,255,0.1)',
+                    },
+                  }}
+                >
+                  <Settings />
+                </IconButton>
+              </Tooltip>
+            )}
 
             {isAuthenticated ? (
               <Tooltip title={t('profile', currentLanguage)}>

@@ -9,6 +9,8 @@ import { getTheme } from './theme/theme';
 import ErrorBoundary from './components/error/ErrorBoundary';
 import Loading from './components/ui/Loading';
 import ConfirmDialog from './components/ui/ConfirmDialog';
+import { BookmarkAddProvider } from './contexts/BookmarkAddContext';
+import { SettingsModalProvider } from './contexts/SettingsModalContext';
 import { initSentry } from './config/sentry';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { useLanguageDetection } from './hooks/useLanguageDetection';
@@ -138,7 +140,11 @@ function AppContent() {
           v7_startTransition: true,
         }}
       >
-        <AppRoutes />
+        <BookmarkAddProvider>
+          <SettingsModalProvider>
+            <AppRoutes />
+          </SettingsModalProvider>
+        </BookmarkAddProvider>
       </Router>
         </>
       )}

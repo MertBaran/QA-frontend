@@ -178,6 +178,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     } else {
       setProfileImageUrl(profileImage || null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- profile image resolution depends on question identity fields only
   }, [question?.userInfo?.profile_image, question?.author.avatar, question?.userInfo?._id, question?.author.id]);
 
   // Thumbnail URL'ini oluştur (key varsa ama URL yoksa)
@@ -429,11 +430,11 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                   wordBreak: 'break-word',
                 }}
               >
-                {question.title}
+                {question.summary}
               </Typography>
 
               <Box sx={{ overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                <MarkdownRenderer content={`${question.content.slice(0, 280)}${question.content.length > 280 ? '...' : ''}`} />
+                <MarkdownRenderer content={`${question.detail.slice(0, 280)}${question.detail.length > 280 ? '...' : ''}`} />
               </Box>
             </Box>
 
@@ -471,7 +472,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                 >
                   <img
                     src={thumbnailUrl || ''}
-                    alt={question.title}
+                    alt={question.summary}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={async (e) => {
                       const img = e.currentTarget;
@@ -613,7 +614,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
           <Box sx={{ p: 0, m: 0 }}>
             <img
               src={thumbnailUrl || ''}
-              alt={question.title}
+              alt={question.summary}
               style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
               onError={async (e) => {
                 const img = e.currentTarget;

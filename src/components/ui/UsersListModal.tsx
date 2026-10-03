@@ -9,7 +9,6 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Avatar,
   CircularProgress,
   Box,
 } from '@mui/material';
@@ -20,6 +19,7 @@ import { useAppSelector } from '../../store/hooks';
 import { t } from '../../utils/translations';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import { User } from '../../types/user';
+import ProfileAvatar from './ProfileAvatar';
 
 const StyledDialog = styled(Dialog, {
   shouldForwardProp: (prop) => prop !== 'isPapirus',
@@ -158,13 +158,13 @@ const UsersListModal: React.FC<UsersListModalProps> = ({
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar 
-                    src={user.profile_image} 
+                  <ProfileAvatar
+                    src={user.profile_image}
+                    ownerId={user.id}
+                    fallbackName={user.name}
                     alt={user.name}
                     sx={{ width: 48, height: 48 }}
-                  >
-                    {user.name.charAt(0).toUpperCase()}
-                  </Avatar>
+                  />
                 </ListItemAvatar>
                 <ListItemText 
                   primary={user.name}

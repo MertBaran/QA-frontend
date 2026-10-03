@@ -191,11 +191,11 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
                         {question.userInfo?.name || question.author.name}
                       </Typography>
                       <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.9rem' }}>
-                        {question.title}
+                        {question.summary}
                       </Typography>
                     </Box>
                   }
-                  secondary={question.content.substring(0, 60) + '...'}
+                  secondary={question.detail.substring(0, 60) + '...'}
                   secondaryTypographyProps={{ 
                     color: theme.palette.text.secondary,
                     sx: { fontSize: '0.75rem', mt: 0.5 }

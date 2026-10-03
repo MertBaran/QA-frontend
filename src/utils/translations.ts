@@ -9,6 +9,8 @@ import { captcha } from './i18n/domains/captcha';
 import { profile } from './i18n/domains/profile';
 import { admin } from './i18n/domains/admin';
 import { register } from './i18n/domains/register';
+import { queryDomain } from './i18n/domains/query';
+import { inquireDomain } from './i18n/domains/inquire';
 
 // Merge all domains into a single object
 const allDomains = {
@@ -23,6 +25,8 @@ const allDomains = {
   ...profile,
   ...admin,
   ...register,
+  ...queryDomain,
+  ...inquireDomain,
 };
 
 // Transform from { key: { tr, en, de } } to { tr: { key: value }, en: { key: value }, de: { key: value } }

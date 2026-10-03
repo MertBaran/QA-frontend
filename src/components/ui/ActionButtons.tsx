@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material';
 import BookmarkButton from './BookmarkButton';
 import { t } from '../../utils/translations';
+import { getNegativeActionColor } from '../../utils/themeNegativeColor';
 import { useAppSelector } from '../../store/hooks';
 import { useTheme } from '@mui/material/styles';
 import type { AddBookmarkRequest } from '../../types/bookmark';
@@ -83,17 +84,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   // Get positive colors from theme
   const positiveColor = (theme.palette as any).custom?.positive || theme.palette.success.main;
   
-  // Theme-specific negative colors
-  const getNegativeColor = () => {
-    if (themeName === 'molume') {
-      return '#FF3B30'; // Red
-    } else if (themeName === 'papirus') {
-      return theme.palette.mode === 'dark' ? '#A0522D' : '#8B4513'; // Sienna brown
-    } else {
-      return '#DB7093'; // Pink-red
-    }
-  };
-  
   // Theme-specific positive colors for like button
   const getPositiveColor = () => {
     if (themeName === 'magnefite') {
@@ -103,7 +93,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     return positiveColor;
   };
   
-  const negativeColorFinal = getNegativeColor();
+  const negativeColorFinal = getNegativeActionColor(themeName, theme.palette.mode);
   const positiveColorFinal = getPositiveColor();
   
   return (

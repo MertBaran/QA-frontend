@@ -100,7 +100,7 @@ export const createHomeQuestion = createAsyncThunk<
   { rejectValue: { message: string; validationErrors?: Record<string, string> } }
 >('home/createHomeQuestion', async (questionData, { rejectWithValue }) => {
   try {
-    logger.user.action('create_question', { title: questionData.title });
+    logger.user.action('create_question', { summary: questionData.summary });
     const question = await questionService.createQuestion(questionData);
     if (!question) {
       return rejectWithValue({ message: 'Failed to create question' });
@@ -122,16 +122,22 @@ export const createHomeQuestion = createAsyncThunk<
 
             // Translate validation messages to Turkish
             if (message.includes('Too small')) {
-              if (field === 'title') {
-                message = 'Başlık en az 10 karakter olmalıdır';
-              } else if (field === 'content') {
-                message = 'İçerik en az 20 karakter olmalıdır';
+              if (field === 'summary') {
+                message = 'Özet en az 5 karakter olmalıdır';
+              } else if (field === 'detail') {
+                message = 'Detay en az 10 karakter olmalıdır';
+              }
+            } else if (message.includes('Too big') || message.includes('too long')) {
+              if (field === 'summary') {
+                message = 'Özet en fazla 500 karakter olabilir';
+              } else if (field === 'detail') {
+                message = 'Detay en fazla 10000 karakter olabilir';
               }
             } else if (message.includes('Required')) {
-              if (field === 'title') {
-                message = 'Başlık gereklidir';
-              } else if (field === 'content') {
-                message = 'İçerik gereklidir';
+              if (field === 'summary') {
+                message = 'Özet gereklidir';
+              } else if (field === 'detail') {
+                message = 'Detay gereklidir';
               }
             }
 
@@ -149,7 +155,7 @@ export const createHomeQuestion = createAsyncThunk<
         // General error message
         return rejectWithValue({
           message: data.error,
-          validationErrors: { title: data.error },
+          validationErrors: { summary: data.error },
         });
       }
     }
@@ -157,7 +163,7 @@ export const createHomeQuestion = createAsyncThunk<
     // Use standard error handling for other errors
     const errorInfo = await handleError(error, {
       action: 'createHomeQuestion',
-      questionData: { title: questionData.title },
+      questionData: { summary: questionData.summary },
     });
     return rejectWithValue({ message: errorInfo.message });
   }

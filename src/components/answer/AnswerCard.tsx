@@ -118,7 +118,7 @@ interface AnswerCardProps {
   onShowLikedUsers?: (answerId: string) => void;
   onShowDislikedUsers?: (answerId: string) => void;
   questionId?: string;
-  questionTitle?: string;
+  questionSummary?: string;
   showParentInfo?: boolean; // Parent info gösterilsin mi (sadece arama sayfasında true)
   isHighlighted?: boolean; // Highlight efekti için
 }
@@ -137,7 +137,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
   onShowDislikedUsers,
   onHelp,
   questionId,
-  questionTitle,
+  questionSummary,
   showParentInfo = true, // Default true, soru detay sayfasında false olacak
   isHighlighted = false,
 }, ref) => {
@@ -201,6 +201,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
     } else {
       setProfileImageUrl(profileImage || null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- profile image resolution depends on answer identity fields only
   }, [answer?.userInfo?.profile_image, answer?.author.avatar, answer?.userInfo?._id, answer?.author.id]);
 
   const handleClick = () => {
@@ -315,7 +316,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
             parentContentInfo={{
               id: answer.questionId,
               type: 'question',
-              title: answer.questionTitle,
+              summary: answer.questionSummary,
               userInfo: undefined,
             }}
           />
@@ -350,7 +351,7 @@ const AnswerCard = forwardRef<HTMLDivElement, AnswerCardProps>(({
               targetType="answer"
               targetId={answer.id}
               targetData={{
-                title: questionTitle || '',
+                title: questionSummary || '',
                 content: answer.content,
                 author: answer.author?.name,
                 authorId: answer.author?.id,

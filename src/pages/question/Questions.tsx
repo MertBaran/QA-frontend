@@ -66,8 +66,8 @@ const Questions = () => {
     } else {
       const filtered = questions.filter(
         (question: Question) =>
-          question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          question.content.toLowerCase().includes(searchTerm.toLowerCase())
+          question.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          question.detail.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredQuestions(filtered);
     }
@@ -268,7 +268,7 @@ const Questions = () => {
                           }}
                           onClick={() => navigate(`/questions/${question.id}`)}
                         >
-                          {question.title}
+                          {question.summary}
                         </Typography>
 
                         {/* Question Content */}
@@ -277,7 +277,7 @@ const Questions = () => {
                           color="text.secondary"
                           sx={{ mb: 2 }}
                         >
-                          {truncateText(question.content)}
+                          {truncateText(question.detail)}
                         </Typography>
 
                         {/* User Info */}

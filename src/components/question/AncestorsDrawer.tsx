@@ -708,7 +708,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                               wordBreak: 'break-word',
                             })}
                           >
-                            {(parentItem.data as Question).title}
+                            {(parentItem.data as Question).summary}
                           </Typography>
                         </Box>
                       }
@@ -721,7 +721,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             wordBreak: 'break-word',
                           })}
                         >
-                          {(parentItem.data as Question).content}
+                          {(parentItem.data as Question).detail}
                         </Typography>
                       }
                     />
@@ -854,7 +854,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             wordBreak: 'break-word',
                           })}
                         >
-                          {(parentItem.data as Answer).questionTitle}
+                          {(parentItem.data as Answer).questionSummary}
                         </Typography>
                       }
                     />
@@ -979,7 +979,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                               wordBreak: 'break-word',
                             })}
                           >
-                            {(item.data as Question).title}
+                            {(item.data as Question).summary}
                           </Typography>
                         </Box>
                       }
@@ -992,7 +992,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                             wordBreak: 'break-word',
                           })}
                         >
-                          {(item.data as Question).content}
+                          {(item.data as Question).detail}
                         </Typography>
                       }
                     />
@@ -1099,7 +1099,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                               }} 
                             />
                           </Box>
-                          {(item.data as Answer).questionTitle && (
+                          {(item.data as Answer).questionSummary && (
                             <Typography 
                               variant="caption" 
                               sx={(theme) => ({ 
@@ -1108,7 +1108,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                                 wordBreak: 'break-word',
                               })}
                             >
-                              {(item.data as Answer).questionTitle}
+                              {(item.data as Answer).questionSummary}
                             </Typography>
                           )}
                           <Typography 

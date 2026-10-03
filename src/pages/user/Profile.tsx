@@ -54,7 +54,9 @@ import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
 import { userService } from '../../services/userService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import ItemsPerPageSelector from '../../components/home/ItemsPerPageSelector';
 import { t } from '../../utils/translations';
+import { stripRefLinksForDisplay } from '../../utils/refLinkDisplay';
 import { ProfilePageSkeleton, ProfileQuestionsListSkeleton, ProfileAnswersListSkeleton } from '../../components/ui/skeleton';
 import { User } from '../../types/user';
 import { Question } from '../../types/question';
@@ -130,11 +132,13 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
   const [questionsPage, setQuestionsPage] = useState(1);
   const [answersPage, setAnswersPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest');
   const [questionsPagination, setQuestionsPagination] = useState({
     totalItems: 0,
     totalPages: 0,
     currentPage: 1,
-    itemsPerPage: 5,
+    itemsPerPage: 10,
     hasNextPage: false,
     hasPreviousPage: false,
   });
@@ -142,11 +146,10 @@ const Profile = () => {
     total: 0,
     totalPages: 0,
     page: 1,
-    limit: 5,
+    limit: 10,
     hasNext: false,
     hasPrev: false,
   });
-  const itemsPerPage = 5;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const customBackgroundVideoRef = useRef<HTMLVideoElement | null>(null);
   const [isReversing, setIsReversing] = useState(false);
@@ -278,11 +281,17 @@ const Profile = () => {
   const isOwnProfile = !userId || userId === user?.id;
 
   // Load questions separately
-  const loadQuestions = useCallback(async (targetUserId: string, page: number = 1) => {
+  const loadQuestions = useCallback(async (
+    targetUserId: string,
+    page: number = 1,
+    limit: number = itemsPerPage,
+    sort: 'newest' | 'oldest' = dateSort
+  ) => {
     try {
       setQuestionsLoading(true);
       setQuestionsError(null);
-      const result = await questionService.getQuestionsByUser(targetUserId, page, itemsPerPage);
+      const sortOrder = sort === 'oldest' ? 'asc' : 'desc';
+      const result = await questionService.getQuestionsByUser(targetUserId, page, limit, sortOrder);
       setUserQuestions(result.data);
       setQuestionsPagination(result.pagination);
     } catch (error: any) {
@@ -292,14 +301,20 @@ const Profile = () => {
     } finally {
       setQuestionsLoading(false);
     }
-  }, [currentLanguage, itemsPerPage]);
+  }, [currentLanguage, itemsPerPage, dateSort]);
 
   // Load answers separately
-  const loadAnswers = useCallback(async (targetUserId: string, page: number = 1) => {
+  const loadAnswers = useCallback(async (
+    targetUserId: string,
+    page: number = 1,
+    limit: number = itemsPerPage,
+    sort: 'newest' | 'oldest' = dateSort
+  ) => {
     try {
       setAnswersLoading(true);
       setAnswersError(null);
-      const result = await answerService.getAnswersByUser(targetUserId, page, itemsPerPage);
+      const sortOrder = sort === 'oldest' ? 'asc' : 'desc';
+      const result = await answerService.getAnswersByUser(targetUserId, page, limit, sortOrder);
       setUserAnswers(result.data);
       setAnswersPagination(result.pagination);
     } catch (error: any) {
@@ -309,7 +324,7 @@ const Profile = () => {
     } finally {
       setAnswersLoading(false);
     }
-  }, [currentLanguage, itemsPerPage]);
+  }, [currentLanguage, itemsPerPage, dateSort]);
 
   // Load both questions and answers in parallel
   const loadUserData = useCallback(async (targetUserId: string) => {
@@ -1347,7 +1362,12 @@ const Profile = () => {
                            <Typography variant="body2" sx={{ 
                              color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.7)' : '#4A5568' 
                            }}>
-                             {t('member_since', currentLanguage)}: {profileUser.createdAt ? new Date(profileUser.createdAt).toLocaleDateString() : 'N/A'}
+                             {profileUser.createdAt
+                               ? t('member_since', currentLanguage).replace(
+                                   '{date}',
+                                   new Date(profileUser.createdAt).toLocaleDateString()
+                                 )
+                               : 'N/A'}
                            </Typography>
                          </Box>
                        </Grid>
@@ -1422,6 +1442,44 @@ const Profile = () => {
                         />
                       </Tabs>
                     </Box>
+
+                    <ItemsPerPageSelector
+                      variant="compact"
+                      itemsPerPage={itemsPerPage}
+                      totalQuestions={
+                        activeTab === 'questions'
+                          ? questionsPagination.totalItems
+                          : answersPagination.total
+                      }
+                      onItemsPerPageChange={(e) => {
+                        const next = parseInt(e.target.value, 10);
+                        setItemsPerPage(next);
+                        setQuestionsPage(1);
+                        setAnswersPage(1);
+                        if (profileUser) {
+                          if (activeTab === 'questions') {
+                            loadQuestions(profileUser.id, 1, next, dateSort);
+                          } else {
+                            loadAnswers(profileUser.id, 1, next, dateSort);
+                          }
+                        }
+                      }}
+                      currentLanguage={currentLanguage}
+                      dateSort={dateSort}
+                      onDateSortChange={(e) => {
+                        const next = e.target.value as 'newest' | 'oldest';
+                        setDateSort(next);
+                        setQuestionsPage(1);
+                        setAnswersPage(1);
+                        if (profileUser) {
+                          if (activeTab === 'questions') {
+                            loadQuestions(profileUser.id, 1, itemsPerPage, next);
+                          } else {
+                            loadAnswers(profileUser.id, 1, itemsPerPage, next);
+                          }
+                        }
+                      }}
+                    />
                     
                     {activeTab === 'questions' && (
                       <>
@@ -1467,7 +1525,7 @@ const Profile = () => {
                                       color: theme.palette.mode === 'dark' ? 'white' : '#1A202C',
                                       fontWeight: 500,
                                     }}>
-                                      {question.title}
+                                      {stripRefLinksForDisplay(question.summary)}
                                     </Typography>
                                   }
                                   secondary={
@@ -1481,7 +1539,7 @@ const Profile = () => {
                                       WebkitBoxOrient: 'vertical',
                                       wordBreak: 'break-word',
                                     }}>
-                                      {question.content}
+                                      {stripRefLinksForDisplay(question.detail)}
                                     </Typography>
                                   }
                                 />
@@ -1582,7 +1640,7 @@ const Profile = () => {
                               >
                                 <ListItemText
                                   primary={
-                                    answer.questionTitle ? (
+                                    answer.questionSummary ? (
                                       <Typography variant="body2" sx={{ 
                                         color: (() => {
                                           if (themeName === 'molume') {
@@ -1597,7 +1655,7 @@ const Profile = () => {
                                         fontWeight: 600,
                                         mb: 0.5,
                                       }}>
-                                        {t('answer_to', currentLanguage)}: {answer.questionTitle}
+                                        {t('answer_to', currentLanguage)}: {stripRefLinksForDisplay(answer.questionSummary)}
                                       </Typography>
                                     ) : null
                                   }
@@ -1611,7 +1669,7 @@ const Profile = () => {
                                       WebkitBoxOrient: 'vertical',
                                       wordBreak: 'break-word',
                                     }}>
-                                      {answer.content}
+                                      {stripRefLinksForDisplay(answer.content)}
                                     </Typography>
                                   }
                                 />

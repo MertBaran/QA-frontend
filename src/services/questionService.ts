@@ -41,7 +41,7 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     timeAgo = `${days} gün önce`;
   }
 
-  const content = questionData.content.toLowerCase();
+  const content = questionData.detail.toLowerCase();
 
   // Backend'den kategori gelmezse basit bir algoritma ile tahmin et
   let inferredCategory = 'Genel';
@@ -125,8 +125,8 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
 
   return {
     id: questionData._id,
-    title: questionData.title,
-    content: questionData.content,
+    summary: questionData.summary,
+    detail: questionData.detail,
     slug: questionData.slug,
     author: {
       id: finalUserInfo._id,
@@ -157,6 +157,19 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     ancestors: questionData.ancestors,
     parentContentInfo: questionData.parentContentInfo,
     thumbnail: questionData.thumbnail ?? null,
+    visibility: questionData.visibility,
+    format: questionData.format,
+    interest: questionData.interest,
+    focus: questionData.focus,
+    references: questionData.references as Question['references'],
+    metadata: questionData.metadata as Question['metadata'],
+    attachments: questionData.attachments as Question['attachments'],
+    featureTemplateId: questionData.featureTemplateId,
+    featureTemplateVersionId: questionData.featureTemplateVersionId,
+    featureFieldValues:
+      questionData.featureFieldValues && typeof questionData.featureFieldValues === 'object'
+        ? (questionData.featureFieldValues as Record<string, unknown>)
+        : undefined,
   };
 };
 
@@ -400,7 +413,8 @@ class QuestionService {
   async getQuestionsByUser(
     userId: string,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    sortOrder: 'asc' | 'desc' = 'desc'
   ): Promise<PaginatedQuestionsResponse> {
     try {
       // Sorular için daha uzun timeout (30 saniye)
@@ -418,7 +432,7 @@ class QuestionService {
           };
         };
       }>(`/questions/user/${userId}`, {
-        params: { page, limit },
+        params: { page, limit, sortOrder },
         timeout: 30000,
       });
       if (response.data.success && response.data.data) {
@@ -467,8 +481,8 @@ class QuestionService {
     if (filters.search) {
       filtered = filtered.filter(
         (question) =>
-          question.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-          question.content.toLowerCase().includes(filters.search.toLowerCase()) ||
+          question.summary.toLowerCase().includes(filters.search.toLowerCase()) ||
+          question.detail.toLowerCase().includes(filters.search.toLowerCase()) ||
           question.tags.some((tag) => tag.toLowerCase().includes(filters.search.toLowerCase())),
       );
     }

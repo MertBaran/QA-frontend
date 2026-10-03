@@ -54,6 +54,31 @@ export const auth = {
     en: 'Server error occurred. Please try again later.',
     de: 'Serverfehler aufgetreten. Bitte versuchen Sie es später erneut.',
   },
+  invalid_credentials: {
+    tr: 'Geçersiz e-posta veya şifre. Lütfen bilgilerinizi kontrol edin.',
+    en: 'Invalid email or password. Please check your credentials.',
+    de: 'Ungültige E-Mail oder Passwort. Bitte überprüfen Sie Ihre Anmeldedaten.',
+  },
+  email_not_registered: {
+    tr: 'Bu e-posta adresi ile kayıtlı hesap bulunamadı. Lütfen önce kayıt olun.',
+    en: 'No account found with this email address. Please register first.',
+    de: 'Kein Konto mit dieser E-Mail-Adresse gefunden. Bitte registrieren Sie sich zuerst.',
+  },
+  wrong_password: {
+    tr: 'Şifre hatalı. Lütfen tekrar deneyin.',
+    en: 'Incorrect password. Please try again.',
+    de: 'Falsches Passwort. Bitte versuchen Sie es erneut.',
+  },
+  user_not_found: {
+    tr: 'Bu e-posta adresi ile kayıtlı hesap bulunamadı.',
+    en: 'No account found with this email address.',
+    de: 'Kein Konto mit dieser E-Mail-Adresse gefunden.',
+  },
+  connection_error: {
+    tr: 'Bağlantı hatası oluştu. İnternet bağlantınızı kontrol edin.',
+    en: 'Connection error occurred. Please check your internet connection.',
+    de: 'Verbindungsfehler aufgetreten. Bitte überprüfen Sie Ihre Internetverbindung.',
+  },
   google_login: {
     tr: 'Google ile Giriş Yap',
     en: 'Sign in with Google',

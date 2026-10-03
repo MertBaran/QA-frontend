@@ -64,7 +64,7 @@ export const transformAnswerData = (answerData: AnswerData): Answer => {
     createdAt: answerData.createdAt,
     timeAgo,
     questionId: answerData.questionInfo?._id ?? answerData.question,
-    questionTitle: answerData.questionInfo?.title,
+    questionSummary: answerData.questionInfo?.summary,
     parentId: answerData.parent?.id,
     parentType: answerData.parent?.type,
     ancestors: answerData.ancestors,
@@ -77,7 +77,8 @@ class AnswerService {
   async getAnswersByQuestion(
     questionId: string,
     page: number = 1,
-    limit: number = 5
+    limit: number = 5,
+    sortOrder: 'asc' | 'desc' = 'desc'
   ): Promise<{
     data: Answer[];
     pagination: {
@@ -104,23 +105,10 @@ class AnswerService {
           };
         };
       }>(`/questions/${questionId}/answers`, {
-        params: { page, limit },
+        params: { page, limit, sortOrder },
       });
       if (response.data.success && response.data.data) {
         const answers = response.data.data.data.map(transformAnswerData);
-        // Debug log for specific answer
-        const debugAnswer = answers.find(a => a.id === '6951cc1f0ffdbcb4e9208825');
-        if (debugAnswer) {
-          console.log('answerService.getAnswersByQuestion Debug:', {
-            answerId: debugAnswer.id,
-            ancestors: debugAnswer.ancestors,
-            ancestorsLength: debugAnswer.ancestors?.length,
-            parentId: debugAnswer.parentId,
-            parentType: debugAnswer.parentType,
-            parentContentInfo: debugAnswer.parentContentInfo,
-            rawData: response.data.data.data.find((a: any) => a._id === '6951cc1f0ffdbcb4e9208825'),
-          });
-        }
         return {
           data: answers,
           pagination: response.data.data.pagination,
@@ -176,10 +164,24 @@ class AnswerService {
     }
   }
 
-  // Tek cevap getir
+  // Tek cevap getir (standalone - herhangi bir soruya ait cevap)
   async getAnswerById(answerId: string): Promise<Answer | null> {
     try {
       const response = await api.get<AnswerResponse>(`/answers/${answerId}`);
+      if (response.data.success && response.data.data) {
+        return transformAnswerData(response.data.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Cevap getirilirken hata:', error);
+      return null;
+    }
+  }
+
+  // Soru bağlamında tek cevap getir (question-scoped endpoint)
+  async getAnswerByQuestionAndId(questionId: string, answerId: string): Promise<Answer | null> {
+    try {
+      const response = await api.get<AnswerResponse>(`/questions/${questionId}/answers/${answerId}`);
       if (response.data.success && response.data.data) {
         return transformAnswerData(response.data.data);
       }
@@ -279,7 +281,8 @@ class AnswerService {
   async getAnswersByUser(
     userId: string,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    sortOrder: 'asc' | 'desc' = 'desc'
   ): Promise<{
     data: Answer[];
     pagination: {
@@ -307,7 +310,7 @@ class AnswerService {
           };
         };
       }>(`/answers/user/${userId}`, {
-        params: { page, limit },
+        params: { page, limit, sortOrder },
         timeout: 30000,
       });
       if (response.data.success && response.data.data) {

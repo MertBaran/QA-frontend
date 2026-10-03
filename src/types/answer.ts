@@ -16,7 +16,7 @@ export interface AnswerData {
   question: string;
   questionInfo?: {
     _id: string;
-    title?: string;
+    summary?: string;
     slug?: string;
   };
   likes: string[];
@@ -54,7 +54,7 @@ export interface Answer {
   createdAt: string;
   timeAgo: string;
   questionId?: string;
-  questionTitle?: string;
+  questionSummary?: string;
   parentId?: string;
   parentType?: 'question' | 'answer';
   ancestors?: AncestorReference[];

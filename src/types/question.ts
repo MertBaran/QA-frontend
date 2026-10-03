@@ -1,4 +1,5 @@
 import { ApiResponse } from './api';
+import type { FeatureTableRow } from './questionFeatureTemplate';
 
 export interface QuestionThumbnail {
   key: string;
@@ -10,11 +11,11 @@ export interface ParentContentInfo {
   id: string;
   type: 'question' | 'answer';
   // Question ise
-  title?: string;
+  summary?: string;
   slug?: string;
   // Answer ise
   questionId?: string;
-  questionTitle?: string;
+  questionSummary?: string;
   questionSlug?: string;
   // Common fields
   user?: string;
@@ -42,8 +43,8 @@ export interface AncestorReference {
 // Backend'den gelecek ham soru tipi
 export interface QuestionData {
   _id: string;
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   slug: string;
   createdAt: string;
   user: UserData | string;
@@ -63,7 +64,17 @@ export interface QuestionData {
   category?: string;
   tags?: string[];
   thumbnail?: QuestionThumbnail | null;
+  visibility?: boolean;
+  format?: string;
+  interest?: string;
+  focus?: number;
+  references?: { type: string; content: string; description: string }[];
+  metadata?: { key: string; value: string }[];
+  attachments?: { key: string; description?: string }[];
   __v?: number;
+  featureTemplateId?: string;
+  featureTemplateVersionId?: string;
+  featureFieldValues?: Record<string, unknown>;
 }
 
 // Backend'den gelecek ham kullanıcı tipi
@@ -84,8 +95,8 @@ export interface UserData {
 // Frontend'de kullanılacak dönüştürülmüş soru tipi
 export interface Question {
   id: string;
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   slug: string;
   author: {
     id: string;
@@ -116,26 +127,70 @@ export interface Question {
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
   thumbnail?: QuestionThumbnail | null;
+  visibility?: boolean;
+  format?: string;
+  interest?: string;
+  focus?: number;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  featureTemplateId?: string;
+  featureTemplateVersionId?: string;
+  featureFieldValues?: Record<string, unknown>;
+}
+
+// Referans ve metadata tipleri
+export type QuestionReferenceType = 'link' | 'soru' | 'cevap' | 'dosya';
+
+export interface QuestionReference {
+  type: QuestionReferenceType;
+  content: string;
+  description: string;
+}
+
+export interface QuestionMetadataItem {
+  key: string;
+  value: string;
+}
+
+export interface QuestionAttachment {
+  key: string;
+  description?: string;
+  size?: number;
 }
 
 // Soru oluşturma için tip
 export interface CreateQuestionData {
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   category?: string;
   tags?: string[];
   parent?: ParentReference;
   thumbnailKey?: string;
+  visibility?: boolean;
+  format?: string;
+  interest?: string;
+  focus?: number;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  featureTemplateId?: string;
+  featureFieldValues?: Record<string, string | number | null | string[] | FeatureTableRow[]>;
 }
 
 // Soru güncelleme için tip
 export interface UpdateQuestionData {
-  title?: string;
-  content?: string;
+  summary?: string;
+  detail?: string;
   category?: string;
   tags?: string[];
   thumbnailKey?: string;
   removeThumbnail?: boolean;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  featureTemplateId?: string;
+  featureFieldValues?: Record<string, string | number | null | string[] | FeatureTableRow[]>;
 }
 
 // API Response tipleri
@@ -152,6 +207,3 @@ export interface QuestionFilters {
 
 // Sıralama seçenekleri
 export const sortOptions = ['En Yeni', 'En Popüler', 'En Çok Görüntülenen', 'En Çok Cevaplanan'];
-
-// Kategoriler
-export const categories = ['Frontend', 'Backend', 'Mobile', 'DevOps', 'Database', 'AI/ML'];

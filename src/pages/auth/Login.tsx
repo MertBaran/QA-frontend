@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Box, Container, Paper, TextField, Button, Typography, Link, FormControlLabel, Checkbox } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginUser } from '../../store/auth/login/loginThunks';
 import { checkAdminPermissions } from '../../store/auth/authThunks';
@@ -50,6 +50,19 @@ const Login = () => {
 
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError } =
     useFormValidation(loginSchema);
+
+  const location = useLocation();
+  // Sadece Register'dan Login'e geçince hata temizle (Login'de alınan hata görünsün)
+  useEffect(() => {
+    const curr = location.pathname;
+    if (curr === '/login' || curr === '/register') {
+      const last = sessionStorage.getItem('lastAuthPath') || '';
+      if ((last === '/login' || last === '/register') && last !== curr) {
+        dispatch(clearError());
+      }
+      sessionStorage.setItem('lastAuthPath', curr);
+    }
+  }, [location.pathname, dispatch]);
 
   // Cleanup reverse animation on unmount
   useEffect(() => {
@@ -234,10 +247,11 @@ const Login = () => {
       await dispatch(getCurrentUser());
       navigate('/');
     } catch (err: any) {
-      console.log(err);
-      showErrorToast(
-        err.response?.data?.message || 'Google ile giriş başarısız oldu.'
-      );
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        t('google_login_failed', currentLanguage);
+      showErrorToast(msg);
     }
   };
 
@@ -249,7 +263,7 @@ const Login = () => {
     if (isNetworkError({ message: error })) {
       return (
         <ErrorAlert
-          error="Bağlantı hatası oluştu. İnternet bağlantınızı kontrol edin."
+          error={t('connection_error', currentLanguage)}
           onRetry={handleRetry}
           onDismiss={handleDismissError}
         />
