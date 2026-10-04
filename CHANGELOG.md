@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-10-04
+
+### Added
+
+- **Comments**: Threads on questions and answers, with replies, reactions, and an edited marker only after the author changes the text.
+- **Previews**: Question detail previews from long home cards, search answers, parent chips, and related questions.
+- **References**: In-text references, including comments. Typing `/ref` opens the picker anywhere in the detail. File and link details share the wider modal.
+- **Gündem**: The owner's focus-10 questions as a fixed bookmark list with one shared cover.
+- **Messaging**: Start a message from a question, answer, or comment, and show when the other user is not followed.
+- **Inquire and query**: Investigation and structured query surfaces.
+- **Relative dates**: Dates stay relative through months and years, and a click shows the exact time.
+- **Report placeholder**: A review dialog on question, answer, and comment containers.
+- **Auth**: Password change with email verification, separate Google registration, and backend health.
+
+### Changed
+
+- The default theme follows the system color scheme. Header, login, and editor navigation use the active palette.
+- Owner likes and dislikes stay visible on content. Reference notches follow the theme.
+- Resolved avatar URLs are cached.
+
+### Fixed
+
+- Security fixes.
+- Bookmark state is loaded on the question detail page.
+
 ## [1.7.0] - 2026-01-08
 
 ### Added
