@@ -19,6 +19,21 @@ export const bookmark = {
     en: 'My Bookmarks',
     de: 'Meine Lesezeichen',
   },
+  focus_10_list: {
+    tr: 'Gündem',
+    en: 'Agenda',
+    de: 'Agenda',
+  },
+  focus_10_description: {
+    tr: 'Odak değeri 10 olan sorular',
+    en: 'Questions with a focus of 10',
+    de: 'Fragen mit Fokus 10',
+  },
+  focus_10_empty: {
+    tr: 'Odak değeri 10 olan soru yok',
+    en: 'No questions with focus 10',
+    de: 'Keine Fragen mit Fokus 10',
+  },
   no_bookmarks: {
     tr: 'Henüz kaydettiğiniz bir şey yok',
     en: "You haven't saved anything yet",

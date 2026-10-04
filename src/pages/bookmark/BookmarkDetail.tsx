@@ -83,6 +83,8 @@ import UserAvatarById from '../../components/ui/UserAvatarById';
 import { contentAssetService } from '../../services/contentAssetService';
 import { uploadFileToPresignedUrl } from '../../services/contentAssetService';
 import { bookmarkService } from '../../services/bookmarkService';
+import { questionService } from '../../services/questionService';
+import type { Question } from '../../types/question';
 import type { BookmarkResponse } from '../../types/bookmark';
 import type { BookmarkCollection } from '../../services/bookmarkService';
 
@@ -298,6 +300,24 @@ const SortableRow: React.FC<{
   );
 };
 
+const FOCUS_LIST_ID = 'focus-10';
+const GUNDEM_COVER = `${process.env.PUBLIC_URL}/gundem-cover.jpg`;
+
+type DateFilterOp = 'equals' | 'greater_than' | 'less_than' | 'between';
+
+function matchesListedDate(dateStr: string, op: DateFilterOp, val: string, val2: string): boolean {
+  if (!val && !(op === 'between' && val2)) return true;
+  const ts = (d: string) => new Date(d).getTime();
+  const itemTs = new Date(dateStr).getTime();
+  const d1 = val ? ts(`${val}T00:00:00`) : 0;
+  const d2 = val2 ? ts(`${val2}T23:59:59`) : 0;
+  if (op === 'equals') return val ? itemTs >= d1 && itemTs <= ts(`${val}T23:59:59`) : true;
+  if (op === 'greater_than') return d1 ? itemTs > d1 : true;
+  if (op === 'less_than') return d1 ? itemTs < d1 : true;
+  if (op === 'between') return Boolean(d1 && d2 && itemTs >= d1 && itemTs <= d2);
+  return true;
+}
+
 const BookmarkDetail = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -327,6 +347,8 @@ const BookmarkDetail = () => {
   const [filterDateVal, setFilterDateVal] = useState('');
   const [filterDateVal2, setFilterDateVal2] = useState('');
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [focusQuestions, setFocusQuestions] = useState<Question[]>([]);
+  const [focusLoading, setFocusLoading] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
@@ -337,14 +359,38 @@ const BookmarkDetail = () => {
   }, [isAuthenticated, dispatch]);
 
   useEffect(() => {
+    if (folderFromUrl === FOCUS_LIST_ID) {
+      setSelectedId(FOCUS_LIST_ID);
+      return;
+    }
     if (folderFromUrl && collections.some((c) => c._id === folderFromUrl)) {
       setSelectedId(folderFromUrl);
     }
   }, [folderFromUrl, collections]);
 
   useEffect(() => {
-    if (selectedId) dispatch(fetchCollectionItems(selectedId));
+    if (selectedId && selectedId !== FOCUS_LIST_ID) dispatch(fetchCollectionItems(selectedId));
   }, [selectedId, dispatch]);
+
+  useEffect(() => {
+    if (selectedId !== FOCUS_LIST_ID || !user?.id) return;
+    let cancelled = false;
+    setFocusLoading(true);
+    questionService
+      .getQuestionsByUser(user.id, 1, 100, 'desc', 10)
+      .then(result => {
+        if (!cancelled) setFocusQuestions(result.data);
+      })
+      .catch(() => {
+        if (!cancelled) setFocusQuestions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFocusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, user?.id]);
 
   const handleSelectFolder = (id: string) => {
     setSelectedId(id);
@@ -424,21 +470,41 @@ const BookmarkDetail = () => {
       list = list.filter((b) => (b.target_data?.content ?? '').toLowerCase().includes(q));
     }
     if (filterDateVal || (filterDateOp === 'between' && filterDateVal2)) {
-      const ts = (d: string) => new Date(d).getTime();
       list = list.filter((b) => {
         const addedAt = (b as BookmarkItem).addedAt || b.createdAt;
-        const itemTs = new Date(addedAt).getTime();
-        const d1 = filterDateVal ? ts(filterDateVal + 'T00:00:00') : 0;
-        const d2 = filterDateVal2 ? ts(filterDateVal2 + 'T23:59:59') : 0;
-        if (filterDateOp === 'equals') return filterDateVal ? itemTs >= d1 && itemTs <= ts(filterDateVal + 'T23:59:59') : true;
-        if (filterDateOp === 'greater_than') return d1 ? itemTs > d1 : true;
-        if (filterDateOp === 'less_than') return d1 ? itemTs < d1 : true;
-        if (filterDateOp === 'between') return d1 && d2 ? itemTs >= d1 && itemTs <= d2 : true;
-        return true;
+        return matchesListedDate(addedAt, filterDateOp, filterDateVal, filterDateVal2);
       });
     }
     return list;
   }, [rawItems, orderedIds, filterOwner, filterType, filterQuestionSummary, filterDetail, filterDateOp, filterDateVal, filterDateVal2]);
+
+  const focusOwnerOptions = useMemo(() => {
+    const seen = new Set<string>();
+    return focusQuestions
+      .map((question) => question.author?.name ?? '')
+      .filter((name) => name && !seen.has(name) && (seen.add(name), true));
+  }, [focusQuestions]);
+
+  const visibleFocusQuestions = useMemo(() => {
+    let list = focusQuestions;
+    if (filterOwner.trim()) {
+      const q = filterOwner.trim().toLowerCase();
+      list = list.filter((question) => (question.author?.name ?? '').toLowerCase().includes(q));
+    }
+    if (filterType && filterType !== 'question') list = [];
+    if (filterQuestionSummary.trim()) {
+      const q = filterQuestionSummary.trim().toLowerCase();
+      list = list.filter((question) => question.summary.toLowerCase().includes(q));
+    }
+    if (filterDetail.trim()) {
+      const q = filterDetail.trim().toLowerCase();
+      list = list.filter((question) => stripRefLinksForDisplay(question.detail).toLowerCase().includes(q));
+    }
+    if (filterDateVal || (filterDateOp === 'between' && filterDateVal2)) {
+      list = list.filter((question) => matchesListedDate(question.createdAt, filterDateOp, filterDateVal, filterDateVal2));
+    }
+    return list;
+  }, [focusQuestions, filterOwner, filterType, filterQuestionSummary, filterDetail, filterDateOp, filterDateVal, filterDateVal2]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -620,9 +686,9 @@ const BookmarkDetail = () => {
             bgcolor: theme.palette.mode === 'dark' ? 'grey.900' : 'grey.100',
             position: 'relative',
             overflow: 'hidden',
-            cursor: selectedId && !coverUploading ? 'pointer' : 'default',
+            cursor: selectedId && selectedId !== FOCUS_LIST_ID && !coverUploading ? 'pointer' : 'default',
           }}
-          onClick={() => selectedId && !coverUploading && fileInputRef.current?.click()}
+          onClick={() => selectedId && selectedId !== FOCUS_LIST_ID && !coverUploading && fileInputRef.current?.click()}
         >
           <input
             ref={fileInputRef}
@@ -630,9 +696,16 @@ const BookmarkDetail = () => {
             accept="image/*"
             hidden
             onChange={handleCoverUpload}
-            disabled={coverUploading || !selectedId}
+            disabled={coverUploading || !selectedId || selectedId === FOCUS_LIST_ID}
           />
-          {coverUrl ? (
+          {selectedId === FOCUS_LIST_ID ? (
+            <Box
+              component="img"
+              src={GUNDEM_COVER}
+              alt=""
+              sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : coverUrl ? (
             <Box
               component="img"
               src={coverUrl}
@@ -663,7 +736,7 @@ const BookmarkDetail = () => {
               )}
             </Box>
           )}
-          {coverUrl && !coverUploading && (
+          {coverUrl && selectedId !== FOCUS_LIST_ID && !coverUploading && (
             <Tooltip title={t('bookmark_cover_change', currentLanguage)}>
               <Box
                 sx={{
@@ -698,19 +771,25 @@ const BookmarkDetail = () => {
                 </IconButton>
               </Tooltip>
             </Box>
-            {loading && collections.length === 0 ? (
-              <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : collections.length === 0 ? (
-              <Box sx={{ p: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {t('bookmark_empty_folder', currentLanguage)}
-                </Typography>
-              </Box>
-            ) : (
-              <List dense disablePadding sx={{ flex: 1 }}>
-                {roots.map((c) => (
+            <List dense disablePadding sx={{ flex: 1 }}>
+              <ListItemButton
+                selected={selectedId === FOCUS_LIST_ID}
+                onClick={() => handleSelectFolder(FOCUS_LIST_ID)}
+              >
+                <ListItemText primary={t('focus_10_list', currentLanguage)} />
+              </ListItemButton>
+              {loading && collections.length === 0 ? (
+                <Box sx={{ p: 3, display: 'flex', justifyContent: 'center' }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : collections.length === 0 ? (
+                <Box sx={{ p: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('bookmark_empty_folder', currentLanguage)}
+                  </Typography>
+                </Box>
+              ) : (
+                roots.map((c) => (
                   <FolderTreeItem
                     key={c._id}
                     collection={c}
@@ -721,14 +800,216 @@ const BookmarkDetail = () => {
                     rootLabel={t('bookmark_root_folder', currentLanguage)}
                     depth={0}
                   />
-                ))}
-              </List>
-            )}
+                ))
+              )}
+            </List>
           </Box>
 
           {/* Sağ */}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-            {!selectedId ? (
+            {selectedId === FOCUS_LIST_ID ? (
+              <>
+                <Box sx={{ px: 3, py: 2, borderBottom: (th) => `1px solid ${th.palette.divider}` }}>
+                  <Typography variant="h5" fontWeight={600}>
+                    {t('focus_10_list', currentLanguage)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {t('focus_10_description', currentLanguage)}
+                  </Typography>
+                </Box>
+                <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+                  {focusLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                      <CircularProgress size={32} />
+                    </Box>
+                  ) : (
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: '100%' }}>
+                      <Table stickyHeader size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: 900 }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600, width: 200, verticalAlign: 'top', px: 1.5 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                                {t('bookmark_owner', currentLanguage)}
+                              </Typography>
+                              <Autocomplete
+                                size="small"
+                                options={focusOwnerOptions}
+                                value={filterOwner && focusOwnerOptions.includes(filterOwner) ? filterOwner : null}
+                                inputValue={filterOwner}
+                                onInputChange={(_, v) => setFilterOwner(v)}
+                                onChange={(_, v) => setFilterOwner(v ?? '')}
+                                freeSolo
+                                renderInput={(params) => (
+                                  <TextField
+                                    {...params}
+                                    placeholder={t('bookmark_filter_owner', currentLanguage)}
+                                    sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem' } }}
+                                  />
+                                )}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 100, verticalAlign: 'top', px: 1.5 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                                {t('bookmark_type', currentLanguage)}
+                              </Typography>
+                              <FormControl size="small" fullWidth>
+                                <Select
+                                  value={filterType}
+                                  onChange={(e) => setFilterType(e.target.value)}
+                                  displayEmpty
+                                  sx={{ fontSize: '0.8rem', minHeight: 40 }}
+                                >
+                                  <MenuItem value="">{t('bookmark_type_all', currentLanguage)}</MenuItem>
+                                  <MenuItem value="question">{t('bookmark_type_question', currentLanguage)}</MenuItem>
+                                  <MenuItem value="answer">{t('bookmark_type_answer', currentLanguage)}</MenuItem>
+                                  <MenuItem value="query">{t('bookmark_type_query', currentLanguage)}</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 220, verticalAlign: 'top', px: 1.5 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                                {t('bookmark_question_summary', currentLanguage)}
+                              </Typography>
+                              <TextField
+                                size="small"
+                                placeholder={t('bookmark_filter_question_summary', currentLanguage)}
+                                value={filterQuestionSummary}
+                                onChange={(e) => setFilterQuestionSummary(e.target.value)}
+                                fullWidth
+                                sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem' } }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 220, verticalAlign: 'top', px: 1.5 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                                {t('bookmark_detail', currentLanguage)}
+                              </Typography>
+                              <TextField
+                                size="small"
+                                placeholder={t('bookmark_filter_detail', currentLanguage)}
+                                value={filterDetail}
+                                onChange={(e) => setFilterDetail(e.target.value)}
+                                fullWidth
+                                sx={{ '& .MuiInputBase-root': { fontSize: '0.8rem' } }}
+                              />
+                            </TableCell>
+                            <TableCell sx={{ fontWeight: 600, width: 200, verticalAlign: 'top', px: 1.5 }}>
+                              <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+                                {t('bookmark_added_at', currentLanguage)}
+                              </Typography>
+                              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                <FormControl size="small" sx={{ minWidth: 90 }}>
+                                  <Select
+                                    value={filterDateOp}
+                                    onChange={(e) => setFilterDateOp(e.target.value as DateFilterOp)}
+                                    sx={{ fontSize: '0.8rem', minHeight: 40 }}
+                                  >
+                                    <MenuItem value="equals">{t('date_operator_exact', currentLanguage)}</MenuItem>
+                                    <MenuItem value="greater_than">{t('date_operator_after', currentLanguage)}</MenuItem>
+                                    <MenuItem value="less_than">{t('date_operator_before', currentLanguage)}</MenuItem>
+                                    <MenuItem value="between">{t('date_operator_between', currentLanguage)}</MenuItem>
+                                  </Select>
+                                </FormControl>
+                                <TextField
+                                  size="small"
+                                  type="date"
+                                  value={filterDateVal}
+                                  onChange={(e) => setFilterDateVal(e.target.value)}
+                                  InputLabelProps={{ shrink: true }}
+                                  sx={{
+                                    flex: 1,
+                                    minWidth: 120,
+                                    '& .MuiInputBase-root': { fontSize: '0.8rem' },
+                                    '& input::-webkit-calendar-picker-indicator': {
+                                      filter: theme.palette.mode === 'dark' ? 'invert(1)' : 'none',
+                                    },
+                                  }}
+                                />
+                                {filterDateOp === 'between' && (
+                                  <TextField
+                                    size="small"
+                                    type="date"
+                                    value={filterDateVal2}
+                                    onChange={(e) => setFilterDateVal2(e.target.value)}
+                                    InputLabelProps={{ shrink: true }}
+                                    sx={{
+                                      flex: 1,
+                                      minWidth: 120,
+                                      '& .MuiInputBase-root': { fontSize: '0.8rem' },
+                                      '& input::-webkit-calendar-picker-indicator': {
+                                        filter: theme.palette.mode === 'dark' ? 'invert(1)' : 'none',
+                                      },
+                                    }}
+                                  />
+                                )}
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {visibleFocusQuestions.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} sx={{ py: 4, textAlign: 'center' }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {focusQuestions.length === 0
+                                    ? t('focus_10_empty', currentLanguage)
+                                    : t('bookmark_no_matching', currentLanguage)}
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            visibleFocusQuestions.map((question) => {
+                              const detailText = stripRefLinksForDisplay(question.detail);
+                              const summary = question.summary.slice(0, PREVIEW_LENGTH) + (question.summary.length > PREVIEW_LENGTH ? '...' : '');
+                              const detail = detailText.slice(0, PREVIEW_LENGTH) + (detailText.length > PREVIEW_LENGTH ? '...' : '');
+                              return (
+                                <TableRow
+                                  key={question.id}
+                                  hover
+                                  sx={{
+                                    cursor: 'pointer',
+                                    '&:hover': { bgcolor: (th) => (th.palette.mode === 'dark' ? 'action.hover' : 'grey.50') },
+                                  }}
+                                  onClick={() => navigate(`/questions/${question.id}`)}
+                                >
+                                  <TableCell sx={{ py: 1.5, width: 200, px: 1.5 }} onClick={(e) => e.stopPropagation()}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                      <UserAvatarById
+                                        userId={question.author?.id}
+                                        fallbackName={question.author?.name || '—'}
+                                        sx={{ width: 40, height: 40, flexShrink: 0 }}
+                                      />
+                                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                        {question.author?.name || '—'}
+                                      </Typography>
+                                    </Box>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5, width: 100, px: 1.5 }}>
+                                    {t('bookmark_type_question', currentLanguage)}
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5, width: 220, px: 1.5 }}>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                                      {summary}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5, width: 220, px: 1.5 }}>
+                                    <Typography variant="caption" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>
+                                      {detail}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell sx={{ py: 1.5, width: 200, px: 1.5 }}>
+                                    {formatDate(question.createdAt, currentLanguage)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  )}
+                </Box>
+              </>
+            ) : !selectedId ? (
               <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 4 }}>
                 <Typography variant="body1" color="text.secondary">
                   {t('bookmark_select_folder', currentLanguage)}

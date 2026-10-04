@@ -32,7 +32,7 @@ const STATIC_GROUPS: { labelKey: string; keys: string[] }[] = [
   },
   {
     labelKey: 'query_group_meta',
-    keys: ['format', 'interest', 'focus', 'featureTemplateId'],
+    keys: ['format', 'interest', 'featureTemplateId'],
   },
   {
     labelKey: 'query_group_metadata',

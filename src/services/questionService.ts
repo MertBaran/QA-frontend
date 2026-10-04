@@ -1,4 +1,5 @@
 import api from './api';
+import { formatContentAge } from '../utils/contentAge';
 import {
   QuestionData,
   Question,
@@ -23,23 +24,7 @@ export interface PaginatedQuestionsResponse {
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
 export const transformQuestionData = (questionData: QuestionData): Question => {
-  const createdAt = new Date(questionData.createdAt);
-  const now = new Date();
-  const timeDiff = now.getTime() - createdAt.getTime();
-
-  // Zaman hesaplama
-  let timeAgo = '';
-  const minutes = Math.floor(timeDiff / (1000 * 60));
-  const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-  const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    timeAgo = `${minutes} dakika önce`;
-  } else if (hours < 24) {
-    timeAgo = `${hours} saat önce`;
-  } else {
-    timeAgo = `${days} gün önce`;
-  }
+  const timeAgo = formatContentAge(questionData.createdAt);
 
   const content = questionData.detail.toLowerCase();
 
@@ -146,6 +131,7 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     dislikesCount: questionData.dislikes.length,
     dislikedByUsers: questionData.dislikes,
     answers: questionData.answers.length,
+    commentCount: questionData.commentCount ?? 0,
     timeAgo,
     isTrending,
     category: questionData.category || inferredCategory,
@@ -414,7 +400,8 @@ class QuestionService {
     userId: string,
     page: number = 1,
     limit: number = 10,
-    sortOrder: 'asc' | 'desc' = 'desc'
+    sortOrder: 'asc' | 'desc' = 'desc',
+    focus?: number
   ): Promise<PaginatedQuestionsResponse> {
     try {
       // Sorular için daha uzun timeout (30 saniye)
@@ -432,7 +419,7 @@ class QuestionService {
           };
         };
       }>(`/questions/user/${userId}`, {
-        params: { page, limit, sortOrder },
+        params: { page, limit, sortOrder, ...(focus != null ? { focus } : {}) },
         timeout: 30000,
       });
       if (response.data.success && response.data.data) {

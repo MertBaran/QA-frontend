@@ -229,17 +229,29 @@ const BookmarkSidebar: React.FC<BookmarkSidebarProps> = ({ currentLanguage }) =>
                 </Tooltip>
               </Box>
             </Box>
-            {loading && collections.length === 0 ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : collections.length === 0 ? (
-              <Typography variant="body2" sx={{ px: 2, py: 2, color: theme.palette.text.secondary }}>
-                {t('no_bookmarks', currentLanguage)}
-              </Typography>
-            ) : (
-              <List dense disablePadding sx={{ pb: 1 }}>
-                {(() => {
+            <List dense disablePadding sx={{ pb: 1 }}>
+              <ListItemButton
+                onClick={() => navigate('/bookmarks?folder=focus-10')}
+                sx={{ py: 0.5, borderRadius: 1, mx: 0.5, pl: 2 }}
+              >
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <Folder sx={{ fontSize: 20, color: theme.palette.primary.main }} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={t('focus_10_list', currentLanguage)}
+                  primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+                />
+              </ListItemButton>
+              {loading && collections.length === 0 ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : collections.length === 0 ? (
+                <Typography variant="body2" sx={{ px: 2, py: 2, color: theme.palette.text.secondary }}>
+                  {t('no_bookmarks', currentLanguage)}
+                </Typography>
+              ) : (
+                (() => {
                   const { roots, getChildren } = buildTree();
                   const renderFolder = (c: typeof collections[0], depth = 0) => {
                     const isExpanded = expandedIds.has(c._id);
@@ -317,9 +329,9 @@ const BookmarkSidebar: React.FC<BookmarkSidebarProps> = ({ currentLanguage }) =>
                     );
                   };
                   return roots.map((c) => renderFolder(c));
-                })()}
-              </List>
-            )}
+                })()
+              )}
+            </List>
             <Box sx={{ px: 2, py: 1.5, borderTop: (t) => `1px solid ${t.palette.divider}` }}>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                 <Tooltip title={t('bookmark_create_new_folder', currentLanguage)}>
