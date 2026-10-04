@@ -9,10 +9,14 @@ import registerReducer from './auth/register/registerSlice';
 import questionReducer from './questions/questionSlice';
 import languageReducer from './language/languageSlice';
 import bookmarkReducer from './bookmarks/bookmarkSlice';
+import bookmarkCollectionReducer from './bookmarks/bookmarkCollectionSlice';
 import confirmReducer from './confirm/confirmSlice';
 import likesReducer from './likes/likesSlice';
 import answerReducer from './answers/answerSlice';
 import homeReducer from './home/homeSlice';
+import followReducer from './follow/followSlice';
+import backendStatusReducer from './backendStatus/backendStatusSlice';
+import messagingReducer from './messaging/messagingSlice';
 
 // Persist configuration for auth slice
 const authPersistConfig = {
@@ -58,10 +62,14 @@ const store = configureStore({
     questions: questionReducer,
     language: languageReducer,
     bookmarks: bookmarkReducer,
+    bookmarkCollections: bookmarkCollectionReducer,
     confirm: confirmReducer,
     likes: likesReducer,
     answers: answerReducer,
     home: homeReducer,
+    follow: followReducer,
+    backendStatus: backendStatusReducer,
+    messaging: messagingReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -1,7 +1,7 @@
 export interface MockQuestion {
   id: number;
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   author: {
     name: string;
     avatar: string;
@@ -9,7 +9,6 @@ export interface MockQuestion {
   tags: string[];
   likes: number;
   answers: number;
-  views: number;
   timeAgo: string;
   isTrending: boolean;
   category: string;
@@ -18,8 +17,8 @@ export interface MockQuestion {
 export const mockQuestions: MockQuestion[] = [
   {
     id: 1,
-    title: 'React Hooks ile state management nasıl yapılır?',
-    content:
+    summary: 'React Hooks ile state management nasıl yapılır?',
+    detail:
       'React Hooks kullanarak state management yapmak istiyorum. Redux yerine Context API ve useReducer kullanarak nasıl bir yapı kurabilirim?',
     author: {
       name: 'Ahmet Yılmaz',
@@ -28,15 +27,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['React', 'JavaScript', 'Hooks'],
     likes: 24,
     answers: 8,
-    views: 156,
     timeAgo: '2 saat önce',
     isTrending: true,
     category: 'Frontend',
   },
   {
     id: 2,
-    title: 'TypeScript ile generic types nasıl kullanılır?',
-    content:
+    summary: 'TypeScript ile generic types nasıl kullanılır?',
+    detail:
       "TypeScript'te generic types kullanarak daha esnek ve type-safe kod yazmak istiyorum. Örneklerle açıklayabilir misiniz?",
     author: {
       name: 'Zeynep Kaya',
@@ -45,15 +43,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['TypeScript', 'Generics'],
     likes: 18,
     answers: 5,
-    views: 89,
     timeAgo: '4 saat önce',
     isTrending: false,
     category: 'Frontend',
   },
   {
     id: 3,
-    title: 'MongoDB aggregation pipeline örnekleri',
-    content:
+    summary: 'MongoDB aggregation pipeline örnekleri',
+    detail:
       "MongoDB'de aggregation pipeline kullanarak karmaşık sorgular yapmak istiyorum. Performanslı örnekler paylaşabilir misiniz?",
     author: {
       name: 'Mehmet Demir',
@@ -62,15 +59,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['MongoDB', 'Database', 'Aggregation'],
     likes: 32,
     answers: 12,
-    views: 234,
     timeAgo: '6 saat önce',
     isTrending: true,
     category: 'Backend',
   },
   {
     id: 4,
-    title: 'Docker container orchestration best practices',
-    content:
+    summary: 'Docker container orchestration best practices',
+    detail:
       "Docker container'ları production ortamında nasıl yönetebilirim? Kubernetes alternatifi olarak hangi araçları kullanabilirim?",
     author: {
       name: 'Elif Özkan',
@@ -79,15 +75,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['Docker', 'DevOps', 'Containerization'],
     likes: 15,
     answers: 6,
-    views: 67,
     timeAgo: '8 saat önce',
     isTrending: false,
     category: 'DevOps',
   },
   {
     id: 5,
-    title: 'Node.js performance optimization techniques',
-    content:
+    summary: 'Node.js performance optimization techniques',
+    detail:
       "Node.js uygulamamın performansını nasıl artırabilirim? Memory leak'leri nasıl tespit edebilirim?",
     author: {
       name: 'Can Arslan',
@@ -96,15 +91,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['Node.js', 'Performance', 'JavaScript'],
     likes: 28,
     answers: 9,
-    views: 178,
     timeAgo: '1 gün önce',
     isTrending: true,
     category: 'Backend',
   },
   {
     id: 6,
-    title: 'CSS Grid vs Flexbox ne zaman kullanılır?',
-    content:
+    summary: 'CSS Grid vs Flexbox ne zaman kullanılır?',
+    detail:
       'CSS Grid ve Flexbox arasındaki farkları ve hangi durumlarda hangisini tercih etmem gerektiğini öğrenmek istiyorum.',
     author: {
       name: 'Selin Yıldız',
@@ -113,15 +107,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['CSS', 'Grid', 'Flexbox', 'Layout'],
     likes: 22,
     answers: 7,
-    views: 145,
     timeAgo: '1 gün önce',
     isTrending: false,
     category: 'Frontend',
   },
   {
     id: 7,
-    title: 'GraphQL vs REST API karşılaştırması',
-    content:
+    summary: 'GraphQL vs REST API karşılaştırması',
+    detail:
       'Yeni bir proje başlatıyorum ve GraphQL mi yoksa REST API mi kullanacağım konusunda kararsızım. Avantaj ve dezavantajları nelerdir?',
     author: {
       name: 'Burak Koç',
@@ -130,15 +123,14 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['GraphQL', 'REST', 'API', 'Backend'],
     likes: 35,
     answers: 14,
-    views: 289,
     timeAgo: '2 gün önce',
     isTrending: true,
     category: 'Backend',
   },
   {
     id: 8,
-    title: 'React Native navigation best practices',
-    content:
+    summary: 'React Native navigation best practices',
+    detail:
       'React Native uygulamamda navigation yapısını nasıl optimize edebilirim? Deep linking nasıl implement edilir?',
     author: {
       name: 'Deniz Aydın',
@@ -147,7 +139,6 @@ export const mockQuestions: MockQuestion[] = [
     tags: ['React Native', 'Navigation', 'Mobile'],
     likes: 19,
     answers: 6,
-    views: 98,
     timeAgo: '2 gün önce',
     isTrending: false,
     category: 'Mobile',
@@ -170,15 +161,16 @@ export const filterQuestions = (
   if (filters.search) {
     filtered = filtered.filter(
       (question) =>
-        question.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-        question.content.toLowerCase().includes(filters.search.toLowerCase()) ||
+        question.summary.toLowerCase().includes(filters.search.toLowerCase()) ||
+        question.detail.toLowerCase().includes(filters.search.toLowerCase()) ||
         question.tags.some((tag) => tag.toLowerCase().includes(filters.search.toLowerCase())),
     );
   }
 
-  // Kategori filtresi
+  // Kategori filtresi (serbest metin - içerir)
   if (filters.category) {
-    filtered = filtered.filter((question) => question.category === filters.category);
+    const cat = filters.category.toLowerCase();
+    filtered = filtered.filter((question) => (question.category || '').toLowerCase().includes(cat));
   }
 
   // Tag filtresi
@@ -196,9 +188,6 @@ export const filterQuestions = (
     case 'En Popüler':
       filtered.sort((a, b) => b.likes - a.likes);
       break;
-    case 'En Çok Görüntülenen':
-      filtered.sort((a, b) => b.views - a.views);
-      break;
     case 'En Çok Cevaplanan':
       filtered.sort((a, b) => b.answers - a.answers);
       break;
@@ -209,8 +198,5 @@ export const filterQuestions = (
   return filtered;
 };
 
-// Kategoriler
-export const categories = ['Frontend', 'Backend', 'Mobile', 'DevOps', 'Database', 'AI/ML'];
-
 // Sıralama seçenekleri
-export const sortOptions = ['En Yeni', 'En Popüler', 'En Çok Görüntülenen', 'En Çok Cevaplanan'];
+export const sortOptions = ['En Yeni', 'En Popüler', 'En Çok Cevaplanan'];

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Modal,
@@ -24,7 +24,7 @@ import {
   Close,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
-import { categories, sortOptions } from '../../types/question';
+import { sortOptions } from '../../types/question';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { useTheme } from '@mui/material/styles';
@@ -166,6 +166,12 @@ const FilterModal: React.FC<FilterModalProps> = ({
     primaryDark = theme.palette.mode === 'dark' ? '#6B5739' : '#8B6F47';
   }
 
+  useEffect(() => {
+    if (open) {
+      setLocalFilters(filters);
+    }
+  }, [open, filters]);
+
   const handleLocalFilterChange = (field: string, value: string) => {
     setLocalFilters(prev => ({ ...prev, [field]: value }));
   };
@@ -277,26 +283,23 @@ const FilterModal: React.FC<FilterModalProps> = ({
 
               {/* Category */}
               <Grid item xs={12} md={6}>
-                <FormControl fullWidth>
-                  <InputLabel sx={{ color: theme.palette.text.secondary }}>{t('category', currentLanguage)}</InputLabel>
-                  <Select
-                    value={localFilters.category}
-                    onChange={(e) => handleLocalFilterChange('category', e.target.value)}
-                    label={t('category', currentLanguage)}
-                    sx={{
+                <TextField
+                  fullWidth
+                  label={t('category', currentLanguage)}
+                  value={localFilters.category}
+                  onChange={(e) => handleLocalFilterChange('category', e.target.value)}
+                  placeholder={t('all_categories', currentLanguage)}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
                       color: theme.palette.text.primary,
-                      '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${primaryColor}80` },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: primaryColor },
-                      '& .MuiSvgIcon-root': { color: theme.palette.text.secondary },
-                    }}
-                  >
-                    <MenuItem value="">{t('all_categories', currentLanguage)}</MenuItem>
-                    {categories.map((category) => (
-                      <MenuItem key={category} value={category}>{category}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                      '& fieldset': { borderColor: theme.palette.divider },
+                      '&:hover fieldset': { borderColor: `${primaryColor}80` },
+                      '&.Mui-focused fieldset': { borderColor: primaryColor },
+                    },
+                    '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
+                    '& .MuiInputLabel-root.Mui-focused': { color: primaryColor },
+                  }}
+                />
               </Grid>
 
 

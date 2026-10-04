@@ -144,9 +144,7 @@ const BulbContainer = styled(Box, {
     boxShadow: themeStyles.boxShadow,
   transition: isDragging ? 'none' : 'all 0.3s ease',
   zIndex: 2,
-  transform: isPulling 
-    ? 'translateY(-5px) scale(1.05)'
-    : 'translateY(0px) scale(1)',
+  transform: 'translateY(0px) scale(1)',
   animation: isDragging ? 'none' : isPulling ? `${pullAnimation} 0.8s ease-in-out` : `${naturalSwing} 4s ease-in-out infinite`,
   '&:hover': {
     boxShadow: themeName === 'papirus'
@@ -366,6 +364,7 @@ const ThemeToggle = () => {
       }
       
       setIsDragging(false);
+      setIsPulling(false);
       setIsReleased(true);
       
       // Tema değiştir
@@ -430,7 +429,7 @@ const ThemeToggle = () => {
     // Tema değiştir
     dispatch(toggleTheme());
     
-    // Animasyon süresi sonunda pulling state'ini sıfırla
+    // Animasyon süresi sonunda pulling state'ini sıfırla ve başlangıç haline dön
     setTimeout(() => {
       setIsPulling(false);
       setIsReleased(true);
@@ -438,6 +437,8 @@ const ThemeToggle = () => {
       // Salınım animasyonu bittikten sonra released state'ini sıfırla
       setTimeout(() => {
         setIsReleased(false);
+        setMouseX(0);
+        setMouseY(0);
       }, 1500);
     }, 800);
   };

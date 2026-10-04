@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { ChangeEvent, FocusEvent, FormEvent } from 'react';
 import {
   Box,
   Container,
@@ -20,16 +21,21 @@ import {
   Email,
   Lock,
 } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { registerUser } from '../../store/auth/register/registerThunks';
 import { clearError } from '../../store/auth/authSlice';
 import { t } from '../../utils/translations';
 import { useFormValidation, registerSchema } from '../../utils/validation';
+import GoogleLoginButton from '../../components/auth/GoogleLoginButton';
+import axios, { type AxiosError } from 'axios';
+import { showErrorToast } from '../../utils/notificationUtils';
+import { getCurrentUser } from '../../store/auth/authThunks';
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
 
   const dispatch = useAppDispatch();
   const { loading, error } = useAppSelector(state => state.auth);
@@ -46,15 +52,28 @@ const Register = () => {
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError, validateField, touched } =
     useFormValidation(registerSchema);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const location = useLocation();
+  // Sadece Login'den Register'a geçince hata temizle (Register'da alınan hata görünsün)
+  useEffect(() => {
+    const curr = location.pathname;
+    if (curr === '/login' || curr === '/register') {
+      const last = sessionStorage.getItem('lastAuthPath') || '';
+      if ((last === '/login' || last === '/register') && last !== curr) {
+        dispatch(clearError());
+      }
+      sessionStorage.setItem('lastAuthPath', curr);
+    }
+  }, [location.pathname, dispatch]);
+
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => {
       const updated = { ...prev, [name]: value };
-      handleChange(name, value, updated);
+      void handleChange(name, value, updated);
       
       // If password changed and confirmPassword is touched, re-validate confirmPassword
       if (name === 'password' && touched['confirmPassword']) {
-        validateField('confirmPassword', updated.confirmPassword, updated);
+        void validateField('confirmPassword', updated.confirmPassword, updated);
       }
       // If confirmPassword changed and password is touched, we already validated it above
       
@@ -62,20 +81,20 @@ const Register = () => {
     });
   };
 
-  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleInputBlur = (e: FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    handleBlur(name, value, formData);
+    void handleBlur(name, value, formData);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    void (async () => {
+      // Clear any previous errors
+      dispatch(clearError());
 
-    // Clear any previous errors
-    dispatch(clearError());
+      const isValid = await validateForm(formData);
+      if (!isValid) return;
 
-    const isValid = await validateForm(formData);
-
-    if (isValid) {
       const userData = {
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -83,8 +102,21 @@ const Register = () => {
         password: formData.password,
       };
 
-      dispatch(registerUser(userData));
-    }
+      try {
+        await dispatch(registerUser(userData)).unwrap();
+        // Auth state güncellendi; garanti olsun diye current user'ı çek ve yönlendir
+        await dispatch(getCurrentUser()).unwrap();
+        navigate('/');
+      } catch (err: unknown) {
+        const msg =
+          typeof err === 'string'
+            ? err
+            : err instanceof Error
+              ? err.message
+              : undefined;
+        if (msg) showErrorToast(msg);
+      }
+    })();
   };
 
   const handleClickShowPassword = () => {
@@ -93,6 +125,26 @@ const Register = () => {
 
   const handleClickShowConfirmPassword = () => {
     setShowConfirmPassword(!showConfirmPassword);
+  };
+
+  const handleGoogleRegister = async (credential: string) => {
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3000'}/auth/registerGoogle`,
+        { token: credential }
+      );
+      // JWT'yi kaydet
+      const { access_token } = response.data as { access_token: string };
+      localStorage.setItem('access_token', access_token);
+      // Kullanıcı bilgisini güncelle
+      await dispatch(getCurrentUser()).unwrap();
+      navigate('/');
+    } catch (err: unknown) {
+      const axiosErr = err as AxiosError<{ message?: string }>;
+      const errorMessage =
+        axiosErr.response?.data?.message || 'Google ile kayıt başarısız oldu.';
+      showErrorToast(errorMessage);
+    }
   };
 
   return (
@@ -127,7 +179,7 @@ const Register = () => {
 
           <Box
             component="form"
-            onSubmit={handleSubmit}
+            onSubmit={(e) => handleSubmit(e)}
             sx={{ mt: 1, width: '100%' }}
           >
             <Grid container spacing={2}>
@@ -318,6 +370,17 @@ const Register = () => {
                 t('register_button', currentLanguage)
               )}
             </Button>
+
+            {/* Google ile Kayıt */}
+            <GoogleLoginButton
+              onSuccess={(credential) => {
+                void handleGoogleRegister(credential);
+              }}
+              onError={() => {
+                showErrorToast(t('google_register_failed', currentLanguage) || 'Google ile kayıt başarısız oldu.');
+              }}
+              text="signup_with"
+            />
 
             <Box sx={{ textAlign: 'center' }}>
               <Link component={RouterLink} to="/login" variant="body2">

@@ -1,5 +1,12 @@
 import { ApiResponse } from './api';
-import { UserData } from './question';
+import {
+  UserData,
+  ParentContentInfo,
+  AncestorReference,
+  QuestionReference,
+  QuestionMetadataItem,
+  QuestionAttachment,
+} from './question';
 
 // Backend'den gelecek ham cevap tipi
 export interface AnswerData {
@@ -16,12 +23,22 @@ export interface AnswerData {
   question: string;
   questionInfo?: {
     _id: string;
-    title?: string;
+    summary?: string;
     slug?: string;
   };
   likes: string[];
   dislikes: string[];
   createdAt: string;
+  parent?: {
+    id: string;
+    type: 'question' | 'answer';
+  };
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  deleted?: boolean;
   __v?: number;
 }
 
@@ -48,17 +65,31 @@ export interface Answer {
   createdAt: string;
   timeAgo: string;
   questionId?: string;
-  questionTitle?: string;
+  questionSummary?: string;
+  parentId?: string;
+  parentType?: 'question' | 'answer';
+  ancestors?: AncestorReference[];
+  parentContentInfo?: ParentContentInfo;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  deleted?: boolean;
 }
 
 // Cevap oluşturma için tip
 export interface CreateAnswerData {
   content: string;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
 }
 
 // Cevap güncelleme için tip
 export interface UpdateAnswerData {
   content: string;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
 }
 
 // API Response tipleri

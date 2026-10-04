@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -9,12 +10,13 @@ import {
   ListItem,
   ListItemAvatar,
   ListItemText,
-  Avatar,
 } from '@mui/material';
+import ProfileAvatar from './ProfileAvatar';
 import { Close } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { requestMessageCompose } from '../../store/messaging/messagingSlice';
 import { t } from '../../utils/translations';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 
@@ -66,17 +68,21 @@ interface LikesModalProps {
   onClose: () => void;
   users: User[];
   title?: string;
+  mention?: { questionId: string; answerId?: string };
 }
 
 const LikesModal: React.FC<LikesModalProps> = ({ 
   open, 
   onClose, 
   users, 
-  title 
+  title,
+  mention,
 }) => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const currentUserId = useAppSelector(state => state.auth.user?.id);
   const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
 
@@ -157,26 +163,50 @@ const LikesModal: React.FC<LikesModalProps> = ({
                 }}
               >
                 <ListItemAvatar>
-                  <Avatar 
+                  <ProfileAvatar 
                     src={user.profile_image} 
-                    alt={user.name}
+                    ownerId={user.id}
+                    fallbackName={user.name}
                     sx={{ width: 48, height: 48 }}
-                  >
-                    {user.name.charAt(0).toUpperCase()}
-                  </Avatar>
+                  />
                 </ListItemAvatar>
                 <ListItemText 
                   primary={user.name}
                   secondary={user.title || user.email}
                   primaryTypographyProps={{ color: theme.palette.text.primary }}
                   secondaryTypographyProps={{ color: theme.palette.text.secondary }}
+                  sx={{ pr: 1 }}
                 />
+                {currentUserId && currentUserId !== user.id && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={event => {
+                      event.stopPropagation();
+                      onClose();
+                      dispatch(requestMessageCompose({
+                        recipient: {
+                          id: user.id,
+                          name: user.name,
+                          profile_image: user.profile_image,
+                        },
+                        questionId: mention?.questionId,
+                        answerId: mention?.answerId,
+                      }));
+                    }}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {t('send_message', currentLanguage)}
+                  </Button>
+                )}
               </ListItem>
             ))}
           </List>
         ) : (
           <Typography sx={{ color: theme.palette.text.secondary, textAlign: 'center', py: 2 }}>
-            {t('no_likes_yet', currentLanguage)}
+            {title?.includes('Disliked') || title?.includes('Beğenmeyen') 
+              ? t('no_dislikes_yet', currentLanguage)
+              : t('no_likes_yet', currentLanguage)}
           </Typography>
         )}
       </DialogContent>

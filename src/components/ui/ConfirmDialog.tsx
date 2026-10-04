@@ -7,6 +7,7 @@ import {
   Button,
   Typography,
   Box,
+  useTheme,
 } from '@mui/material';
 import {
   ErrorOutline,
@@ -22,11 +23,15 @@ import type { ConfirmType } from '../../services/confirmService';
 
 const StyledDialog = styled(Dialog)(({ theme }) => ({
   '& .MuiDialog-paper': {
-    background: 'linear-gradient(135deg, rgba(10, 26, 35, 0.98) 0%, rgba(21, 42, 53, 0.99) 100%)',
-    border: '1px solid rgba(255, 184, 0, 0.2)',
+    background: theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.background.default} 0%, ${theme.palette.background.paper} 100%)`
+      : theme.palette.background.paper,
+    border: `1px solid ${theme.palette.mode === 'dark' 
+      ? theme.palette.divider 
+      : theme.palette.divider}`,
     borderRadius: 16,
-    backdropFilter: 'blur(10px)',
-    color: 'white',
+    backdropFilter: theme.palette.mode === 'dark' ? 'blur(10px)' : 'none',
+    color: theme.palette.text.primary,
     minWidth: 400,
     maxWidth: 600,
   },
@@ -46,25 +51,38 @@ const StyledButton = styled(Button)(({ theme }) => ({
 }));
 
 const ConfirmButton = styled(StyledButton)(({ theme }) => ({
-  background: 'linear-gradient(135deg, #FFB800 0%, #FF8F00 100%)',
-  color: 'white',
+  background: theme.palette.mode === 'dark'
+    ? `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`
+    : theme.palette.primary.main,
+  color: theme.palette.primary.contrastText || theme.palette.getContrastText(theme.palette.primary.main),
   '&:hover': {
-    background: 'linear-gradient(135deg, #FFD54F 0%, #FFB800 100%)',
+    background: theme.palette.mode === 'dark'
+      ? `linear-gradient(135deg, ${theme.palette.primary.light} 0%, ${theme.palette.primary.main} 100%)`
+      : theme.palette.primary.dark,
   },
 }));
 
 const CancelButton = styled(StyledButton)(({ theme }) => ({
   background: 'transparent',
-  border: '1px solid rgba(255,255,255,0.3)',
-  color: 'rgba(255,255,255,0.9)',
+  border: `1px solid ${theme.palette.mode === 'dark' 
+    ? 'rgba(255,255,255,0.3)' 
+    : theme.palette.divider}`,
+  color: theme.palette.mode === 'dark'
+    ? 'rgba(255,255,255,0.9)'
+    : theme.palette.text.primary,
   '&:hover': {
-    background: 'rgba(255,255,255,0.1)',
-    borderColor: 'rgba(255,255,255,0.5)',
+    background: theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.1)'
+      : theme.palette.action.hover,
+    borderColor: theme.palette.mode === 'dark'
+      ? 'rgba(255,255,255,0.5)'
+      : theme.palette.divider,
   },
 }));
 
 const ConfirmDialog: React.FC = () => {
   const dispatch = useAppDispatch();
+  const theme = useTheme();
   const { open, options } = useAppSelector((state) => state.confirm);
 
   const handleClose = () => {
@@ -95,14 +113,14 @@ const ConfirmDialog: React.FC = () => {
     const iconStyle = { fontSize: 48 };
     switch (type) {
       case 'error':
-        return <ErrorOutline sx={{ ...iconStyle, color: '#f44336' }} />;
+        return <ErrorOutline sx={{ ...iconStyle, color: theme.palette.error.main }} />;
       case 'warning':
-        return <WarningAmber sx={{ ...iconStyle, color: '#ff9800' }} />;
+        return <WarningAmber sx={{ ...iconStyle, color: theme.palette.warning.main }} />;
       case 'question':
-        return <HelpOutline sx={{ ...iconStyle, color: '#FFB800' }} />;
+        return <HelpOutline sx={{ ...iconStyle, color: theme.palette.primary.main }} />;
       case 'info':
       default:
-        return <InfoOutlined sx={{ ...iconStyle, color: '#2196f3' }} />;
+        return <InfoOutlined sx={{ ...iconStyle, color: theme.palette.info.main }} />;
     }
   };
 
@@ -113,6 +131,23 @@ const ConfirmDialog: React.FC = () => {
     return 'primary';
   };
 
+  const getErrorButtonStyles = () => {
+    if (options.type === 'error') {
+      return {
+        background: theme.palette.mode === 'dark'
+          ? `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`
+          : theme.palette.error.main,
+        color: theme.palette.error.contrastText || theme.palette.getContrastText(theme.palette.error.main),
+        '&:hover': {
+          background: theme.palette.mode === 'dark'
+            ? `linear-gradient(135deg, ${theme.palette.error.light} 0%, ${theme.palette.error.main} 100%)`
+            : theme.palette.error.dark,
+        },
+      };
+    }
+    return {};
+  };
+
   return (
     <StyledDialog
       open={open}
@@ -121,7 +156,7 @@ const ConfirmDialog: React.FC = () => {
       fullWidth={options.fullWidth}
     >
       {options.title && (
-        <DialogTitle sx={{ color: 'white', fontWeight: 600 }}>
+        <DialogTitle sx={{ color: theme.palette.text.primary, fontWeight: 600 }}>
           {options.title}
         </DialogTitle>
       )}
@@ -130,7 +165,7 @@ const ConfirmDialog: React.FC = () => {
         <Typography
           variant="body1"
           sx={{
-            color: 'rgba(255,255,255,0.9)',
+            color: theme.palette.text.primary,
             textAlign: 'center',
             lineHeight: 1.6,
           }}
@@ -145,14 +180,7 @@ const ConfirmDialog: React.FC = () => {
         <ConfirmButton
           onClick={handleConfirm}
           color={getConfirmColor()}
-          sx={{
-            ...(options.type === 'error' && {
-              background: 'linear-gradient(135deg, #f44336 0%, #d32f2f 100%)',
-              '&:hover': {
-                background: 'linear-gradient(135deg, #ef5350 0%, #f44336 100%)',
-              },
-            }),
-          }}
+          sx={getErrorButtonStyles()}
         >
           {options.confirmText || 'Onayla'}
         </ConfirmButton>

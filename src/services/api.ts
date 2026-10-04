@@ -1,7 +1,7 @@
 import axios, { AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
 import config from '../config/config';
 import logger from '../utils/logger';
-import { getStoredToken, isTokenValidAndNotExpired, forceLogout } from '../utils/tokenUtils';
+import { getStoredToken, isTokenValidAndNotExpired, logout } from '../utils/tokenUtils';
 import { showWarningToast, showErrorToast } from '../utils/notificationUtils';
 import { t } from '../utils/translations';
 import { store } from '../store';
@@ -16,10 +16,16 @@ const api = axios.create({
   timeout: config.REQUEST_TIMEOUT,
 });
 
-// Token'ı her istekte Authorization header'a ekle
+// Token ve dil header'larını her istekte ekle
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     logger.api.request(config.method ?? '', config.url ?? '', config.data);
+
+    // Accept-Language: backend i18n için
+    const lang = store.getState().language.currentLanguage;
+    const localeMap: Record<string, string> = { tr: 'tr', en: 'en', de: 'de' };
+    config.headers = config.headers || {};
+    config.headers['Accept-Language'] = localeMap[lang] || 'en';
 
     // Token'ı header'a ekle (kontrol etme, sadece ekle)
     const token = getStoredToken();
@@ -49,13 +55,16 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     logger.api.error(error.config?.method ?? '', error.config?.url ?? '', error);
 
-    // 401 hatası durumunda akıllı kontrol
-    if (error.response?.status === 401) {
+    // 401 hatası - login/register endpoint'lerinde kullanıcıya bırak (invalid credentials)
+    const isAuthEndpoint =
+      error.config?.url?.includes('/auth/login') ||
+      error.config?.url?.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       const lang = store.getState().language.currentLanguage;
       // Token expire olduğunda otomatik logout yap
       if (!isTokenValidAndNotExpired()) {
         showErrorToast(t('session_expired', lang));
-        forceLogout();
+        logout();
       } else {
         showWarningToast(t('unauthorized_action', lang));
       }

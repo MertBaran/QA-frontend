@@ -8,7 +8,7 @@ import {
   Button,
   Alert,
 } from '@mui/material';
-import axios from 'axios';
+import { authService } from '../../services/authService';
 
 const ForgotPassword: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -27,16 +27,16 @@ const ForgotPassword: React.FC = () => {
     }
     setLoading(true);
     try {
-      await axios.post(
-        `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/auth/forgotPassword`,
-        { email }
-      );
+      await authService.forgotPassword(email);
       setSuccess(true);
       setTimeout(() => navigate('/login'), 3000);
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || 'Şifre sıfırlama isteği gönderilemedi.'
-      );
+      const data = err.response?.data;
+      const apiError =
+        data?.error ||
+        data?.message ||
+        (Array.isArray(data?.errors) && data.errors[0]?.message);
+      setError(apiError || 'Bir hata oluştu.');
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ const ForgotPassword: React.FC = () => {
           Şifremi Unuttum
         </Typography>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        {success && <Alert severity="success" sx={{ mb: 2 }}>Eğer bu email sistemde kayıtlıysa, şifre sıfırlama bağlantısı gönderildi. Lütfen emailinizi kontrol edin.</Alert>}
+        {success && <Alert severity="success" sx={{ mb: 2 }}>Şifre sıfırlama bağlantısı e-posta adresinize gönderildi. Lütfen emailinizi kontrol edin.</Alert>}
         <form onSubmit={handleSubmit}>
           <TextField
             label="Email Adresi"

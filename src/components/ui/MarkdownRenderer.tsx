@@ -1,139 +1,157 @@
 import React from 'react';
-import ReactMarkdown from '@uiw/react-markdown-preview';
-import { Box } from '@mui/material';
-import { styled } from '@mui/material/styles';
-import '@uiw/react-markdown-preview/markdown.css';
-
-const MarkdownContainer = styled(Box)(({ theme }) => ({
-  width: '100%',
-  maxWidth: '100%',
-  overflow: 'hidden',
-  wordBreak: 'break-all',
-  overflowWrap: 'break-word',
-  '& .wmde-markdown': {
-    backgroundColor: 'transparent',
-    color: theme.palette.text.primary,
-    fontSize: '16px !important',
-    lineHeight: '1.6',
-    maxWidth: '100%',
-    overflow: 'hidden',
-    wordBreak: 'break-all',
-    overflowWrap: 'break-word',
-  },
-  '& .wmde-markdown pre': {
-    backgroundColor: theme.palette.mode === 'dark' 
-      ? theme.palette.background.paper 
-      : theme.palette.grey[100],
-    border: `1px solid ${theme.palette.primary.main}33`,
-    borderRadius: '4px',
-  },
-  '& .wmde-markdown code': {
-    color: theme.palette.primary.main,
-    backgroundColor: `${theme.palette.primary.main}22`,
-  },
-  '& .wmde-markdown h1': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown h2': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown h3': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown h4': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown h5': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown h6': {
-    color: theme.palette.primary.main,
-    borderBottom: `1px solid ${theme.palette.primary.main}33`,
-  },
-  '& .wmde-markdown a': {
-    color: theme.palette.primary.main,
-    '&:hover': {
-        color: theme.palette.primary.dark,
-    },
-  },
-  '& .wmde-markdown blockquote': {
-    borderLeft: '4px solid rgba(255, 184, 0, 0.5)',
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  '& .wmde-markdown table': {
-    border: '1px solid rgba(255, 184, 0, 0.2)',
-  },
-  '& .wmde-markdown th': {
-    border: '1px solid rgba(255, 184, 0, 0.1)',
-  },
-  '& .wmde-markdown td': {
-    border: '1px solid rgba(255, 184, 0, 0.1)',
-  },
-  '& .wmde-markdown ul, & .wmde-markdown ol': {
-    color: 'rgba(255, 255, 255, 0.9)',
-  },
-  '& .wmde-markdown p': {
-    marginBottom: theme.spacing(1.5),
-    fontSize: '16px !important',
-    wordBreak: 'break-all',
-    overflowWrap: 'break-word',
-    maxWidth: '100%',
-  },
-}));
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Box, useTheme } from '@mui/material';
+import DeferredImage from './DeferredImage';
+import { rehypeRefLinks } from '../../utils/rehypeRefLinks';
+import { remarkInlineStyles } from '../../utils/remarkInlineStyles';
+import { getMdHighlightStyle } from '../../utils/mdHighlightStyle';
 
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  /** ref:N link'lerinde hover'da çağrılır (N = referans index) */
+  onRefHover?: (refIndex: number | null) => void;
+  /** ref:N link'lerinde tıklamada çağrılır (N = referans index) */
+  onRefClick?: (refIndex: number) => void;
+  /** Panel referansına hover'da vurgulanacak index - ref metnini highlight eder */
+  highlightedRefIndex?: number | null;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
-  content, 
-  className 
-}) => {
-  // Sanitize content to remove potentially problematic HTML tags
-  // This prevents React from trying to render invalid HTML tags as React components
-  const sanitizedContent = React.useMemo(() => {
-    if (!content) return '';
-    
-    // List of allowed HTML tags that are safe to render
-    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 's', 'b', 'i', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-                        'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 'a', 'img', 'table', 'thead', 
-                        'tbody', 'tfoot', 'tr', 'th', 'td', 'hr', 'div', 'span', 'del', 'ins', 'sub', 'sup'];
-    
-    // Escape any HTML-like tags that might be confused as React components
-    // This regex matches opening tags (with or without attributes) and closing tags
-    let cleaned = content.replace(/<(\/?)([a-z][a-z0-9]*)(?:\s[^>]*)?>/gi, (match, slash, tagName) => {
-      const lowerTagName = tagName.toLowerCase();
-      
-      // If it's not an allowed tag, escape it
-      if (!allowedTags.includes(lowerTagName)) {
-        // Escape the entire tag
-        return match.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      }
-      
-      // Return the original match for allowed tags
-      return match;
-    });
-    
-    return cleaned;
-  }, [content]);
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className, onRefHover, onRefClick, highlightedRefIndex }) => {
+  const theme = useTheme();
+  // #333 override - dark mode'da tema yanlış renk veriyorsa açık renk kullan
+  const textColor = theme.palette.mode === 'dark' ? '#F5F5F5' : theme.palette.text.primary;
+  const textStyle: React.CSSProperties = { color: textColor };
+
+  if (!content) return null;
 
   return (
-    <MarkdownContainer className={className}>
+    <Box className={className} sx={{ fontSize: 16, lineHeight: 1.6, fontFamily: theme.typography.fontFamily, maxWidth: '100%', overflowWrap: 'break-word' }}>
       <ReactMarkdown
-        source={sanitizedContent}
-        wrapperElement={{
-          'data-color-mode': 'dark'
+        remarkPlugins={[remarkGfm, remarkInlineStyles]}
+        rehypePlugins={[rehypeRefLinks]}
+        components={{
+          p: ({ children }) => <p style={{ ...textStyle, marginBottom: 12 }}>{children}</p>,
+          li: ({ children }) => <li style={textStyle}>{children}</li>,
+          mark: (props) => {
+            const dataMdBg = (props as { 'data-md-bg'?: string })['data-md-bg'];
+            const dataMdColor = (props as { 'data-md-color'?: string })['data-md-color'];
+            return (
+              <mark
+                className="md-highlight"
+                data-md-bg={dataMdBg}
+                data-md-color={dataMdColor}
+                style={getMdHighlightStyle(dataMdBg, theme, dataMdColor)}
+              >
+                {props.children}
+              </mark>
+            );
+          },
+          span: (props) => {
+            const dataRef = (props as { 'data-ref'?: string })['data-ref'];
+            const dataMdColor = (props as { 'data-md-color'?: string })['data-md-color'];
+            if (dataRef != null) {
+              const refIndex = parseInt(dataRef, 10);
+              const isHighlighted = highlightedRefIndex === refIndex;
+              const refStyle: React.CSSProperties = {
+                ...textStyle,
+                color: theme.palette.primary.main,
+                textDecoration: 'underline',
+                cursor: onRefHover || onRefClick ? 'pointer' : 'default',
+                borderRadius: 4,
+                padding: '0 2px',
+                transition: 'background-color 0.2s ease, box-shadow 0.2s ease',
+                ...(isHighlighted && {
+                  backgroundColor: theme.palette.mode === 'dark' ? `${theme.palette.primary.main}30` : `${theme.palette.primary.main}20`,
+                  boxShadow: `0 0 0 1px ${theme.palette.primary.main}40`,
+                }),
+              };
+              return (
+                <span
+                  data-ref={dataRef}
+                  role="button"
+                  tabIndex={0}
+                  style={refStyle}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onRefClick?.(refIndex);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onRefClick?.(refIndex);
+                    }
+                  }}
+                  onMouseEnter={() => onRefHover?.(refIndex)}
+                  onMouseLeave={() => onRefHover?.(null)}
+                >
+                  {props.children}
+                </span>
+              );
+            }
+            if (dataMdColor) {
+              return (
+                <span
+                  data-md-color={dataMdColor}
+                  className="md-color"
+                  style={{ color: dataMdColor }}
+                >
+                  {props.children}
+                </span>
+              );
+            }
+            return <span {...props} style={textStyle}>{props.children}</span>;
+          },
+          strong: ({ children }) => <strong style={textStyle}>{children}</strong>,
+          em: ({ children }) => <em style={textStyle}>{children}</em>,
+          del: ({ children }) => <del style={{ ...textStyle, textDecoration: 'line-through' }}>{children}</del>,
+          h1: ({ children }) => <h1 style={textStyle}>{children}</h1>,
+          h2: ({ children }) => <h2 style={textStyle}>{children}</h2>,
+          h3: ({ children }) => <h3 style={textStyle}>{children}</h3>,
+          h4: ({ children }) => <h4 style={textStyle}>{children}</h4>,
+          h5: ({ children }) => <h5 style={textStyle}>{children}</h5>,
+          h6: ({ children }) => <h6 style={textStyle}>{children}</h6>,
+          table: ({ children }) => (
+            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+              <table style={{ borderCollapse: 'collapse', width: '100%', ...textStyle }}>{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead>{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr>{children}</tr>,
+          th: ({ children }) => (
+            <th style={{ ...textStyle, border: `1px solid ${theme.palette.divider}`, padding: '8px 12px', textAlign: 'left', fontWeight: 600 }}>
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td style={{ ...textStyle, border: `1px solid ${theme.palette.divider}`, padding: '8px 12px' }}>
+              {children}
+            </td>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote style={{ ...textStyle, color: theme.palette.mode === 'dark' ? 'rgba(245,245,245,0.9)' : theme.palette.text.secondary, marginLeft: 0, paddingLeft: 16, borderLeft: `4px solid ${theme.palette.primary.main}` }}>
+              {children}
+            </blockquote>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} style={{ color: theme.palette.primary.main }} target="_blank" rel="noopener noreferrer">
+              {children}
+            </a>
+          ),
+          img: ({ src, alt }) => (
+            <Box sx={{ maxWidth: 480, my: 1, borderRadius: 1, overflow: 'hidden' }}>
+              <DeferredImage src={typeof src === 'string' ? src : undefined} alt={alt || ''} objectFit="contain" />
+            </Box>
+          ),
         }}
-      />
-    </MarkdownContainer>
+      >
+        {content}
+      </ReactMarkdown>
+    </Box>
   );
 };
 
 export default MarkdownRenderer;
-

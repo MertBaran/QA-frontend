@@ -30,6 +30,33 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
     try {
       logger.user.action('fetch_home_questions', params);
 
+      // When savedOnly: fetch bookmarks first, pass IDs to API for correct server-side pagination
+      let savedIds: string | undefined;
+      if (params.savedOnly === 'true') {
+        try {
+          const bookmarks = await bookmarkService.getUserBookmarks();
+          const ids = bookmarks
+            .filter((b) => b.target_type === 'question')
+            .map((b) => b.target_id)
+            .filter(Boolean);
+          if (ids.length > 0) {
+            savedIds = ids.join(',');
+          } else {
+            return {
+              questions: [],
+              totalQuestions: 0,
+              totalPages: 0,
+            };
+          }
+        } catch {
+          return {
+            questions: [],
+            totalQuestions: 0,
+            totalPages: 0,
+          };
+        }
+      }
+
       const result = await questionService.getQuestionsPaginatedWithParents({
         page: params.page,
         limit: params.limit,
@@ -38,8 +65,6 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
             ? 'createdAt'
             : params.sortBy === 'En Popüler'
               ? 'likes'
-              : params.sortBy === 'En Çok Görüntülenen'
-                ? 'views'
                 : params.sortBy === 'En Çok Cevaplanan'
                   ? 'answers'
                   : 'createdAt',
@@ -47,28 +72,14 @@ export const fetchHomeQuestions = createAsyncThunk<FetchQuestionsResult, FetchQu
         search: params.search,
         category: params.category,
         tags: params.tags,
+        savedIds,
       });
-
-      let data = result.data;
-
-      // Saved only filter: filter by bookmarked questions
-      if (params.savedOnly === 'true') {
-        try {
-          const bookmarks = await bookmarkService.getUserBookmarks();
-          const savedQuestionIds = new Set(
-            bookmarks.filter((b) => b.target_type === 'question').map((b) => b.target_id),
-          );
-          data = data.filter((q) => savedQuestionIds.has(q.id));
-        } catch {
-          // silent failure
-        }
-      }
 
       logger.user.action('home_page_loaded');
       logger.performance.measure('home_page_load', 1500, { component: 'Home' });
 
       return {
-        questions: data,
+        questions: result.data,
         totalQuestions: result.pagination.totalItems,
         totalPages: result.pagination.totalPages,
       };
@@ -89,7 +100,7 @@ export const createHomeQuestion = createAsyncThunk<
   { rejectValue: { message: string; validationErrors?: Record<string, string> } }
 >('home/createHomeQuestion', async (questionData, { rejectWithValue }) => {
   try {
-    logger.user.action('create_question', { title: questionData.title });
+    logger.user.action('create_question', { summary: questionData.summary });
     const question = await questionService.createQuestion(questionData);
     if (!question) {
       return rejectWithValue({ message: 'Failed to create question' });
@@ -111,16 +122,22 @@ export const createHomeQuestion = createAsyncThunk<
 
             // Translate validation messages to Turkish
             if (message.includes('Too small')) {
-              if (field === 'title') {
-                message = 'Başlık en az 10 karakter olmalıdır';
-              } else if (field === 'content') {
-                message = 'İçerik en az 20 karakter olmalıdır';
+              if (field === 'summary') {
+                message = 'Özet en az 5 karakter olmalıdır';
+              } else if (field === 'detail') {
+                message = 'Detay en az 10 karakter olmalıdır';
+              }
+            } else if (message.includes('Too big') || message.includes('too long')) {
+              if (field === 'summary') {
+                message = 'Özet en fazla 500 karakter olabilir';
+              } else if (field === 'detail') {
+                message = 'Detay en fazla 10000 karakter olabilir';
               }
             } else if (message.includes('Required')) {
-              if (field === 'title') {
-                message = 'Başlık gereklidir';
-              } else if (field === 'content') {
-                message = 'İçerik gereklidir';
+              if (field === 'summary') {
+                message = 'Özet gereklidir';
+              } else if (field === 'detail') {
+                message = 'Detay gereklidir';
               }
             }
 
@@ -138,7 +155,7 @@ export const createHomeQuestion = createAsyncThunk<
         // General error message
         return rejectWithValue({
           message: data.error,
-          validationErrors: { title: data.error },
+          validationErrors: { summary: data.error },
         });
       }
     }
@@ -146,7 +163,7 @@ export const createHomeQuestion = createAsyncThunk<
     // Use standard error handling for other errors
     const errorInfo = await handleError(error, {
       action: 'createHomeQuestion',
-      questionData: { title: questionData.title },
+      questionData: { summary: questionData.summary },
     });
     return rejectWithValue({ message: errorInfo.message });
   }

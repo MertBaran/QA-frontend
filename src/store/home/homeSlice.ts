@@ -18,8 +18,8 @@ const initialState: HomeState = {
   filterModalOpen: false,
   createQuestionModalOpen: false,
   newQuestion: {
-    title: '',
-    content: '',
+    summary: '',
+    detail: '',
     category: '',
     tags: '',
   },
@@ -27,6 +27,7 @@ const initialState: HomeState = {
   isSubmitting: false,
   currentPage: 1,
   itemsPerPage: 10,
+  dateSort: 'newest',
   totalQuestions: 0,
   totalPages: 0,
 };
@@ -81,8 +82,8 @@ const homeSlice = createSlice({
     },
     clearCreateQuestionForm: (state) => {
       state.newQuestion = {
-        title: '',
-        content: '',
+        summary: '',
+        detail: '',
         category: '',
         tags: '',
       };
@@ -97,6 +98,12 @@ const homeSlice = createSlice({
     setItemsPerPage: (state, action: PayloadAction<number>) => {
       state.itemsPerPage = action.payload;
       state.currentPage = 1; // Reset to first page when changing items per page
+    },
+    setDateSort: (state, action: PayloadAction<'newest' | 'oldest'>) => {
+      state.dateSort = action.payload;
+      state.currentPage = 1;
+      // Tarih sıralaması seçildiğinde filtredeki sıralamayı En Yeni ile hizala
+      state.filters.sortBy = 'En Yeni';
     },
 
     // Question actions
@@ -150,8 +157,8 @@ const homeSlice = createSlice({
         state.totalQuestions += 1;
         // Clear form
         state.newQuestion = {
-          title: '',
-          content: '',
+          summary: '',
+          detail: '',
           category: '',
           tags: '',
         };
@@ -181,6 +188,7 @@ export const {
   clearCreateQuestionForm,
   setCurrentPage,
   setItemsPerPage,
+  setDateSort,
   updateQuestionInList,
   removeQuestionFromList,
   addQuestionToList,

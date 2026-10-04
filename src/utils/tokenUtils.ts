@@ -78,7 +78,7 @@ export const removeStoredToken = (): void => {
 /**
  * Kullanıcıyı logout yapar ve login sayfasına yönlendirir
  */
-export const forceLogout = (): void => {
+export const logout = (): void => {
   removeStoredToken();
   localStorage.removeItem('user');
   localStorage.removeItem('token'); // Eski token'ı da temizle
@@ -108,12 +108,12 @@ export const checkTokenAndLogout = (): boolean => {
   const token = getStoredToken();
 
   if (!token) {
-    forceLogout();
+    logout();
     return false;
   }
 
   if (!isTokenValid(token)) {
-    forceLogout();
+    logout();
     return false;
   }
 

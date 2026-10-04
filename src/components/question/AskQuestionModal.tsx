@@ -15,6 +15,12 @@ import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { CreateQuestionData } from '../../types/question';
 import RichTextEditor from '../ui/RichTextEditor';
+import {
+  QUESTION_SUMMARY_MIN_LENGTH,
+  QUESTION_SUMMARY_MAX_LENGTH,
+  QUESTION_DETAIL_MIN_LENGTH,
+  QUESTION_DETAIL_MAX_LENGTH,
+} from '../../constants/questionValidation';
 import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
 
@@ -90,7 +96,7 @@ interface AskQuestionModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: CreateQuestionData) => Promise<void>;
-  aboutQuestion?: { id: string; title: string };
+  aboutQuestion?: { id: string; summary: string };
   aboutAnswer?: { id: string; content: string };
   title?: string;
 }
@@ -106,24 +112,31 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName } = useAppSelector(state => state.theme);
   const isPapirus = themeName === 'papirus';
-  const [questionTitle, setQuestionTitle] = useState('');
-  const [questionContent, setQuestionContent] = useState('');
+  const [questionSummary, setQuestionSummary] = useState('');
+  const [questionDetail, setQuestionDetail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
 
   const handleSubmit = async () => {
-    if (!questionTitle.trim() || !questionContent.trim()) {
+    if (!questionSummary.trim() || !questionDetail.trim()) {
       setError(t('validation_required', currentLanguage));
       return;
     }
 
-    if (questionTitle.length < 10) {
-      setError(t('validation_title_min', currentLanguage));
+    if (questionSummary.length < QUESTION_SUMMARY_MIN_LENGTH) {
+      setError(t('validation_summary_min', currentLanguage));
       return;
     }
-
-    if (questionContent.length < 20) {
-      setError(t('validation_content_min', currentLanguage));
+    if (questionSummary.length > QUESTION_SUMMARY_MAX_LENGTH) {
+      setError(t('validation_summary_max', currentLanguage));
+      return;
+    }
+    if (questionDetail.length < QUESTION_DETAIL_MIN_LENGTH) {
+      setError(t('validation_detail_min', currentLanguage));
+      return;
+    }
+    if (questionDetail.length > QUESTION_DETAIL_MAX_LENGTH) {
+      setError(t('validation_detail_max', currentLanguage));
       return;
     }
 
@@ -131,9 +144,9 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
     setError('');
 
     try {
-      await onSubmit({ title: questionTitle, content: questionContent });
-      setQuestionTitle('');
-      setQuestionContent('');
+      await onSubmit({ summary: questionSummary.slice(0, QUESTION_SUMMARY_MAX_LENGTH), detail: questionDetail.slice(0, QUESTION_DETAIL_MAX_LENGTH) });
+      setQuestionSummary('');
+      setQuestionDetail('');
       onClose();
     } catch (err: any) {
       console.error('Soru oluşturulurken hata:', err);
@@ -145,8 +158,8 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
 
   const handleClose = () => {
     if (!submitting) {
-      setQuestionTitle('');
-      setQuestionContent('');
+      setQuestionSummary('');
+      setQuestionDetail('');
       setError('');
       onClose();
     }
@@ -203,7 +216,7 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
             })}
           >
             <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.primary }}>
-              <strong>{t('this_question_about', currentLanguage)}:</strong> {aboutQuestion.title}
+              <strong>{t('this_question_about', currentLanguage)}:</strong> {aboutQuestion.summary}
             </Typography>
           </Alert>
         )}
@@ -230,12 +243,12 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
         )}
 
         <TextField
-          label={t('question_title', currentLanguage)}
+          label={t('question_summary', currentLanguage)}
           fullWidth
-          value={questionTitle}
-          onChange={(e) => setQuestionTitle(e.target.value)}
+          value={questionSummary}
+          onChange={(e) => setQuestionSummary(e.target.value)}
           disabled={submitting}
-          error={error.includes('title')}
+          error={error.includes('summary')}
           sx={(theme) => ({
             mb: 2,
             '& .MuiOutlinedInput-root': {
@@ -250,13 +263,15 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
 
         <Box sx={{ mb: 3 }}>
           <Typography variant="body2" sx={{ mb: 1, color: (theme) => theme.palette.text.secondary }}>
-            {t('question_content', currentLanguage)}
+            {t('question_detail', currentLanguage)}
           </Typography>
           <RichTextEditor
-          value={questionContent}
-            onChange={(value) => setQuestionContent(value || '')}
+            value={questionDetail}
+            onChange={(value) => setQuestionDetail((value || '').slice(0, QUESTION_DETAIL_MAX_LENGTH))}
             minHeight={300}
-          error={error.includes('content')}
+            maxLength={QUESTION_DETAIL_MAX_LENGTH}
+            error={error.includes('detail')}
+            helperText={error.includes('detail') ? error : undefined}
           />
         </Box>
 
@@ -276,7 +291,7 @@ const AskQuestionModal: React.FC<AskQuestionModalProps> = ({
           </Button>
           <ActionButton
             onClick={handleSubmit}
-            disabled={submitting || !questionTitle.trim() || !questionContent.trim()}
+            disabled={submitting || !questionSummary.trim() || !questionDetail.trim() || questionSummary.length > QUESTION_SUMMARY_MAX_LENGTH || questionDetail.length > QUESTION_DETAIL_MAX_LENGTH}
             sx={{ flex: 1 }}
             endIcon={submitting ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <Send />}
           >

@@ -29,15 +29,6 @@ code {
   font-size: 16px !important;
 }
 
-/* Markdown Renderer (standalone) */
-.wmde-markdown {
-  font-size: 16px !important;
-}
-
-.wmde-markdown p {
-  font-size: 16px !important;
-}
-
 /* Tarayıcı autocomplete stilleri - Global fallback (GlobalStyles'da tema bazlı stiller var) */
 /* Bu stiller GlobalStyles yüklenmeden önce veya tema değiştiğinde geçerli olur */
 input:-webkit-autofill,

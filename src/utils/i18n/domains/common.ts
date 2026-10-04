@@ -19,10 +19,156 @@ export const common = {
     en: 'Notifications',
     de: 'Benachrichtigungen',
   },
+  messages: {
+    tr: 'Mesajlar',
+    en: 'Messages',
+    de: 'Nachrichten',
+  },
+  coming_soon: {
+    tr: 'Yakında',
+    en: 'Coming soon',
+    de: 'Demnächst',
+  },
+  new_message: {
+    tr: 'Yeni mesaj',
+    en: 'New message',
+    de: 'Neue Nachricht',
+  },
+  send_message: {
+    tr: 'Mesaj gönder',
+    en: 'Send message',
+    de: 'Nachricht senden',
+  },
+  format_bold: { tr: 'Kalın', en: 'Bold', de: 'Fett' },
+  format_italic: { tr: 'İtalik', en: 'Italic', de: 'Kursiv' },
+  format_strikethrough: { tr: 'Üstü çizili', en: 'Strikethrough', de: 'Durchgestrichen' },
+  delete_conversation: { tr: 'Konuşmayı sil', en: 'Delete conversation', de: 'Unterhaltung löschen' },
+  block_user: { tr: 'Kullanıcıyı engelle', en: 'Block user', de: 'Benutzer blockieren' },
+  user_blocked: { tr: 'Kullanıcı engellendi', en: 'User blocked', de: 'Benutzer blockiert' },
+  blocked: { tr: 'Engellendi', en: 'Blocked', de: 'Blockiert' },
+  you_blocked_this_user: { tr: 'Bu kullanıcıyı engellediniz', en: 'You have blocked this user', de: 'Sie haben diesen Benutzer blockiert' },
+  unblock: { tr: 'Engeli kaldır', en: 'Unblock', de: 'Blockierung aufheben' },
+  resend: { tr: 'Tekrar gönder', en: 'Resend', de: 'Erneut senden' },
+  user_unblocked: { tr: 'Engel kaldırıldı', en: 'User unblocked', de: 'Blockierung aufgehoben' },
+  search_in_conversation: { tr: 'Konuşmada ara...', en: 'Search in conversation...', de: 'In Unterhaltung suchen...' },
+  search_all_messages: { tr: 'Tüm mesajlarda ara...', en: 'Search all messages...', de: 'In allen Nachrichten suchen...' },
+  voice_only: { tr: 'Sadece ses kayıtları', en: 'Voice only', de: 'Nur Sprachnachrichten' },
+  starred_only: { tr: 'Sadece yıldızlılar', en: 'Starred only', de: 'Nur mit Stern' },
+  following_this_user: { tr: 'Takip ediliyor', en: 'Following', de: 'Folgt' },
+  user_not_followed: {
+    tr: 'Bu kullanıcı takip edilmiyor',
+    en: 'This user is not followed',
+    de: 'Dieser Benutzer wird nicht gefolgt',
+  },
+  resize_panel: { tr: 'Yüksekliği değiştirmek için yukarı/aşağı sürükleyin', en: 'Drag up or down to resize height', de: 'Nach oben oder unten ziehen zum Ändern der Höhe' },
+  scroll_to_bottom: { tr: 'En alta in', en: 'Scroll to bottom', de: 'Nach unten scrollen' },
+  no_voice_messages: { tr: 'Ses kaydı bulunamadı', en: 'No voice messages found', de: 'Keine Sprachnachrichten gefunden' },
+  no_matching_conversations: { tr: 'Eşleşen konuşma bulunamadı', en: 'No matching conversations', de: 'Keine passenden Unterhaltungen' },
+  no_matching_messages: { tr: 'Eşleşen mesaj bulunamadı', en: 'No matching messages', de: 'Keine passenden Nachrichten' },
+  conversations: {
+    tr: 'Konuşmalar',
+    en: 'Conversations',
+    de: 'Unterhaltungen',
+  },
+  voice_message: {
+    tr: 'Ses kaydı',
+    en: 'Voice message',
+    de: 'Sprachnachricht',
+  },
+  voice_load_failed: {
+    tr: 'Ses yüklenemedi',
+    en: 'Voice failed to load',
+    de: 'Sprachnachricht konnte nicht geladen werden',
+  },
+  voice_max_duration: {
+    tr: 'Ses kaydı en fazla 10 dakika olabilir.',
+    en: 'Voice recording cannot exceed 10 minutes.',
+    de: 'Sprachnachricht darf maximal 10 Minuten dauern.',
+  },
+  cancel: {
+    tr: 'İptal',
+    en: 'Cancel',
+    de: 'Abbrechen',
+  },
+  pause: {
+    tr: 'Duraklat',
+    en: 'Pause',
+    de: 'Pause',
+  },
+  resume: {
+    tr: 'Devam et',
+    en: 'Resume',
+    de: 'Fortsetzen',
+  },
+  send: {
+    tr: 'Gönder',
+    en: 'Send',
+    de: 'Senden',
+  },
+  reply: {
+    tr: 'Yanıtla',
+    en: 'Reply',
+    de: 'Antworten',
+  },
+  copy: {
+    tr: 'Kopyala',
+    en: 'Copy',
+    de: 'Kopieren',
+  },
+  copied: {
+    tr: 'Kopyalandı',
+    en: 'Copied',
+    de: 'Kopiert',
+  },
+  you: {
+    tr: 'Sen',
+    en: 'You',
+    de: 'Du',
+  },
+  actions: {
+    tr: 'İşlemler',
+    en: 'Actions',
+    de: 'Aktionen',
+  },
+  react: {
+    tr: 'İfade bırak',
+    en: 'React',
+    de: 'Reagieren',
+  },
+  star: {
+    tr: 'Yıldızla',
+    en: 'Star',
+    de: 'Markieren',
+  },
+  unstar: {
+    tr: 'Yıldızı kaldır',
+    en: 'Remove star',
+    de: 'Markierung entfernen',
+  },
+  remove_reaction: {
+    tr: 'İfadeyi kaldır',
+    en: 'Remove reaction',
+    de: 'Reaktion entfernen',
+  },
   profile: {
     tr: 'Profil',
     en: 'Profile',
     de: 'Profil',
+  },
+  settings: {
+    tr: 'Ayarlar',
+    en: 'Settings',
+    de: 'Einstellungen',
+  },
+  theme: {
+    tr: 'Tema',
+    en: 'Theme',
+    de: 'Design',
+  },
+  appearance: {
+    tr: 'Görünüm',
+    en: 'Appearance',
+    de: 'Darstellung',
   },
   login: {
     tr: 'Giriş Yap',
@@ -44,6 +190,31 @@ export const common = {
     en: 'Loading...',
     de: 'Lädt...',
   },
+  maintenance_title: {
+    tr: 'Uygulama Bakımda',
+    en: 'Application Under Maintenance',
+    de: 'Wartung',
+  },
+  maintenance_message: {
+    tr: 'Sistem şu anda bakımda. Lütfen kısa süre sonra tekrar deneyin.',
+    en: 'The system is currently under maintenance. Please try again shortly.',
+    de: 'Das System wird gerade gewartet. Bitte versuchen Sie es in Kürze erneut.',
+  },
+  maintenance_checking: {
+    tr: 'Bağlantı kontrol ediliyor...',
+    en: 'Checking connection...',
+    de: 'Verbindung wird überprüft...',
+  },
+  no_data: {
+    tr: 'Henüz burada bir şey yok.',
+    en: 'Nothing here yet.',
+    de: 'Hier ist noch nichts.',
+  },
+  error: {
+    tr: 'Bir hata oluştu',
+    en: 'An error occurred',
+    de: 'Ein Fehler ist aufgetreten',
+  },
   back: {
     tr: 'Geri Dön',
     en: 'Back',
@@ -59,15 +230,15 @@ export const common = {
     en: 'Likes',
     de: 'Likes',
   },
+  dislikes: {
+    tr: 'Beğenmeme',
+    en: 'Dislikes',
+    de: 'Abgelehnt',
+  },
   views: {
     tr: 'Görüntülenme',
     en: 'Views',
     de: 'Ansichten',
-  },
-  cancel: {
-    tr: 'İptal',
-    en: 'Cancel',
-    de: 'Abbrechen',
   },
   create: {
     tr: 'Oluştur',
@@ -99,6 +270,16 @@ export const common = {
     en: 'Confirm',
     de: 'Bestätigen',
   },
+  md_editor_clear_title: {
+    tr: 'İçeriği temizle',
+    en: 'Clear content',
+    de: 'Inhalt löschen',
+  },
+  md_editor_clear_confirm: {
+    tr: 'Editör içeriğini temizlemek istediğinize emin misiniz?',
+    en: 'Are you sure you want to clear the editor content?',
+    de: 'Möchten Sie den Editorinhalt wirklich löschen?',
+  },
   yes: {
     tr: 'Evet',
     en: 'Yes',
@@ -114,12 +295,62 @@ export const common = {
     en: 'Users Who Liked',
     de: 'Benutzer, die gemocht haben',
   },
+  users_who_disliked: {
+    tr: 'Beğenmeyen Kullanıcılar',
+    en: 'Users Who Disliked',
+    de: 'Benutzer, die nicht gemocht haben',
+  },
   no_likes_yet: {
     tr: 'Henüz beğeni yok',
     en: 'No likes yet',
     de: 'Noch keine Likes',
   },
+  no_dislikes_yet: {
+    tr: 'Henüz beğenmeyen yok',
+    en: 'No dislikes yet',
+    de: 'Noch keine Dislikes',
+  },
+  follow: {
+    tr: 'Takip Et',
+    en: 'Follow',
+    de: 'Folgen',
+  },
+  unfollow: {
+    tr: 'Takibi Bırak',
+    en: 'Unfollow',
+    de: 'Nicht mehr folgen',
+  },
+  followers: {
+    tr: 'Takipçiler',
+    en: 'Followers',
+    de: 'Follower',
+  },
+  following: {
+    tr: 'Takip Edilenler',
+    en: 'Following',
+    de: 'Folgt',
+  },
+  no_followers_yet: {
+    tr: 'Henüz takipçi yok',
+    en: 'No followers yet',
+    de: 'Noch keine Follower',
+  },
+  no_following_yet: {
+    tr: 'Henüz takip edilen yok',
+    en: 'Not following anyone yet',
+    de: 'Folgt noch niemandem',
+  },
   ancestors: {
+    tr: 'Sorunun Soyu',
+    en: "Question's Ancestors",
+    de: 'Fragenvorläufer',
+  },
+  answer_ancestors: {
+    tr: 'Cevabın Soyu',
+    en: "Answer's Ancestors",
+    de: 'Antwortvorläufer',
+  },
+  question_ancestors: {
     tr: 'Sorunun Soyu',
     en: "Question's Ancestors",
     de: 'Fragenvorläufer',
@@ -173,6 +404,26 @@ export const common = {
     tr: 'Sorular',
     en: 'Questions',
     de: 'Fragen',
+  },
+  users: {
+    tr: 'Kullanıcılar',
+    en: 'Users',
+    de: 'Benutzer',
+  },
+  search_user_questions_count: {
+    tr: '{count} soru',
+    en: '{count} questions',
+    de: '{count} Fragen',
+  },
+  search_user_answers_count: {
+    tr: '{count} cevap',
+    en: '{count} answers',
+    de: '{count} Antworten',
+  },
+  search_user_joined: {
+    tr: '{date} tarihinde katıldı',
+    en: 'Joined on {date}',
+    de: 'Beigetreten am {date}',
   },
   no_results: {
     tr: 'Sonuç bulunamadı',
@@ -308,5 +559,115 @@ export const common = {
     tr: 'Akıllı Arama',
     en: 'Smart Search',
     de: 'Intelligente Suche',
+  },
+  smart_search_disabled_tooltip: {
+    tr: 'Yakında — canlı öncesi yeniden değerlendirilecek',
+    en: 'Coming soon — will be re-evaluated before launch',
+    de: 'Demnächst — vor dem Launch erneut bewertet',
+  },
+  search_following_only: {
+    tr: 'Takip Ettiklerimde Ara',
+    en: 'Search in Following',
+    de: 'In Gefolgten suchen',
+  },
+  search_following_only_tooltip: {
+    tr: 'Kendi içeriklerinizde ve takip ettiğiniz kullanıcıların içeriklerinde arar',
+    en: 'Searches your content and content from people you follow',
+    de: 'Durchsucht Ihre Inhalte und Inhalte der Personen, denen Sie folgen',
+  },
+  question: {
+    tr: 'Soru',
+    en: 'Question',
+    de: 'Frage',
+  },
+  answer: {
+    tr: 'Cevap',
+    en: 'Answer',
+    de: 'Antwort',
+  },
+  read_more: {
+    tr: 'Devamını oku',
+    en: 'Read more',
+    de: 'Weiterlesen',
+  },
+  show_less: {
+    tr: 'Daha az göster',
+    en: 'Show less',
+    de: 'Weniger anzeigen',
+  },
+  close_panel: {
+    tr: 'Paneli kapat',
+    en: 'Close panel',
+    de: 'Panel schließen',
+  },
+  open_panel: {
+    tr: 'Paneli aç',
+    en: 'Open panel',
+    de: 'Panel öffnen',
+  },
+  open_in_new: {
+    tr: 'Yeni sekmede aç',
+    en: 'Open in new tab',
+    de: 'In neuem Tab öffnen',
+  },
+  template_management: {
+    tr: 'Şablon Yönetimi',
+    en: 'Template Management',
+    de: 'Vorlagenverwaltung',
+  },
+  ai_connection: {
+    tr: 'Yapay Zeka Bağlantısı',
+    en: 'AI Connection',
+    de: 'KI-Verbindung',
+  },
+  agents: {
+    tr: 'Agents',
+    en: 'Agents',
+    de: 'Agents',
+  },
+  plan: {
+    tr: 'Plan',
+    en: 'Plan',
+    de: 'Plan',
+  },
+  close: {
+    tr: 'Kapat',
+    en: 'Close',
+    de: 'Schließen',
+  },
+  report: {
+    tr: 'Bildir',
+    en: 'Report',
+    de: 'Melden',
+  },
+  report_title: {
+    tr: 'İçeriği bildir',
+    en: 'Report content',
+    de: 'Inhalt melden',
+  },
+  report_placeholder_body: {
+    tr: 'Ayrıntılı bildirme formu daha sonra eklenecek. Gönderdiğiniz bildirim şimdilik incelenmek üzere alınır.',
+    en: 'A detailed report form will be added later. For now, your report is received for review.',
+    de: 'Ein ausführliches Meldeformular folgt später. Ihre Meldung wird vorerst zur Prüfung entgegengenommen.',
+  },
+  report_reason: {
+    tr: 'Bildirme nedeni',
+    en: 'Reason',
+    de: 'Grund',
+  },
+  report_reason_placeholder: {
+    tr: 'Kısaca neden bildiriyorsunuz?',
+    en: 'Briefly, why are you reporting this?',
+    de: 'Warum melden Sie das?',
+  },
+  report_submit: {
+    tr: 'Bildirimi gönder',
+    en: 'Submit report',
+    de: 'Meldung senden',
+  },
+  report_sent: {
+    tr: 'Bildiriminiz incelenmek üzere gönderildi.',
+    en: 'Your report was sent for review.',
+    de: 'Ihre Meldung wurde zur Prüfung gesendet.',
   },
 } as const;

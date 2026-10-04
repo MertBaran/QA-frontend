@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -6,39 +6,50 @@ import {
   DialogActions,
   Button,
   TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Stack,
   Typography,
   Box,
   IconButton,
   Tooltip,
   Dialog as PreviewDialog,
 } from '@mui/material';
-import { Image as ImageIcon, Delete, ZoomIn } from '@mui/icons-material';
-import { categories } from '../../types/question';
+import { Image as ImageIcon, Delete, Drafts, Group, Alarm } from '@mui/icons-material';
 import { t } from '../../utils/translations';
 import RichTextEditor from '../ui/RichTextEditor';
+import {
+  QUESTION_SUMMARY_MIN_LENGTH,
+  QUESTION_SUMMARY_MAX_LENGTH,
+  QUESTION_DETAIL_MIN_LENGTH,
+  QUESTION_DETAIL_MAX_LENGTH,
+} from '../../constants/questionValidation';
 import { useAppSelector } from '../../store/hooks';
+import { getNegativeActionColor } from '../../utils/themeNegativeColor';
+import { confirmService } from '../../services/confirmService';
 import papyrusWhole from '../../asset/textures/papyrus_whole.png';
 import papyrusWholeDark from '../../asset/textures/papyrus_whole_dark.png';
+import AskQuestionButton from '../home/AskQuestionButton';
+
+
+const getActionButtonColor = (themeName: string, mode: 'light' | 'dark', theme: { palette: { primary: { main: string }; divider: string } }) => {
+  if (themeName === 'molume') return mode === 'dark' ? '#7A4A75' : '#5E315A';
+  if (themeName === 'papirus') return mode === 'dark' ? '#A0522D' : '#8B4513';
+  if (themeName === 'magnefite') return mode === 'dark' ? '#9CA3AF' : '#6B7280';
+  return theme.palette.primary.main;
+};
 
 interface CreateQuestionModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (options: { thumbnailFile?: File | null; removeThumbnail?: boolean }) => Promise<void> | void;
   question: {
-    title: string;
-    content: string;
+    summary: string;
+    detail: string;
     category: string;
     tags: string;
   };
   onQuestionChange: (field: string, value: string) => void;
   validationErrors: {
-    title?: string;
-    content?: string;
+    summary?: string;
+    detail?: string;
     category?: string;
     tags?: string;
   };
@@ -46,6 +57,18 @@ interface CreateQuestionModalProps {
   currentLanguage: string;
   mode?: 'create' | 'edit';
   initialThumbnailUrl?: string | null;
+  /** When true, renders as a panel inside CreateQuestionFlow (no Dialog wrapper) */
+  embedded?: boolean;
+  /** References for content-ref linking (from CreateQuestionFlow) */
+  references?: { type: string; content: string; description: string }[];
+  /** Currently hovered reference index for highlight sync */
+  hoveredRefIndex?: number | null;
+  /** Callback when user hovers over a reference link in content */
+  onRefHover?: (refIndex: number | null) => void;
+  /** Soru hakkında soru sorarken gösterilecek (özet üstünde "Bu soru hakkında: xxx") */
+  aboutQuestion?: { id: string; summary: string };
+  /** Cevap hakkında soru sorarken gösterilecek (özet üstünde "Bu cevap hakkında: xxx") */
+  aboutAnswer?: { id: string; content: string };
 }
 
 const MAX_THUMBNAIL_SIZE_MB = 5;
@@ -61,8 +84,15 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   currentLanguage,
   mode = 'create',
   initialThumbnailUrl = null,
+  embedded = false,
+  references,
+  hoveredRefIndex,
+  onRefHover,
+  aboutQuestion,
+  aboutAnswer,
 }) => {
   const { name: themeName, mode: themeMode } = useAppSelector((state) => state.theme);
+  const negativeColor = getNegativeActionColor(themeName, themeMode);
   const isPapirus = themeName === 'papirus';
   const isEditMode = mode === 'edit';
 
@@ -75,9 +105,41 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const dialogTitle = isEditMode ? t('edit_question', currentLanguage) : t('new_question', currentLanguage);
-  const submitLabel = isEditMode ? t('update_question', currentLanguage) : t('create_question', currentLanguage);
+  const submitLabel = isEditMode ? t('update_question', currentLanguage) : t('ask', currentLanguage);
 
-  const helperText = t('question_thumbnail_helper', currentLanguage).replace('{size}', String(MAX_THUMBNAIL_SIZE_MB));
+  const handleDetailChange = useCallback(
+    (value: string | undefined) => {
+      if (isEditMode) return;
+      onQuestionChange('detail', (value || '').slice(0, QUESTION_DETAIL_MAX_LENGTH));
+    },
+    [isEditMode, onQuestionChange],
+  );
+
+  const hasContent = () =>
+    question.summary.trim().length > 0 ||
+    question.detail.trim().length > 0 ||
+    question.category.trim().length > 0 ||
+    question.tags.trim().length > 0 ||
+    thumbnailFile !== null ||
+    removeExistingThumbnail;
+
+  const handleCancel = async () => {
+    if (hasContent()) {
+      const confirmed = await confirmService.show({
+        message: t('discard_confirmation', currentLanguage),
+        type: 'warning',
+        confirmText: t('discard_confirm', currentLanguage),
+        cancelText: t('cancel', currentLanguage),
+        confirmColor: 'warning',
+        variant: 'outlined',
+      });
+      if (!confirmed) return;
+    }
+    onClose();
+  };
+
+  const thumbnailLabel = t('question_thumbnail_label', currentLanguage);
+  const thumbnailMaxSize = t('question_thumbnail_max_size', currentLanguage);
   const sizeErrorText = t('question_thumbnail_too_large', currentLanguage).replace('{size}', String(MAX_THUMBNAIL_SIZE_MB));
 
   useEffect(() => {
@@ -228,6 +290,400 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
     return t('question_thumbnail_remove', currentLanguage);
   })();
 
+  const thumbnailBox = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0, minWidth: 180, alignItems: 'stretch' }}>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={handleThumbnailChange}
+      />
+      <Box
+        component="button"
+        type="button"
+        onClick={handleSelectThumbnail}
+        disabled={isSubmitting}
+        sx={(theme) => ({
+          width: '100%',
+          height: 140,
+          borderRadius: 1,
+          border: `1px dashed ${theme.palette.divider}`,
+          backgroundColor: theme.palette.background.default,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: isSubmitting ? 'not-allowed' : 'pointer',
+          overflow: 'hidden',
+          p: 0,
+          flexShrink: 0,
+          position: 'relative',
+          '&:hover': !isSubmitting ? { borderColor: theme.palette.primary.main, backgroundColor: theme.palette.action.hover } : {},
+        })}
+      >
+        {thumbnailPreview ? (
+          <img src={thumbnailPreview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <ImageIcon sx={{ fontSize: 40, color: (theme) => theme.palette.text.disabled }} />
+        )}
+        <Typography
+          component="span"
+          sx={{
+            position: 'absolute',
+            bottom: 6,
+            right: 8,
+            fontSize: '0.65rem',
+            color: (theme) => theme.palette.text.disabled,
+          }}
+        >
+          {thumbnailMaxSize}
+        </Typography>
+      </Box>
+      {thumbnailError && (
+        <Typography variant="caption" color="error">
+          {thumbnailError}
+        </Typography>
+      )}
+      {isEditMode && removeExistingThumbnail && (
+        <Typography variant="caption" color="warning.main">
+          {t('question_thumbnail_remove_info', currentLanguage)}
+        </Typography>
+      )}
+    </Box>
+  );
+
+  const validationHint = `* ${t('validation_summary_min', currentLanguage)}, ${t('validation_detail_min', currentLanguage).toLowerCase()}`;
+
+  const formContent = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1, minWidth: 0, minHeight: 0 }}>
+        {(aboutQuestion || aboutAnswer) && (
+          <Box
+            sx={(theme) => ({
+              p: 1.5,
+              mb: 1.5,
+              borderRadius: 1.5,
+              border: `1px solid ${theme.palette.divider}`,
+              backgroundColor: theme.palette.mode === 'dark'
+                ? `${theme.palette.primary.main}18`
+                : `${theme.palette.primary.main}0d`,
+            })}
+          >
+            <Typography
+              variant="body1"
+              sx={(theme) => ({
+                color: theme.palette.text.primary,
+                fontWeight: 600,
+                fontSize: '0.95rem',
+              })}
+            >
+              {aboutQuestion
+                ? `${t('this_question_about', currentLanguage)}: ${aboutQuestion.summary}`
+                : aboutAnswer
+                  ? `${t('this_answer_about', currentLanguage)}: ${aboutAnswer.content.substring(0, 120)}${aboutAnswer.content.length > 120 ? '...' : ''}`
+                  : ''}
+            </Typography>
+          </Box>
+        )}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+            <Typography variant="body1" sx={{ color: (theme) => theme.palette.text.secondary, fontWeight: 500, flex: 1 }}>
+              {t('question_summary', currentLanguage)}
+            </Typography>
+            <Box sx={{ minWidth: 180, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+              <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                {thumbnailLabel}
+              </Typography>
+              {showRemoveButton && (
+                <Tooltip title={removeButtonLabel}>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); handleRemoveThumbnail(); }}
+                    disabled={isSubmitting}
+                    sx={{ p: 0.25, color: negativeColor }}
+                  >
+                    <Delete sx={{ fontSize: 20 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'stretch' }}>
+          <Box sx={{ flex: 1, minWidth: 0, position: 'relative' }}>
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              value={question.summary}
+              onChange={(e) => !isEditMode && onQuestionChange('summary', e.target.value.slice(0, QUESTION_SUMMARY_MAX_LENGTH))}
+              inputProps={{ maxLength: QUESTION_SUMMARY_MAX_LENGTH, readOnly: isEditMode }}
+              placeholder={!question.summary.trim() ? validationHint : ''}
+              error={!!validationErrors.summary}
+              helperText={validationErrors.summary}
+              sx={(theme) => ({
+                '& .MuiOutlinedInput-root': {
+                  color: theme.palette.text.primary,
+                  minHeight: 140,
+                  maxHeight: 140,
+                  alignItems: 'flex-start',
+                  '& fieldset': {
+                    borderColor: validationErrors.summary ? theme.palette.error.main : theme.palette.divider,
+                  },
+                  '&:hover fieldset': {
+                    borderColor: validationErrors.summary ? theme.palette.error.main : theme.palette.primary.main,
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: validationErrors.summary ? theme.palette.error.main : theme.palette.primary.main,
+                  },
+                },
+                '& .MuiInputBase-input': {
+                  overflowY: 'auto !important',
+                },
+                '& .MuiInputLabel-root': {
+                  color: validationErrors.summary ? theme.palette.error.main : theme.palette.text.secondary,
+                  '&.Mui-focused': {
+                    color: validationErrors.summary ? theme.palette.error.main : theme.palette.primary.main,
+                  },
+                },
+                '& .MuiFormHelperText-root': {
+                  color: theme.palette.error.main,
+                },
+              })}
+            />
+            <Typography
+              variant="caption"
+              sx={(theme) => ({
+                position: 'absolute',
+                bottom: validationErrors.summary ? 32 : 12,
+                right: 14,
+                pointerEvents: 'none',
+                color: question.summary.length >= QUESTION_SUMMARY_MAX_LENGTH ? theme.palette.error.main : theme.palette.text.secondary,
+              })}
+            >
+              {question.summary.length} / {QUESTION_SUMMARY_MAX_LENGTH}
+            </Typography>
+          </Box>
+          {thumbnailBox}
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ mb: 1, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+            <Typography variant="body1" sx={{ color: (theme) => theme.palette.text.secondary, fontWeight: 500 }}>
+              {t('question_detail', currentLanguage)}
+            </Typography>
+            {references && references.length > 0 && (
+              <Typography variant="caption" sx={{ color: (theme) => theme.palette.text.disabled }}>
+                {t('question_detail_ref_hint', currentLanguage)}
+              </Typography>
+            )}
+          </Box>
+          <RichTextEditor
+            value={question.detail}
+            onChange={handleDetailChange}
+            minHeight={200}
+            fillHeight
+            maxLength={QUESTION_DETAIL_MAX_LENGTH}
+            error={!!validationErrors.detail}
+            helperText={validationErrors.detail}
+            references={references}
+            hoveredRefIndex={hoveredRefIndex}
+            onRefHover={onRefHover}
+            disabled={isEditMode}
+            currentLanguage={currentLanguage}
+          />
+        </Box>
+      </Box>
+  );
+
+  const actionButtons = (
+    <>
+      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+        <Tooltip title={t('save_to_drafts', currentLanguage)}>
+          <Button
+            variant="outlined"
+            startIcon={<Drafts sx={{ fontSize: 20 }} />}
+            onClick={() => {}}
+            sx={(theme) => {
+              const accent = getActionButtonColor(themeName, themeMode, theme);
+              return {
+                borderColor: accent,
+                color: accent,
+                '&:hover': {
+                  borderColor: accent,
+                  backgroundColor: theme.palette.mode === 'dark' ? `${accent}22` : `${accent}11`,
+                },
+              };
+            }}
+          >
+            {t('save_to_drafts', currentLanguage)}
+          </Button>
+        </Tooltip>
+        <Tooltip title={t('mention', currentLanguage)}>
+          <Button
+            variant="outlined"
+            startIcon={<Group sx={{ fontSize: 20 }} />}
+            onClick={() => {}}
+            sx={(theme) => {
+              const accent = getActionButtonColor(themeName, themeMode, theme);
+              return {
+                borderColor: accent,
+                color: accent,
+                '&:hover': {
+                  borderColor: accent,
+                  backgroundColor: theme.palette.mode === 'dark' ? `${accent}22` : `${accent}11`,
+                },
+              };
+            }}
+          >
+            {t('mention', currentLanguage)}
+          </Button>
+        </Tooltip>
+        <Tooltip title={t('set_reminder', currentLanguage)}>
+          <Button
+            variant="outlined"
+            startIcon={<Alarm sx={{ fontSize: 20 }} />}
+            onClick={() => {}}
+            sx={(theme) => {
+              const accent = getActionButtonColor(themeName, themeMode, theme);
+              return {
+                borderColor: accent,
+                color: accent,
+                '&:hover': {
+                  borderColor: accent,
+                  backgroundColor: theme.palette.mode === 'dark' ? `${accent}22` : `${accent}11`,
+                },
+              };
+            }}
+          >
+            {t('set_reminder', currentLanguage)}
+          </Button>
+        </Tooltip>
+      </Box>
+      <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Button
+          variant="outlined"
+          onClick={handleCancel}
+          sx={(theme) => ({
+            borderColor: 'transparent',
+            color: theme.palette.text.secondary,
+            '&:hover': {
+              borderColor: negativeColor,
+              background:
+                theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.1)'
+                  : 'rgba(0, 0, 0, 0.05)',
+            },
+          })}
+        >
+          {t('cancel', currentLanguage)}
+        </Button>
+        <AskQuestionButton
+          label={
+            isSubmitting
+              ? t(isEditMode ? 'updating' : 'creating', currentLanguage)
+              : submitLabel
+          }
+          onClick={() => {
+            void handleSubmit();
+          }}
+          hideIcon
+          minWidth={180}
+          disabled={
+            !question.summary.trim() ||
+            !question.detail.trim() ||
+            question.summary.length > QUESTION_SUMMARY_MAX_LENGTH ||
+            question.detail.length > QUESTION_DETAIL_MAX_LENGTH ||
+            isSubmitting ||
+            !!thumbnailError
+          }
+        />
+      </Box>
+    </>
+  );
+
+  const actionsContent = (
+    <Box sx={(theme) => ({ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' })}>
+      {actionButtons}
+    </Box>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {open && (
+          <Box
+            sx={(theme) => ({
+              flex: 1,
+              minWidth: 400,
+              minHeight: 0,
+              maxWidth: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              background:
+                theme.palette.mode === 'dark'
+                  ? `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`
+                  : `linear-gradient(135deg, ${theme.palette.background.paper} 0%, ${theme.palette.background.default} 100%)`,
+              boxShadow: theme.shadows[8],
+              overflow: 'hidden',
+              ...(isPapirus
+                ? {
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundImage: themeMode === 'dark' ? `url(${papyrusWholeDark})` : `url(${papyrusWhole})`,
+                      backgroundSize: '110%',
+                      backgroundPosition: 'center 25%',
+                      backgroundRepeat: 'no-repeat',
+                      opacity: themeMode === 'dark' ? 0.12 : 0.15,
+                      pointerEvents: 'none',
+                      zIndex: 0,
+                    },
+                    position: 'relative',
+                    '& > *': { position: 'relative', zIndex: 1 },
+                  }
+                : {}),
+            })}
+          >
+            <Box sx={{ borderBottom: (theme) => `1px solid ${theme.palette.divider}`, py: 1.5, px: 3, display: 'flex', alignItems: 'flex-end' }}>
+              <Typography
+                sx={{
+                  background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  fontWeight: 700,
+                  lineHeight: 1.2,
+                }}
+              >
+                {dialogTitle}
+              </Typography>
+            </Box>
+            <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', px: 3, py: 2 }}>
+              {formContent}
+            </Box>
+            {actionsContent}
+          </Box>
+        )}
+        <PreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md">
+          {thumbnailPreview && (
+            <Box sx={{ p: 0, m: 0 }}>
+              <img
+                src={thumbnailPreview}
+                alt="Question thumbnail large preview"
+                style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+              />
+            </Box>
+          )}
+        </PreviewDialog>
+      </>
+    );
+  }
+
   return (
     <Dialog
       open={open}
@@ -239,10 +695,12 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
           borderRadius: 2,
           margin: 1,
           maxHeight: '95vh',
-          minWidth: 700,
+          minWidth: 600,
           width: '100%',
           position: 'relative',
           overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
           ...(isPapirus
             ? {
                 '&::before': {
@@ -281,293 +739,32 @@ const CreateQuestionModal: React.FC<CreateQuestionModalProps> = ({
     >
       <DialogTitle
         sx={{
-          background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          fontWeight: 700,
           borderBottom: (theme) => `1px solid ${theme.palette.divider}`,
-          pb: 2,
+          py: 1.5,
           px: 3,
+          display: 'flex',
+          alignItems: 'flex-end',
         }}
       >
-        {dialogTitle}
+        <Typography
+          component="span"
+          sx={{
+            background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+            backgroundClip: 'text',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            fontWeight: 700,
+            lineHeight: 1.2,
+          }}
+        >
+          {dialogTitle}
+        </Typography>
       </DialogTitle>
-      <DialogContent sx={{ overflow: 'auto', maxHeight: '70vh', px: 3 }}>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary, mb: 1 }}>
-            * {t('validation_title_min', currentLanguage)}, {t('validation_content_min', currentLanguage).toLowerCase()}
-          </Typography>
-          <TextField
-            label={t('question_title', currentLanguage)}
-            fullWidth
-            value={question.title}
-            onChange={(e) => onQuestionChange('title', e.target.value)}
-            error={!!validationErrors.title}
-            helperText={validationErrors.title}
-            sx={(theme) => ({
-              '& .MuiOutlinedInput-root': {
-                color: theme.palette.text.primary,
-                '& fieldset': {
-                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.divider,
-                },
-                '&:hover fieldset': {
-                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: validationErrors.title ? theme.palette.error.main : theme.palette.text.secondary,
-                '&.Mui-focused': {
-                  color: validationErrors.title ? theme.palette.error.main : theme.palette.primary.main,
-                },
-              },
-              '& .MuiFormHelperText-root': {
-                color: theme.palette.error.main,
-              },
-            })}
-          />
-          <Box>
-            <Typography variant="body2" sx={{ mb: 1, color: (theme) => theme.palette.text.secondary }}>
-              {t('question_content', currentLanguage)}
-            </Typography>
-            <RichTextEditor
-              value={question.content}
-              onChange={(value) => onQuestionChange('content', value || '')}
-              minHeight={300}
-              error={!!validationErrors.content}
-              helperText={validationErrors.content}
-            />
-          </Box>
-          <FormControl fullWidth error={!!validationErrors.category}>
-            <InputLabel
-              sx={(theme) => ({
-                color: validationErrors.category ? theme.palette.error.main : theme.palette.text.secondary,
-              })}
-            >
-              {t('category', currentLanguage)}
-            </InputLabel>
-            <Select
-              value={question.category}
-              onChange={(e) => onQuestionChange('category', e.target.value)}
-              sx={(theme) => ({
-                color: theme.palette.text.primary,
-                '& .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.divider,
-                },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.primary.main,
-                },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                  borderColor: validationErrors.category ? theme.palette.error.main : theme.palette.primary.main,
-                },
-                '& .MuiSvgIcon-root': {
-                  color: validationErrors.category ? theme.palette.error.main : theme.palette.text.secondary,
-                },
-              })}
-            >
-              {categories.map((category) => (
-                <MenuItem key={category} value={category}>
-                  {category}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            label={t('tags', currentLanguage)}
-            fullWidth
-            value={question.tags}
-            onChange={(e) => onQuestionChange('tags', e.target.value)}
-            placeholder={t('tags_placeholder', currentLanguage)}
-            error={!!validationErrors.tags}
-            helperText={validationErrors.tags}
-            sx={(theme) => ({
-              '& .MuiOutlinedInput-root': {
-                color: theme.palette.text.primary,
-                '& fieldset': {
-                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.divider,
-                },
-                '&:hover fieldset': {
-                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
-                },
-              },
-              '& .MuiInputLabel-root': {
-                color: validationErrors.tags ? theme.palette.error.main : theme.palette.text.secondary,
-                '&.Mui-focused': {
-                  color: validationErrors.tags ? theme.palette.error.main : theme.palette.primary.main,
-                },
-              },
-              '& .MuiFormHelperText-root': {
-                color: theme.palette.error.main,
-              },
-            })}
-          />
-
-          <Box sx={{ mt: 1 }}>
-            <Typography variant="body2" sx={{ mb: 1, color: (theme) => theme.palette.text.secondary }}>
-              {t('question_thumbnail_label', currentLanguage)}
-            </Typography>
-            <Box
-              sx={(theme) => ({
-                display: 'flex',
-                gap: 2,
-                alignItems: 'center',
-                padding: 2,
-                borderRadius: 2,
-                border: `1px dashed ${theme.palette.divider}`,
-                backgroundColor:
-                  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-              })}
-            >
-              <Box
-                sx={(theme) => ({
-                  width: 96,
-                  height: 96,
-                  borderRadius: 2,
-                  border: `1px solid ${theme.palette.divider}`,
-                  backgroundColor: theme.palette.background.paper,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  position: 'relative',
-                  cursor: thumbnailPreview ? 'pointer' : 'default',
-                })}
-                onClick={(e) => {
-                  if (thumbnailPreview) {
-                    e.stopPropagation();
-                    setPreviewOpen(true);
-                  }
-                }}
-              >
-                {thumbnailPreview ? (
-                  <img
-                    src={thumbnailPreview}
-                    alt="Question thumbnail preview"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <ImageIcon sx={{ fontSize: 36, color: (theme) => theme.palette.text.disabled }} />
-                )}
-
-                {thumbnailPreview && (
-                  <Tooltip title={t('question_thumbnail_preview', currentLanguage)}>
-                    <IconButton
-                      size="small"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 4,
-                        right: 4,
-                        bgcolor: 'rgba(0,0,0,0.35)',
-                        color: 'white',
-                        '&:hover': { bgcolor: 'rgba(0,0,0,0.55)' },
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPreviewOpen(true);
-                      }}
-                    >
-                      <ZoomIn fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary }}>
-                  {helperText}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={handleThumbnailChange}
-                  />
-                  <Button
-                    variant="outlined"
-                    startIcon={<ImageIcon />}
-                    onClick={handleSelectThumbnail}
-                    disabled={isSubmitting}
-                  >
-                    {t('question_thumbnail_select', currentLanguage)}
-                  </Button>
-                  {showRemoveButton && (
-                    <Button
-                      variant="text"
-                      color="secondary"
-                      startIcon={<Delete />}
-                      onClick={handleRemoveThumbnail}
-                      disabled={isSubmitting}
-                    >
-                      {removeButtonLabel}
-                    </Button>
-                  )}
-                </Box>
-                {thumbnailError && (
-                  <Typography variant="caption" color="error">
-                    {thumbnailError}
-                  </Typography>
-                )}
-                {isEditMode && removeExistingThumbnail && (
-                  <Typography variant="caption" color="warning.main">
-                    {t('question_thumbnail_remove_info', currentLanguage)}
-                  </Typography>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        </Stack>
+      <DialogContent sx={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', px: 3, py: 2 }}>
+        {formContent}
       </DialogContent>
-      <DialogActions
-        sx={(theme) => ({ px: 3, py: 2, gap: 2, borderTop: `1px solid ${theme.palette.divider}` })}
-      >
-        <Button
-          onClick={onClose}
-          sx={(theme) => ({
-            color: theme.palette.text.secondary,
-            '&:hover': {
-              background:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 255, 255, 0.1)'
-                  : 'rgba(0, 0, 0, 0.05)',
-            },
-          })}
-        >
-          {t('cancel', currentLanguage)}
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          variant="contained"
-          disabled={!question.title.trim() || !question.content.trim() || isSubmitting || !!thumbnailError}
-          sx={(theme) => ({
-            background:
-              theme.palette.mode === 'dark'
-                ? `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`
-                : `linear-gradient(135deg, ${theme.palette.success.light} 0%, ${theme.palette.success.main} 100%)`,
-            '&:hover': {
-              background:
-                theme.palette.mode === 'dark'
-                  ? `linear-gradient(135deg, ${theme.palette.success.dark} 0%, ${theme.palette.success.main} 100%)`
-                  : `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-            },
-            '&:disabled': {
-              background:
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255, 255, 255, 0.1)'
-                  : 'rgba(0, 0, 0, 0.05)',
-              color: theme.palette.text.disabled,
-            },
-          })}
-        >
-          {isSubmitting ? t(isEditMode ? 'updating' : 'creating', currentLanguage) : submitLabel}
-        </Button>
+      <DialogActions sx={(theme) => ({ px: 3, py: 2, borderTop: `1px solid ${theme.palette.divider}`, display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' })}>
+        {actionButtons}
       </DialogActions>
 
       <PreviewDialog open={previewOpen} onClose={() => setPreviewOpen(false)} maxWidth="md">

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Box, Container, Paper, TextField, Button, Typography, Link, FormControlLabel, Checkbox } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loginUser } from '../../store/auth/login/loginThunks';
 import { checkAdminPermissions } from '../../store/auth/authThunks';
@@ -21,6 +21,7 @@ import ReCaptchaComponent from '../../components/auth/ReCaptcha';
 import axios from 'axios';
 import { getCurrentUser } from '../../store/auth/authThunks';
 import magnefiteBackgroundVideo from '../../asset/videos/vid_ebru.mp4';
+import { showErrorToast } from '../../utils/notificationUtils';
 
 const Login = () => {
   const dispatch = useAppDispatch();
@@ -41,8 +42,84 @@ const Login = () => {
   const [retryCount, setRetryCount] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Video reverse animation refs and state
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isReversing, setIsReversing] = useState(false);
+  const reverseAnimationFrameRef = useRef<number | null>(null);
+  const reverseStartTimeRef = useRef<number | null>(null);
+
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError } =
     useFormValidation(loginSchema);
+
+  const location = useLocation();
+  // Sadece Register'dan Login'e geçince hata temizle (Login'de alınan hata görünsün)
+  useEffect(() => {
+    const curr = location.pathname;
+    if (curr === '/login' || curr === '/register') {
+      const last = sessionStorage.getItem('lastAuthPath') || '';
+      if ((last === '/login' || last === '/register') && last !== curr) {
+        dispatch(clearError());
+      }
+      sessionStorage.setItem('lastAuthPath', curr);
+    }
+  }, [location.pathname, dispatch]);
+
+  // Cleanup reverse animation on unmount
+  useEffect(() => {
+    return () => {
+      if (reverseAnimationFrameRef.current) {
+        cancelAnimationFrame(reverseAnimationFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Reverse animation function for login video
+  const startReverseAnimation = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setIsReversing(true);
+    const duration = video.duration;
+
+    // Video'nun sonuna git ve biraz bekleyip reverse başlat
+    video.currentTime = duration;
+
+    // Kısa bir delay sonra reverse başlat (takılmayı önlemek için)
+    setTimeout(() => {
+      if (!video) return;
+
+      reverseStartTimeRef.current = Date.now();
+      const startTime = duration;
+
+      const animate = () => {
+        if (!video || !reverseStartTimeRef.current) return;
+
+        const elapsed = (Date.now() - reverseStartTimeRef.current) / 1000;
+        const newTime = Math.max(0, startTime - elapsed);
+
+        // currentTime'ı sadece önemli değişikliklerde güncelle (takılmayı azaltmak için)
+        if (Math.abs(video.currentTime - newTime) > 0.05) {
+          video.currentTime = newTime;
+        }
+
+        if (newTime > 0.1) {
+          reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          // Reverse bitti, normal oynatmaya dön
+          if (reverseAnimationFrameRef.current) {
+            cancelAnimationFrame(reverseAnimationFrameRef.current);
+            reverseAnimationFrameRef.current = null;
+          }
+          setIsReversing(false);
+          reverseStartTimeRef.current = null;
+          video.currentTime = 0;
+          video.play();
+        }
+      };
+
+      reverseAnimationFrameRef.current = requestAnimationFrame(animate);
+    }, 50); // 50ms delay - takılmayı önlemek için
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -86,14 +163,14 @@ const Login = () => {
           rememberMe,
           captchaToken
         };
-        
+
         await dispatch(loginUser(loginData)).unwrap();
         logger.user.action('login_successful');
-        
+
         // Login başarılı olduktan sonra admin permission check
         try {
           const adminResult = await dispatch(checkAdminPermissions()).unwrap();
-          
+
           if (adminResult.hasAdminPermission) {
             // Admin ise admin dashboard'a yönlendir
             navigate('/admin/dashboard');
@@ -165,15 +242,16 @@ const Login = () => {
       );
       // JWT'yi kaydet
       const { access_token } = response.data;
-      localStorage.setItem('token', access_token);
+      localStorage.setItem('access_token', access_token);
       // Kullanıcı bilgisini güncelle
       await dispatch(getCurrentUser());
       navigate('/');
     } catch (err: any) {
-      console.log(err);
-      alert(
-        err.response?.data?.message || 'Google ile giriş başarısız oldu.'
-      );
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        t('google_login_failed', currentLanguage);
+      showErrorToast(msg);
     }
   };
 
@@ -185,7 +263,7 @@ const Login = () => {
     if (isNetworkError({ message: error })) {
       return (
         <ErrorAlert
-          error="Bağlantı hatası oluştu. İnternet bağlantınızı kontrol edin."
+          error={t('connection_error', currentLanguage)}
           onRetry={handleRetry}
           onDismiss={handleDismissError}
         />
@@ -223,12 +301,17 @@ const Login = () => {
         <>
           <Box
             component="video"
+            ref={videoRef}
             autoPlay
-            loop
             muted
             playsInline
             aria-hidden
             src={magnefiteBackgroundVideo}
+            onEnded={() => {
+              if (!isReversing) {
+                startReverseAnimation();
+              }
+            }}
             sx={{
               position: 'fixed',
               top: 0,
@@ -236,11 +319,12 @@ const Login = () => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+              filter: mode === 'dark' ? 'brightness(0.35)' : 'none',
               pointerEvents: 'none',
               zIndex: 0,
             }}
           />
+          {mode === 'dark' && (
           <Box
             sx={{
               position: 'fixed',
@@ -248,13 +332,12 @@ const Login = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: mode === 'dark'
-                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
-                : 'linear-gradient(180deg, rgba(225, 226, 228, 0.82) 0%, rgba(209, 212, 216, 0.78) 50%, rgba(209, 212, 216, 0.9) 100%)',
+              background: 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)',
               pointerEvents: 'none',
               zIndex: 0,
             }}
           />
+          )}
         </>
       )}
       <Container component="main" maxWidth="xs" sx={{ position: 'relative', zIndex: 1 }}>
@@ -266,116 +349,116 @@ const Login = () => {
             alignItems: 'center',
           }}
         >
-        <Paper
-          elevation={3}
-          sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-          }}
-        >
-          <Typography component="h1" variant="h4" gutterBottom>
-            {t('login_title', currentLanguage)}
-          </Typography>
-
-          {/* Enhanced Error Display */}
-          {getErrorComponent()}
-
-          {/* Google ile Giriş */}
-          <GoogleLoginButton
-            onSuccess={handleGoogleLogin}
-            onError={() => {
-              alert(t('google_login_failed', currentLanguage));
+          <Paper
+            elevation={3}
+            sx={{
+              padding: 4,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              width: '100%',
             }}
-          />
-          <Typography align="center" sx={{ my: 2 }}>{t('or', currentLanguage)}</Typography>
-
-          {/* Retry Count Display */}
-          {retryCount > 0 && (
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
-              {t('retry_count', currentLanguage)}: {retryCount}
+          >
+            <Typography component="h1" variant="h4" gutterBottom>
+              {t('login_title', currentLanguage)}
             </Typography>
-          )}
 
-          <Box component="form" onSubmit={handleSubmit} autoComplete="on" sx={{ mt: 1, width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label={t('email_address', currentLanguage)}
-              name="email"
-              autoComplete="username"
-              value={formData.email}
-              onChange={handleInputChange}
-              onBlur={handleInputBlur}
-              type="email"
-              error={!!getFieldError('email')}
-              helperText={getFieldError('email')}
-              disabled={loading}
-              InputLabelProps={{ //giriş bilgileri tarayıcı tarafından hatırlanıyor ise küçük yapıyor
-                shrink: true,
-              }}
-              inputProps={{
-                'data-secure': 'true',
-                'data-no-inspect': 'true',
+            {/* Enhanced Error Display */}
+            {getErrorComponent()}
+
+            {/* Google ile Giriş */}
+            <GoogleLoginButton
+              onSuccess={handleGoogleLogin}
+              onError={() => {
+                showErrorToast(t('google_login_failed', currentLanguage));
               }}
             />
-            <SecurePasswordField
-              name="password"
-              label={t('password', currentLanguage)}
-              value={formData.password}
-              onChange={handleInputChange}
-              onBlur={handleInputBlur}
-              error={!!getFieldError('password')}
-              helperText={getFieldError('password')}
-              showPassword={showPassword}
-              onTogglePassword={() => setShowPassword(!showPassword)}
-              disabled={loading}
-            />
-            
-            {/* Beni Hatırla Checkbox */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label={t('remember_me', currentLanguage)}
+            <Typography align="center" sx={{ my: 2 }}>{t('or', currentLanguage)}</Typography>
+
+            {/* Retry Count Display */}
+            {retryCount > 0 && (
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
+                {t('retry_count', currentLanguage)}: {retryCount}
+              </Typography>
+            )}
+
+            <Box component="form" onSubmit={handleSubmit} autoComplete="on" sx={{ mt: 1, width: '100%' }}>
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="email"
+                label={t('email_address', currentLanguage)}
+                name="email"
+                autoComplete="username"
+                value={formData.email}
+                onChange={handleInputChange}
+                onBlur={handleInputBlur}
+                type="email"
+                error={!!getFieldError('email')}
+                helperText={getFieldError('email')}
+                disabled={loading}
+                InputLabelProps={{ //giriş bilgileri tarayıcı tarafından hatırlanıyor ise küçük yapıyor
+                  shrink: true,
+                }}
+                inputProps={{
+                  'data-secure': 'true',
+                  'data-no-inspect': 'true',
+                }}
               />
-              <Link component={RouterLink} to="/forgot-password" variant="body2">
-                {t('forgot_password', currentLanguage)}
-              </Link>
-            </Box>
-            
-            {/* reCAPTCHA */}
-            <ReCaptchaComponent
-              onVerify={handleCaptchaVerify}
-              error={captchaError}
-              disabled={loading}
-            />
+              <SecurePasswordField
+                name="password"
+                label={t('password', currentLanguage)}
+                value={formData.password}
+                onChange={handleInputChange}
+                onBlur={handleInputBlur}
+                error={!!getFieldError('password')}
+                helperText={getFieldError('password')}
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword(!showPassword)}
+                disabled={loading}
+              />
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={loading || !isFormValid || !captchaToken}
-            >
-              {loading ? <ButtonLoading size={24} /> : t('login_button', currentLanguage)}
-            </Button>
-            <Box sx={{ textAlign: 'center' }}>
-              <Link component={RouterLink} to="/register" variant="body2">
-                {t('no_account', currentLanguage)}
-              </Link>
+              {/* Beni Hatırla Checkbox */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={t('remember_me', currentLanguage)}
+                />
+                <Link component={RouterLink} to="/forgot-password" variant="body2">
+                  {t('forgot_password', currentLanguage)}
+                </Link>
+              </Box>
+
+              {/* reCAPTCHA */}
+              <ReCaptchaComponent
+                onVerify={handleCaptchaVerify}
+                error={captchaError}
+                disabled={loading}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                sx={{ mt: 3, mb: 2 }}
+                disabled={loading || !isFormValid || !captchaToken}
+              >
+                {loading ? <ButtonLoading size={24} /> : t('login_button', currentLanguage)}
+              </Button>
+              <Box sx={{ textAlign: 'center' }}>
+                <Link component={RouterLink} to="/register" variant="body2">
+                  {t('no_account', currentLanguage)}
+                </Link>
+              </Box>
             </Box>
-          </Box>
-        </Paper>
+          </Paper>
         </Box>
       </Container>
     </Box>

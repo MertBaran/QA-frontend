@@ -1,4 +1,5 @@
 import api from './api';
+import { formatContentAge } from '../utils/contentAge';
 import {
   AnswerData,
   Answer,
@@ -10,23 +11,7 @@ import {
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
 export const transformAnswerData = (answerData: AnswerData): Answer => {
-  const createdAt = new Date(answerData.createdAt);
-  const now = new Date();
-  const timeDiff = now.getTime() - createdAt.getTime();
-
-  // Zaman hesaplama
-  let timeAgo = '';
-  const minutes = Math.floor(timeDiff / (1000 * 60));
-  const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-  const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    timeAgo = `${minutes} dakika önce`;
-  } else if (hours < 24) {
-    timeAgo = `${hours} saat önce`;
-  } else {
-    timeAgo = `${days} gün önce`;
-  }
+  const timeAgo = formatContentAge(answerData.createdAt);
 
   const userInfo =
     answerData.userInfo || (typeof answerData.user === 'object' ? answerData.user : null);
@@ -64,29 +49,128 @@ export const transformAnswerData = (answerData: AnswerData): Answer => {
     createdAt: answerData.createdAt,
     timeAgo,
     questionId: answerData.questionInfo?._id ?? answerData.question,
-    questionTitle: answerData.questionInfo?.title,
+    questionSummary: answerData.questionInfo?.summary,
+    parentId: answerData.parent?.id,
+    parentType: answerData.parent?.type,
+    ancestors: answerData.ancestors,
+    parentContentInfo: answerData.parentContentInfo,
+    references: answerData.references,
+    metadata: answerData.metadata,
+    attachments: answerData.attachments,
+    deleted: Boolean(answerData.deleted),
   };
 };
 
 class AnswerService {
-  // Soruya ait cevapları getir
-  async getAnswersByQuestion(questionId: string): Promise<Answer[]> {
+  // Soruya ait cevapları getir (pagination ile)
+  async getAnswersByQuestion(
+    questionId: string,
+    page: number = 1,
+    limit: number = 5,
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ): Promise<{
+    data: Answer[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const response = await api.get<AnswersResponse>(`/questions/${questionId}/answers`);
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          data: AnswerData[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+        };
+      }>(`/questions/${questionId}/answers`, {
+        params: { page, limit, sortOrder },
+      });
       if (response.data.success && response.data.data) {
-        return response.data.data.map(transformAnswerData);
+        const answers = response.data.data.data.map(transformAnswerData);
+        return {
+          data: answers,
+          pagination: response.data.data.pagination,
+        };
       }
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
     } catch (error) {
       console.error('Cevaplar getirilirken hata:', error);
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
     }
   }
 
-  // Tek cevap getir
+  // Bir cevabın hangi sayfada olduğunu bul
+  async getAnswerPageNumber(
+    questionId: string,
+    answerId: string,
+    limit: number = 5
+  ): Promise<number | null> {
+    try {
+      const response = await api.get<{
+        success: boolean;
+        data: { page: number | null };
+      }>(`/questions/${questionId}/answers/${answerId}/page`, {
+        params: { limit },
+      });
+      if (response.data.success && response.data.data) {
+        return response.data.data.page;
+      }
+      return null;
+    } catch (error) {
+      console.error('Cevap sayfa numarası getirilirken hata:', error);
+      return null;
+    }
+  }
+
+  // Tek cevap getir (standalone - herhangi bir soruya ait cevap)
   async getAnswerById(answerId: string): Promise<Answer | null> {
     try {
       const response = await api.get<AnswerResponse>(`/answers/${answerId}`);
+      if (response.data.success && response.data.data) {
+        return transformAnswerData(response.data.data);
+      }
+      return null;
+    } catch (error) {
+      console.error('Cevap getirilirken hata:', error);
+      return null;
+    }
+  }
+
+  // Soru bağlamında tek cevap getir (question-scoped endpoint)
+  async getAnswerByQuestionAndId(questionId: string, answerId: string): Promise<Answer | null> {
+    try {
+      const response = await api.get<AnswerResponse>(`/questions/${questionId}/answers/${answerId}`);
       if (response.data.success && response.data.data) {
         return transformAnswerData(response.data.data);
       }
@@ -182,17 +266,63 @@ class AnswerService {
     }
   }
 
-  // Kullanıcıya ait cevapları getir
-  async getAnswersByUser(userId: string): Promise<Answer[]> {
+  // Kullanıcıya ait cevapları getir (pagination ile)
+  async getAnswersByUser(
+    userId: string,
+    page: number = 1,
+    limit: number = 10,
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ): Promise<{
+    data: Answer[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     try {
-      const response = await api.get<AnswersResponse>(`/answers/user/${userId}`);
+      // Cevaplar için daha uzun timeout (30 saniye)
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          data: AnswerData[];
+          pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNext: boolean;
+            hasPrev: boolean;
+          };
+        };
+      }>(`/answers/user/${userId}`, {
+        params: { page, limit, sortOrder },
+        timeout: 30000,
+      });
       if (response.data.success && response.data.data) {
-        return response.data.data.map(transformAnswerData);
+        return {
+          data: response.data.data.data.map(transformAnswerData),
+          pagination: response.data.data.pagination,
+        };
       }
-      return [];
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit,
+          total: 0,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
     } catch (error) {
       console.error('Kullanıcı cevapları getirilirken hata:', error);
-      return [];
+      // Hata durumunda throw et ki component'te yakalanabilsin
+      throw error;
     }
   }
 }

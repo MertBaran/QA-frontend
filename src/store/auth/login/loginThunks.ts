@@ -18,12 +18,15 @@ export const loginUser = createAsyncThunk<
 >('auth/login', async (credentials, { rejectWithValue, getState, dispatch }) => {
   try {
     const response = await authService.login(credentials);
-    localStorage.setItem('token', response.token);
+    localStorage.setItem('access_token', response.token);
 
     // Login sonrası admin permission'ları kontrol et
     try {
       const adminPermissions = await authService.checkAdminPermissions();
-      dispatch(setAdminPermissions(adminPermissions));
+      dispatch(setAdminPermissions({
+        hasAdminPermission: adminPermissions.hasAdminPermission,
+        roles: adminPermissions.permissions,
+      }));
       logger.auth.success('Admin permissions checked after login');
     } catch (permissionError) {
       logger.auth.error('Failed to check admin permissions after login', permissionError);
@@ -31,7 +34,7 @@ export const loginUser = createAsyncThunk<
       dispatch(
         setAdminPermissions({
           hasAdminPermission: false,
-          permissions: [],
+          roles: [],
         }),
       );
     }
@@ -50,11 +53,18 @@ export const loginUser = createAsyncThunk<
       credentials: { email: credentials.email },
     });
 
-    // Return more specific error message
+    // API returns { error, message } - extract user-friendly message
+    const apiMessage =
+      error.response?.data?.error ||
+      error.response?.data?.message;
     const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      'Login failed. Please check your credentials.';
+      apiMessage ||
+      (error.response?.status === 401
+        ? 'Invalid credentials'
+        : error.message?.includes('404')
+          ? 'Invalid credentials'
+          : error.message ||
+            'Login failed. Please check your credentials.');
 
     return rejectWithValue(errorMessage);
   }

@@ -56,7 +56,7 @@ export const createQuestion = createAsyncThunk<Question, CreateQuestionData>(
   'questions/createQuestion',
   async (questionData, { rejectWithValue }) => {
     try {
-      logger.user.action('create_question', { title: questionData.title });
+      logger.user.action('create_question', { summary: questionData.summary });
       const question = await questionService.createQuestion(questionData);
       if (!question) {
         return rejectWithValue('Failed to create question');
@@ -66,7 +66,7 @@ export const createQuestion = createAsyncThunk<Question, CreateQuestionData>(
     } catch (error) {
       const errorInfo = await handleError(error, {
         action: 'createQuestion',
-        questionData: { title: questionData.title },
+        questionData: { summary: questionData.summary },
       });
       return rejectWithValue(errorInfo.message);
     }
@@ -79,7 +79,7 @@ export const updateQuestion = createAsyncThunk<
   { id: string; questionData: UpdateQuestionData }
 >('questions/updateQuestion', async ({ id, questionData }, { rejectWithValue }) => {
   try {
-    logger.user.action('update_question', { id, title: questionData.title });
+    logger.user.action('update_question', { id, summary: questionData.summary });
     const question = await questionService.updateQuestion(id, questionData);
     if (!question) {
       return rejectWithValue('Failed to update question');
@@ -90,7 +90,7 @@ export const updateQuestion = createAsyncThunk<
     const errorInfo = await handleError(error, {
       action: 'updateQuestion',
       questionId: id,
-      questionData: { title: questionData.title },
+      questionData: { summary: questionData.summary },
     });
     return rejectWithValue(errorInfo.message);
   }

@@ -75,10 +75,22 @@ const answerSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(getAnswersByQuestion.fulfilled, (state, action: PayloadAction<Answer[]>) => {
+      .addCase(getAnswersByQuestion.fulfilled, (state, action: PayloadAction<{
+        data: Answer[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+          hasNext: boolean;
+          hasPrev: boolean;
+        };
+      }>) => {
         state.loading = false;
-        state.answers = action.payload;
-        state.totalAnswers = action.payload.length;
+        state.answers = action.payload.data;
+        state.totalAnswers = action.payload.pagination.total;
+        state.currentPage = action.payload.pagination.page;
+        state.answersPerPage = action.payload.pagination.limit;
       })
       .addCase(getAnswersByQuestion.rejected, (state, action) => {
         state.loading = false;
@@ -146,14 +158,17 @@ const answerSlice = createSlice({
       // Delete answer
       .addCase(deleteAnswer.fulfilled, (state, action) => {
         state.loading = false;
-        // The answer ID is in action.meta.arg
         const answerId = (action as any).meta.arg.answerId as string;
-        state.answers = state.answers.filter((a) => a.id !== answerId);
-        state.totalAnswers -= 1;
-
-        // Clear current answer if it's the deleted one
-        if (state.currentAnswer && state.currentAnswer.id === answerId) {
-          state.currentAnswer = null;
+        const index = state.answers.findIndex((a) => a.id === answerId);
+        if (index !== -1) {
+          state.answers[index] = {
+            ...state.answers[index],
+            deleted: true,
+            content: '',
+            references: [],
+            metadata: [],
+            attachments: [],
+          };
         }
       })
       .addCase(deleteAnswer.pending, (state) => {

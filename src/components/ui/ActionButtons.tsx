@@ -6,12 +6,15 @@ import {
   ThumbDown,
   ThumbDownOutlined,
   Delete,
-  HelpOutline,
+  ContactSupport,
   Edit,
+  ChatBubbleOutline,
 } from '@mui/icons-material';
 import BookmarkButton from './BookmarkButton';
 import { t } from '../../utils/translations';
-import { useAppSelector } from '../../store/hooks';
+import { getNegativeActionColor } from '../../utils/themeNegativeColor';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { requestMessageCompose } from '../../store/messaging/messagingSlice';
 import { useTheme } from '@mui/material/styles';
 import type { AddBookmarkRequest } from '../../types/bookmark';
 
@@ -47,6 +50,8 @@ interface ActionButtonsProps {
   onDelete?: (e: React.MouseEvent) => void;
   onHelp?: (e: React.MouseEvent) => void;
   onEdit?: (e: React.MouseEvent) => void;
+  messageRecipient?: { id: string; name: string; profile_image?: string };
+  mention?: { questionId: string; answerId?: string; commentId?: string };
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
@@ -74,25 +79,17 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   onDelete,
   onHelp,
   onEdit,
+  messageRecipient,
+  mention,
 }) => {
   const theme = useTheme();
+  const dispatch = useAppDispatch();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
   const { name: themeName } = useAppSelector(state => state.theme);
   
   // Get positive colors from theme
   const positiveColor = (theme.palette as any).custom?.positive || theme.palette.success.main;
-  
-  // Theme-specific negative colors
-  const getNegativeColor = () => {
-    if (themeName === 'molume') {
-      return '#FF3B30'; // Red
-    } else if (themeName === 'papirus') {
-      return theme.palette.mode === 'dark' ? '#A0522D' : '#8B4513'; // Sienna brown
-    } else {
-      return '#DB7093'; // Pink-red
-    }
-  };
   
   // Theme-specific positive colors for like button
   const getPositiveColor = () => {
@@ -103,8 +100,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     return positiveColor;
   };
   
-  const negativeColorFinal = getNegativeColor();
+  const negativeColorFinal = getNegativeActionColor(themeName, theme.palette.mode);
   const positiveColorFinal = getPositiveColor();
+  const askHoverColor = theme.palette.mode === 'dark' ? '#F0C14B' : '#E6B325';
   
   return (
     <Box sx={(theme) => {
@@ -128,66 +126,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       
       return baseStyles;
     }}>
-      {showBookmark && (
-        <Box sx={{ 
-          display: 'inline-flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          width: '40px',
-          height: '40px',
-          flexShrink: 0,
-          '& > span': {
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '40px',
-            height: '40px',
-            '& .MuiIconButton-root': {
-              width: '40px !important',
-              height: '40px !important',
-              padding: '0 !important',
-              minWidth: '40px',
-              minHeight: '40px',
-            },
-          },
-        }}>
-          <BookmarkButton 
-            targetType={targetType}
-            targetId={targetId} 
-            targetData={targetData}
-            isBookmarked={isBookmarked}
-            bookmarkId={bookmarkId}
-          />
-        </Box>
-      )}
-
-      {showEdit && onEdit && (
-        <Tooltip title={t('edit_question', currentLanguage)}>
-          <IconButton
-            size="small"
-            onClick={onEdit}
-            sx={{
-              color: theme.palette.text.secondary,
-              width: '40px',
-              height: '40px',
-              padding: 0,
-              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
-              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
-              '&:hover': {
-                color: theme.palette.primary.main,
-                backgroundColor:
-                  theme.palette.mode === 'dark'
-                    ? `${theme.palette.primary.main}22`
-                    : `${theme.palette.primary.main}11`,
-                borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
-              },
-            }}
-          >
-            <Edit />
-          </IconButton>
-        </Tooltip>
-      )}
-
       {showLike && onLike && onUnlike && (
         <Tooltip title={isLiked ? t('unlike', currentLanguage) : t('like', currentLanguage)}>
           <IconButton
@@ -239,6 +177,78 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           </IconButton>
         </Tooltip>
       )}
+
+      {showBookmark && (
+        <Box sx={{ 
+          display: 'inline-flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          width: '40px',
+          height: '40px',
+          flexShrink: 0,
+          '& > span': {
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '40px',
+            height: '40px',
+            '& .MuiIconButton-root': {
+              width: '40px !important',
+              height: '40px !important',
+              padding: '0 !important',
+              minWidth: '40px',
+              minHeight: '40px',
+            },
+          },
+        }}>
+          <BookmarkButton 
+            targetType={targetType}
+            targetId={targetId} 
+            targetData={targetData}
+            isBookmarked={isBookmarked}
+            bookmarkId={bookmarkId}
+          />
+        </Box>
+      )}
+
+      {messageRecipient && mention?.questionId && user?.id && user.id !== messageRecipient.id && (
+        <Tooltip title={t('send_message', currentLanguage)}>
+          <IconButton
+            size="small"
+            onClick={event => {
+              event.stopPropagation();
+              dispatch(requestMessageCompose({
+                recipient: {
+                  id: messageRecipient.id,
+                  name: messageRecipient.name,
+                  profile_image: messageRecipient.profile_image,
+                },
+                questionId: mention.questionId,
+                answerId: mention.answerId,
+                commentId: mention.commentId,
+              }));
+            }}
+            sx={{
+              color: theme.palette.text.secondary,
+              width: '40px',
+              height: '40px',
+              padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+              '&:hover': {
+                color: theme.palette.primary.main,
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? `${theme.palette.primary.main}22`
+                    : `${theme.palette.primary.main}11`,
+                borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
+              },
+            }}
+          >
+            <ChatBubbleOutline />
+          </IconButton>
+        </Tooltip>
+      )}
       
       {showDelete && canDelete && onDelete && (
         <Tooltip title={t('delete', currentLanguage)}>
@@ -267,7 +277,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         </Tooltip>
       )}
       
-      {/* Help button rendered last to appear on top */}
       {showHelp && user && onHelp && (
         <Tooltip title={t('ask_question', currentLanguage)}>
           <IconButton
@@ -283,15 +292,42 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
               position: 'relative',
               zIndex: 30,
               '&:hover': {
+                color: askHoverColor,
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? `${askHoverColor}22`
+                  : `${askHoverColor}22`,
+                borderColor: theme.palette.mode === 'light' ? askHoverColor : undefined,
+              },
+            }}
+          >
+            <ContactSupport />
+          </IconButton>
+        </Tooltip>
+      )}
+
+      {showEdit && onEdit && (
+        <Tooltip title={t('edit_question', currentLanguage)}>
+          <IconButton
+            size="small"
+            onClick={onEdit}
+            sx={{
+              color: theme.palette.text.secondary,
+              width: '40px',
+              height: '40px',
+              padding: 0,
+              border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
+              backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
+              '&:hover': {
                 color: theme.palette.primary.main,
-                backgroundColor: theme.palette.mode === 'dark' 
-                  ? `${theme.palette.primary.main}22` 
-                  : `${theme.palette.primary.main}11`,
+                backgroundColor:
+                  theme.palette.mode === 'dark'
+                    ? `${theme.palette.primary.main}22`
+                    : `${theme.palette.primary.main}11`,
                 borderColor: theme.palette.mode === 'light' ? theme.palette.primary.main : undefined,
               },
             }}
           >
-            <HelpOutline />
+            <Edit />
           </IconButton>
         </Tooltip>
       )}

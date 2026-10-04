@@ -2,8 +2,8 @@ import type { User } from './User';
 
 export interface Question {
   _id: string;
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   user: string | User;
   createdAt: string;
   updatedAt: string;
@@ -23,8 +23,8 @@ export interface Answer {
 }
 
 export interface AskQuestionData {
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   // Diğer alanlar eklenebilir
 }
 

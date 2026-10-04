@@ -20,9 +20,9 @@ export const profile = {
     de: 'Noch keine Aktivitäten',
   },
   member_since: {
-    tr: 'Üyelik Tarihi',
-    en: 'Member Since',
-    de: 'Mitglied seit',
+    tr: '{date} tarihinde katıldı',
+    en: 'Joined on {date}',
+    de: 'Beigetreten am {date}',
   },
   location: {
     tr: 'Konum',
@@ -53,6 +53,16 @@ export const profile = {
     tr: 'Profil yüklenirken hata oluştu',
     en: 'Error loading profile',
     de: 'Fehler beim Laden des Profils',
+  },
+  error_loading_questions: {
+    tr: 'Sorular yüklenirken hata oluştu',
+    en: 'Error loading questions',
+    de: 'Fehler beim Laden der Fragen',
+  },
+  error_loading_answers: {
+    tr: 'Cevaplar yüklenirken hata oluştu',
+    en: 'Error loading answers',
+    de: 'Fehler beim Laden der Antworten',
   },
   profile_updated_success: {
     tr: 'Profil başarıyla güncellendi',

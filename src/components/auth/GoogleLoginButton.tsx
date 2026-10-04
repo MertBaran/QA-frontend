@@ -6,9 +6,10 @@ import { useAppSelector } from '../../store/hooks';
 interface GoogleLoginButtonProps {
   onSuccess: (credential: string) => void;
   onError: () => void;
+  text?: 'signin_with' | 'signup_with';
 }
 
-const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess, onError }) => {
+const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess, onError, text = 'signin_with' }) => {
   const { currentLanguage } = useAppSelector(state => state.language);
 
   return (
@@ -21,7 +22,7 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess, onErro
         }}
         onError={onError}
         width="100%"
-        text="signin_with"
+        text={text}
         locale={currentLanguage}
         theme="filled_blue"
         size="large"

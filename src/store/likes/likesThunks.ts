@@ -14,3 +14,16 @@ export const fetchLikedUsers = createAsyncThunk<User[], string[]>(
     }
   },
 );
+
+// Fetch users who disliked a content (answer or question)
+export const fetchDislikedUsers = createAsyncThunk<User[], string[]>(
+  'likes/fetchDislikedUsers',
+  async (userIds, { rejectWithValue }) => {
+    try {
+      const users = await Promise.all(userIds.map((id) => userService.getUserById(id)));
+      return users.filter((u): u is User => u !== null);
+    } catch (error) {
+      return rejectWithValue('Failed to fetch disliked users');
+    }
+  },
+);
