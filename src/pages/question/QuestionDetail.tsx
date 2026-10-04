@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Container,
@@ -14,7 +14,12 @@ import {
   Alert,
   useTheme,
   Dialog,
+  alpha,
   Pagination,
+  Tooltip,
+  Tabs,
+  Tab,
+  Collapse,
 } from '@mui/material';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
@@ -29,32 +34,71 @@ import {
   Send,
   AccountTree,
   Quiz,
+  ChevronLeft,
+  ChevronRight,
+  Close,
+  ExpandMore,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
-import { Question, UpdateQuestionData } from '../../types/question';
+import { getScrollbarSx } from '../../theme/scrollbarStyles';
+import { Question, UpdateQuestionData, CreateQuestionData, QuestionReference, QuestionMetadataItem } from '../../types/question';
+import type { FeatureTableRow } from '../../types/questionFeatureTemplate';
 import { Answer } from '../../types/answer';
+import { filledMetadata, filledReferences, referenceNeedsDescription } from '../../utils/filledEntries';
+import { referenceNotchColor } from '../../theme/referenceNotchColor';
+import ReportContentButton from '../../components/ui/ReportContentButton';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import { commentService } from '../../services/commentService';
+import type { CommentItem } from '../../types/comment';
+import CommentThread from '../../components/comment/CommentThread';
+import DeferredImage from '../../components/ui/DeferredImage';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
+import ContentTime from '../../components/ui/ContentTime';
 import ActionButtons from '../../components/ui/ActionButtons';
 import LikesModal from '../../components/ui/LikesModal';
 import ParentInfoChip from '../../components/ui/ParentInfoChip';
 import { QuestionDetailSkeleton } from '../../components/ui/skeleton';
-import AskQuestionModal from '../../components/question/AskQuestionModal';
 import RelatedQuestionsPopover from '../../components/question/RelatedQuestionsPopover';
 import RichTextEditor, { CONTENT_MAX_LENGTH } from '../../components/ui/RichTextEditor';
+import {
+  QUESTION_SUMMARY_MIN_LENGTH,
+  QUESTION_SUMMARY_MAX_LENGTH,
+  QUESTION_DETAIL_MIN_LENGTH,
+  QUESTION_DETAIL_MAX_LENGTH,
+  TAG_MAX_LENGTH,
+  TAG_MAX_COUNT,
+} from '../../constants/questionValidation';
 import ExpandableMarkdown from '../../components/ui/ExpandableMarkdown';
 import AncestorsDrawer from '../../components/question/AncestorsDrawer';
 import AnswerCard from '../../components/answer/AnswerCard';
+import AnswerComposeExtras, { type AnswerFileDraft } from '../../components/answer/AnswerComposeExtras';
+import InlineSidePanel from '../../components/ui/InlineSidePanel';
+import ItemsPerPageSelector, { DateSortOrder, dateSortToApiOrder } from '../../components/home/ItemsPerPageSelector';
 import { openModal, closeModal, openDislikesModal, closeDislikesModal } from '../../store/likes/likesSlice';
 import { fetchLikedUsers, fetchDislikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
-import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
-import CreateQuestionModal from '../../components/question/CreateQuestionModal';
+import { updateAnswerInList } from '../../store/answers/answerSlice';
+import CreateQuestionFlow from '../../components/question/CreateQuestionFlow';
+import type { CreateQuestionLeftState } from '../../components/question/CreateQuestionLeftModal';
+import QuestionDetailLeftPanel, {
+  type QuestionDetailFeatureFieldRow,
+} from '../../components/question/QuestionDetailLeftPanel';
+import QuestionDetailRightPanel from '../../components/question/QuestionDetailRightPanel';
 import { contentAssetService, uploadFileToPresignedUrl } from '../../services/contentAssetService';
+import { questionFeatureTemplateService } from '../../services/questionFeatureTemplateService';
+import {
+  FeatureFieldFormValue,
+  parseFeatureFieldDefs,
+  valuesApiToForm,
+  valuesFormToApi,
+  formatFeatureFieldSummary,
+  formatFeatureFieldDetailText,
+  tableRowFromApiToForm,
+} from '../../utils/featureTemplateUtils';
 import { updateQuestion as updateQuestionThunk } from '../../store/questions/questionThunks';
 import { updateQuestionInList } from '../../store/home/homeSlice';
 import { showSuccessToast, showErrorToast } from '../../utils/notificationUtils';
@@ -162,9 +206,25 @@ const ActionButtonsContainer = styled(Box)(({ theme }) => ({
   },
 }));
 
-const QuestionDetail: React.FC = () => {
+export type QuestionDetailProps = {
+  /** Route param yerine doğrudan soru id (ör. Soruştur sağ panel) */
+  questionId?: string;
+  /** Layout / geniş minWidth olmadan gömülü gösterim */
+  embedded?: boolean;
+  /** Gömülü cevap vurgusu (#answer- yerine) */
+  highlightAnswerId?: string;
+  onClose?: () => void;
+};
+
+const QuestionDetail: React.FC<QuestionDetailProps> = ({
+  questionId: questionIdProp,
+  embedded = false,
+  highlightAnswerId: highlightAnswerIdProp,
+  onClose,
+}) => {
   const theme = useTheme();
-  const { id } = useParams<{ id: string }>();
+  const { id: paramId } = useParams<{ id: string }>();
+  const id = questionIdProp || paramId;
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
@@ -188,20 +248,47 @@ const QuestionDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [newAnswer, setNewAnswer] = useState('');
+  const [answerReferences, setAnswerReferences] = useState<QuestionReference[]>([]);
+  const [answerMetadata, setAnswerMetadata] = useState<QuestionMetadataItem[]>([]);
+  const [answerFiles, setAnswerFiles] = useState<AnswerFileDraft[]>([]);
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [answerValidationError, setAnswerValidationError] = useState<string>('');
   const [highlightedAnswerId, setHighlightedAnswerId] = useState<string | null>(null);
+  const embeddedScrollRef = useRef<HTMLDivElement | null>(null);
+
+  /** Gömülü panelde sadece detay scrollbar'ını kaydır; dış sayfaya dokunma */
+  const scrollElementInView = (element: HTMLElement, block: 'center' | 'start' = 'center') => {
+    const container = embedded && embeddedScrollRef.current ? embeddedScrollRef.current : null;
+    if (container) {
+      const elRect = element.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+      const align =
+        block === 'start'
+          ? elRect.top - cRect.top - 12
+          : elRect.top - cRect.top - cRect.height / 2 + elRect.height / 2;
+      container.scrollTo({
+        top: Math.max(0, container.scrollTop + align),
+        behavior: 'smooth',
+      });
+      return;
+    }
+    element.scrollIntoView({ behavior: 'smooth', block });
+  };
 
   // Parent question/answer state
   const [parentQuestion, setParentQuestion] = useState<Question | null>(null);
   const [parentAnswer, setParentAnswer] = useState<Answer | null>(null);
   const [parentAnswerQuestion, setParentAnswerQuestion] = useState<Question | null>(null);
 
-  // Ask question modal states
+  // Ask question modal states (CreateQuestionFlow - merkezi modal)
   const [askQuestionModalOpen, setAskQuestionModalOpen] = useState(false);
   const [askQuestionMode, setAskQuestionMode] = useState<'question' | 'answer' | null>(null);
   const [targetQuestionId, setTargetQuestionId] = useState<string | null>(null);
   const [targetAnswerId, setTargetAnswerId] = useState<string | null>(null);
+  const [askQuestionForm, setAskQuestionForm] = useState({ summary: '', detail: '', category: '', tags: '' });
+  const [askQuestionValidationErrors, setAskQuestionValidationErrors] = useState<{ summary?: string; detail?: string; category?: string; tags?: string }>({});
+  const [askQuestionSubmitting, setAskQuestionSubmitting] = useState(false);
 
   // Related questions popover states
   const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
@@ -221,22 +308,82 @@ const QuestionDetail: React.FC = () => {
   // Edit question modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editQuestionForm, setEditQuestionForm] = useState({
-    title: '',
-    content: '',
+    summary: '',
+    detail: '',
     category: '',
     tags: '',
   });
   const [editValidationErrors, setEditValidationErrors] = useState<{
-    title?: string;
-    content?: string;
+    summary?: string;
+    detail?: string;
     category?: string;
     tags?: string;
   }>({});
   const [updatingQuestion, setUpdatingQuestion] = useState(false);
+  const [editInitialLeftState, setEditInitialLeftState] = useState<
+    CreateQuestionLeftState | undefined
+  >(undefined);
+  const [featureTemplateDisplayName, setFeatureTemplateDisplayName] = useState<string | null>(null);
+  const [featureFieldDisplayRows, setFeatureFieldDisplayRows] = useState<QuestionDetailFeatureFieldRow[]>([]);
   const [questionThumbnailPreviewOpen, setQuestionThumbnailPreviewOpen] = useState(false);
   const [answersPage, setAnswersPage] = useState(1);
-  const answersLimit = 5;
+  const [answersLimit, setAnswersLimit] = useState(10);
+  const [dateSort, setDateSort] = useState<DateSortOrder>('newest');
+  const [hoveredRefIndex, setHoveredRefIndex] = useState<number | null>(null);
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'answers' | 'comments'>('answers');
+  const [answerComposerOpen, setAnswerComposerOpen] = useState(false);
+  const [answerRefsOpen, setAnswerRefsOpen] = useState(false);
+  const [reactionMention, setReactionMention] = useState<{ questionId: string; answerId?: string } | null>(null);
   const [questionProfileImageUrl, setQuestionProfileImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!question?.featureTemplateId) {
+      setFeatureTemplateDisplayName(null);
+      setFeatureFieldDisplayRows([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const tpl = await questionFeatureTemplateService.getById(question.featureTemplateId!);
+      if (cancelled || !tpl) return;
+      setFeatureTemplateDisplayName(tpl.name);
+      const defs = parseFeatureFieldDefs(tpl.currentVersion?.fields);
+      const vals = question.featureFieldValues ?? {};
+      setFeatureFieldDisplayRows(
+        defs.map((d) => {
+          const raw = vals[d.fieldId];
+          const has =
+            raw != null &&
+            raw !== '' &&
+            !(typeof raw === 'string' && raw.trim() === '') &&
+            !(Array.isArray(raw) && raw.length === 0);
+          if (!has) {
+            return { title: d.title, summary: '—', detail: '—' };
+          }
+          const base: QuestionDetailFeatureFieldRow = {
+            title: d.title,
+            summary: formatFeatureFieldSummary(d, raw),
+            detail: formatFeatureFieldDetailText(d, raw),
+          };
+          if (d.type === 'table' && d.columns?.length && Array.isArray(raw)) {
+            return {
+              ...base,
+              tableData: {
+                columns: d.columns,
+                rows: (raw as FeatureTableRow[]).map((row) => tableRowFromApiToForm(row, d.columns!)),
+              },
+            };
+          }
+          return base;
+        }),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [question?.id, question?.featureTemplateId, question?.featureFieldValues]);
 
   // Soru ve cevapları yükle
   useEffect(() => {
@@ -250,7 +397,12 @@ const QuestionDetail: React.FC = () => {
         // Soru ve cevapları paralel olarak yükle
         const [questionData] = await Promise.all([
           questionService.getQuestionById(id),
-          dispatch(getAnswersByQuestion({ questionId: id, page: answersPage, limit: answersLimit }))
+          dispatch(getAnswersByQuestion({
+            questionId: id,
+            page: answersPage,
+            limit: answersLimit,
+            sortOrder: dateSortToApiOrder(dateSort),
+          }))
         ]);
 
         if (questionData) {
@@ -359,7 +511,136 @@ const QuestionDetail: React.FC = () => {
     };
 
     loadQuestionData();
-  }, [id, dispatch, answersPage]);
+  }, [id, dispatch, answersPage, answersLimit, dateSort]);
+
+  useEffect(() => {
+    if (!question || !user) return;
+    const ownerId = question.userInfo?._id || question.author.id;
+    if (ownerId !== user.id) return;
+    const references = filledReferences(question.references);
+    const metadata = filledMetadata(question.metadata);
+    const dirty =
+      references.length !== (question.references?.length ?? 0) ||
+      metadata.length !== (question.metadata?.length ?? 0);
+    if (!dirty) return;
+    let cancelled = false;
+    questionService
+      .updateQuestion(question.id, { references, metadata })
+      .then(updated => {
+        if (!cancelled && updated) setQuestion(updated);
+      })
+      .catch(err => {
+        console.error('Boş referans veya metadata silinemedi:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [question, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const dirty = answers.filter(answer => {
+      const ownerId = answer.userInfo?._id || answer.author.id;
+      if (ownerId !== user.id) return false;
+      return (
+        filledReferences(answer.references).length !== (answer.references?.length ?? 0) ||
+        filledMetadata(answer.metadata).length !== (answer.metadata?.length ?? 0)
+      );
+    });
+    if (dirty.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const answer of dirty) {
+        try {
+          const updated = await answerService.updateAnswer(answer.id, {
+            content: answer.content,
+            references: filledReferences(answer.references),
+            metadata: filledMetadata(answer.metadata),
+          });
+          if (!cancelled && updated) {
+            dispatch(updateAnswerInList({ answerId: answer.id, updates: updated }));
+          }
+        } catch (err) {
+          console.error('Boş cevap referansı silinemedi:', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [answers, user, dispatch]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    commentService
+      .listForQuestion(id)
+      .then(list => {
+        if (!cancelled) setComments(list);
+      })
+      .catch(err => {
+        console.error('Yorumlar yüklenirken hata:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const refreshComments = async () => {
+    if (!id) return;
+    const list = await commentService.listForQuestion(id);
+    setComments(list);
+  };
+
+  const handleCreateComment = async (
+    targetType: 'question' | 'answer',
+    targetId: string,
+    body: string,
+    parentId?: string,
+  ) => {
+    try {
+      await commentService.create({ body, targetType, targetId, parentId });
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum gönderilemedi:', err);
+      showErrorToast(t('write_comment', currentLanguage));
+      throw err;
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, body: string) => {
+    try {
+      await commentService.update(commentId, body);
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum güncellenemedi:', err);
+      showErrorToast(t('edit_comment', currentLanguage));
+      throw err;
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { confirmService } = await import('../../services/confirmService');
+    const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
+    if (!confirmed) return;
+
+    try {
+      await commentService.remove(commentId);
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum silinemedi:', err);
+      showErrorToast(t('delete_comment', currentLanguage));
+    }
+  };
+
+  const handleReactComment = async (commentId: string, type: 'like' | 'dislike') => {
+    try {
+      const updated = await commentService.react(commentId, type);
+      setComments(current => current.map(item => (item.id === commentId ? updated : item)));
+    } catch (err) {
+      console.error('Yorum tepkisi kaydedilemedi:', err);
+    }
+  };
 
   // Fetch bookmarks once on mount if authenticated (so QuestionDetail can show bookmark state)
   useEffect(() => {
@@ -389,60 +670,63 @@ const QuestionDetail: React.FC = () => {
     loadRelatedCounts();
   }, [answers]);
 
+  const resolveAnswerHighlight = async (answerId: string, clearHash = false) => {
+    if (!id) return;
+    const pageNumber = await answerService.getAnswerPageNumber(
+      id,
+      answerId,
+      answersLimit
+    );
+    if (pageNumber) {
+      if (pageNumber !== answersPage) {
+        setAnswersPage(pageNumber);
+        return;
+      }
+      setHighlightedAnswerId(answerId);
+      setTimeout(() => {
+        const element = document.getElementById(`answer-${answerId}`);
+        if (element) {
+          scrollElementInView(element, 'center');
+          setTimeout(() => {
+            setHighlightedAnswerId(null);
+            if (clearHash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }, 3000);
+        }
+      }, 100);
+    } else {
+      setHighlightedAnswerId(null);
+    }
+  };
+
   // Hash'ten cevap ID'sini al ve highlight et
   useEffect(() => {
     const handleHashChange = async () => {
       const hash = window.location.hash;
       if (hash && hash.startsWith('#answer-')) {
         const answerId = hash.substring('#answer-'.length);
-
-        if (!id) return;
-
-        // Cevabın hangi sayfada olduğunu bul
-        const pageNumber = await answerService.getAnswerPageNumber(id, answerId, answersLimit);
-
-        if (pageNumber) {
-          // Eğer cevap mevcut sayfada değilse, o sayfaya git
-          if (pageNumber !== answersPage) {
-            setAnswersPage(pageNumber);
-            // Sayfa değiştiğinde cevaplar yüklenecek, sonra highlight edeceğiz
-            // Bu yüzden highlight'ı biraz geciktiriyoruz
-            return; // Sayfa değişti, cevaplar yüklendikten sonra tekrar kontrol edilecek
-          } else {
-            // Cevap mevcut sayfada, direkt highlight et
-            setHighlightedAnswerId(answerId);
-            setTimeout(() => {
-              const element = document.getElementById(`answer-${answerId}`);
-              if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                // Remove highlight after animation
-                setTimeout(() => {
-                  setHighlightedAnswerId(null);
-                  window.history.replaceState(null, '', window.location.pathname);
-                }, 3000);
-              }
-            }, 100);
-          }
-        } else {
-          // Cevap bulunamadı
-          setHighlightedAnswerId(null);
-        }
-      } else {
+        setDetailTab('answers');
+        await resolveAnswerHighlight(answerId, true);
+      } else if (!highlightAnswerIdProp) {
         setHighlightedAnswerId(null);
       }
     };
 
-    // Check hash on mount and when hash changes
     handleHashChange();
-
-    // Listen for hash changes
     window.addEventListener('hashchange', handleHashChange);
-
     return () => {
       window.removeEventListener('hashchange', handleHashChange);
     };
-  }, [id, answersLimit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, answersLimit, answersPage]);
+
+  // Gömülü panelden gelen cevap vurgusu
+  useEffect(() => {
+    if (!highlightAnswerIdProp || !id) return;
+    void resolveAnswerHighlight(highlightAnswerIdProp, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightAnswerIdProp, id, answersLimit, answersPage, answers]);
 
   // Sayfa değiştiğinde veya cevaplar yüklendiğinde hash'i kontrol et
   useEffect(() => {
@@ -454,12 +738,12 @@ const QuestionDetail: React.FC = () => {
       const answerExists = answers.some(a => a.id === answerId);
 
       if (answerExists) {
-        // Cevap mevcut sayfada, highlight et
+        setDetailTab('answers');
         setHighlightedAnswerId(answerId);
         setTimeout(() => {
           const element = document.getElementById(`answer-${answerId}`);
           if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            scrollElementInView(element, 'center');
 
             // Remove highlight after animation
             setTimeout(() => {
@@ -471,6 +755,29 @@ const QuestionDetail: React.FC = () => {
       }
     }
   }, [answers, answersPage]);
+
+  useEffect(() => {
+    const openCommentFromHash = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#comment-') || comments.length === 0 || !id) return;
+      const commentId = hash.slice('#comment-'.length);
+      const comment = comments.find(item => item.id === commentId);
+      if (!comment) return;
+      if (comment.targetType === 'question') {
+        setDetailTab('comments');
+        return;
+      }
+      setDetailTab('answers');
+      void answerService.getAnswerPageNumber(id, comment.targetId, answersLimit).then(pageNumber => {
+        if (!pageNumber) return;
+        setAnswersPage(current => (current === pageNumber ? current : pageNumber));
+      });
+    };
+
+    openCommentFromHash();
+    window.addEventListener('hashchange', openCommentFromHash);
+    return () => window.removeEventListener('hashchange', openCommentFromHash);
+  }, [comments, id, answersLimit]);
 
   // Cevap gönder
   const handleSubmitAnswer = async () => {
@@ -484,14 +791,70 @@ const QuestionDetail: React.FC = () => {
       setSubmittingAnswer(true);
       setAnswerValidationError('');
 
-      await dispatch(createAnswer({ questionId: id, answerData: { content: newAnswer.slice(0, CONTENT_MAX_LENGTH) } }));
+      const soruCevapRefWithoutDesc = answerReferences.find(
+        (ref) => referenceNeedsDescription(ref.type) && ref.content?.trim() && !ref.description?.trim()
+      );
+      if (soruCevapRefWithoutDesc) {
+        showErrorToast(t('reference_description_required', currentLanguage));
+        setSubmittingAnswer(false);
+        return;
+      }
+
+      let attachmentKeys: { key: string; description?: string; size?: number }[] = [];
+      if (answerFiles.length > 0) {
+        for (const file of answerFiles) {
+          const presigned = await contentAssetService.createPresignedUpload({
+            type: 'answer-attachment',
+            filename: file.file.name,
+            mimeType: file.file.type,
+            contentLength: file.file.size,
+            ownerId: user.id,
+            visibility: 'public',
+          });
+          await uploadFileToPresignedUrl(presigned, file.file);
+          attachmentKeys.push({
+            key: presigned.key,
+            description: file.description || undefined,
+            size: file.file.size,
+          });
+        }
+      }
+
+      const cleanedMetadata = filledMetadata(answerMetadata);
+      const mappedReferences = filledReferences(answerReferences.map((ref) => {
+        if (ref.type === 'dosya' && ref.content) {
+          const index = answerFiles.findIndex((file) => file.id === ref.content);
+          if (index >= 0 && attachmentKeys[index]) {
+            return { ...ref, content: attachmentKeys[index].key };
+          }
+        }
+        return ref;
+      }));
+
+      await dispatch(createAnswer({
+        questionId: id,
+        answerData: {
+          content: newAnswer.slice(0, CONTENT_MAX_LENGTH),
+          references: mappedReferences.length > 0 ? mappedReferences : undefined,
+          metadata: cleanedMetadata.length > 0 ? cleanedMetadata : undefined,
+          attachments: attachmentKeys.length > 0 ? attachmentKeys : undefined,
+        },
+      }));
 
       setNewAnswer('');
+      setAnswerReferences([]);
+      setAnswerMetadata([]);
+      setAnswerFiles([]);
       setAnswerValidationError('');
       // Yeni cevap eklendiğinde ilk sayfaya dön ve cevapları yeniden yükle
       setAnswersPage(1);
       if (id) {
-        dispatch(getAnswersByQuestion({ questionId: id, page: 1, limit: answersLimit }));
+        dispatch(getAnswersByQuestion({
+          questionId: id,
+          page: 1,
+          limit: answersLimit,
+          sortOrder: dateSortToApiOrder(dateSort),
+        }));
       }
       logger.user.action('answer_submitted', { questionId: id });
     } catch (err: any) {
@@ -807,8 +1170,10 @@ const QuestionDetail: React.FC = () => {
       return;
     }
 
-    // Optimistic update: UI'dan hemen sil
-    dispatch(removeAnswerFromList(answerId));
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: { deleted: true, content: '', references: [], metadata: [], attachments: [] },
+    }));
 
     try {
       await dispatch(deleteAnswer({ answerId, questionId: id! }));
@@ -816,7 +1181,12 @@ const QuestionDetail: React.FC = () => {
       // Rollback on error - re-fetch answers
       console.error('Cevap silinirken hata:', error);
       if (id) {
-        dispatch(getAnswersByQuestion({ questionId: id, page: answersPage, limit: answersLimit }));
+        dispatch(getAnswersByQuestion({
+          questionId: id,
+          page: answersPage,
+          limit: answersLimit,
+          sortOrder: dateSortToApiOrder(dateSort),
+        }));
       }
       showErrorToast(t('delete_failed', currentLanguage));
     }
@@ -827,30 +1197,163 @@ const QuestionDetail: React.FC = () => {
     if (!question) return;
     setAskQuestionMode('question');
     setTargetQuestionId(question.id);
+    setTargetAnswerId(null);
+    setAskQuestionForm({ summary: '', detail: '', category: '', tags: '' });
+    setAskQuestionValidationErrors({});
     setAskQuestionModalOpen(true);
   };
 
   const handleAskQuestionAboutAnswer = (answerId: string) => {
     setAskQuestionMode('answer');
     setTargetAnswerId(answerId);
+    setTargetQuestionId(null);
+    setAskQuestionForm({ summary: '', detail: '', category: '', tags: '' });
+    setAskQuestionValidationErrors({});
     setAskQuestionModalOpen(true);
   };
 
-  const handleSubmitRelatedQuestion = async (data: any) => {
-    if (!user) return;
+  const handleCloseAskQuestionModal = () => {
+    setAskQuestionModalOpen(false);
+    setAskQuestionMode(null);
+    setTargetQuestionId(null);
+    setTargetAnswerId(null);
+    setAskQuestionForm({ summary: '', detail: '', category: '', tags: '' });
+    setAskQuestionValidationErrors({});
+  };
 
-    const questionData = {
-      ...data,
-      parent: {
-        id: askQuestionMode === 'question' ? targetQuestionId! : targetAnswerId!,
-        type: askQuestionMode,
-      },
-    };
+  const handleSubmitRelatedQuestion = async (opt: {
+    thumbnailFile?: File | null;
+    removeThumbnail?: boolean;
+    leftState?: CreateQuestionLeftState;
+    rightState?: { references: { type: string; content: string; description: string }[]; metadata: { key: string; value: string }[] };
+    attachedFiles?: { id: string; file: File; description: string }[];
+  }) => {
+    if (!user || !askQuestionMode || !(targetQuestionId || targetAnswerId)) return;
 
-    const newQuestion = await questionService.createQuestion(questionData);
-    // Navigate to the newly created question
-    if (newQuestion) {
-      navigate(`/questions/${newQuestion.id}`);
+    const { summary, detail, category, tags } = askQuestionForm;
+    if (!summary.trim() || !detail.trim()) return;
+    if (summary.length < QUESTION_SUMMARY_MIN_LENGTH || summary.length > QUESTION_SUMMARY_MAX_LENGTH) {
+      setAskQuestionValidationErrors({
+        summary: summary.length < QUESTION_SUMMARY_MIN_LENGTH ? t('validation_summary_min', currentLanguage) : t('validation_summary_max', currentLanguage),
+      });
+      return;
+    }
+    if (detail.length < QUESTION_DETAIL_MIN_LENGTH || detail.length > QUESTION_DETAIL_MAX_LENGTH) {
+      setAskQuestionValidationErrors({
+        detail: detail.length < QUESTION_DETAIL_MIN_LENGTH ? t('validation_detail_min', currentLanguage) : t('validation_detail_max', currentLanguage),
+      });
+      return;
+    }
+    const tagsArray = tags.split(',').map((t) => t.trim()).filter(Boolean);
+    if (tagsArray.length > TAG_MAX_COUNT) {
+      setAskQuestionValidationErrors({ tags: t('validation_tag_max_count', currentLanguage) });
+      return;
+    }
+    const invalidTag = tagsArray.find((t) => t.length > TAG_MAX_LENGTH);
+    if (invalidTag) {
+      setAskQuestionValidationErrors({ tags: t('validation_tag_max_chars', currentLanguage) });
+      return;
+    }
+
+    const soruCevapRefWithoutDesc = opt.rightState?.references?.find(
+      (r) => referenceNeedsDescription(r.type) && r.content?.trim() && !r.description?.trim()
+    );
+    if (soruCevapRefWithoutDesc) {
+      showErrorToast(t('reference_description_required', currentLanguage));
+      return;
+    }
+
+    setAskQuestionSubmitting(true);
+    setAskQuestionValidationErrors({});
+
+    try {
+      const { thumbnailFile, leftState, rightState, attachedFiles } = opt;
+      let thumbnailKey: string | undefined;
+
+      if (thumbnailFile) {
+        const presigned = await contentAssetService.createPresignedUpload({
+          type: 'question-thumbnail',
+          filename: thumbnailFile.name,
+          mimeType: thumbnailFile.type,
+          contentLength: thumbnailFile.size,
+          ownerId: user.id,
+          visibility: 'public',
+        });
+        await uploadFileToPresignedUrl(presigned, thumbnailFile);
+        thumbnailKey = presigned.key;
+      }
+
+      let attachmentKeys: { key: string; description?: string; size?: number }[] | undefined;
+      if (attachedFiles?.length) {
+        attachmentKeys = [];
+        for (const af of attachedFiles) {
+          const presigned = await contentAssetService.createPresignedUpload({
+            type: 'question-attachment',
+            filename: af.file.name,
+            mimeType: af.file.type,
+            contentLength: af.file.size,
+            ownerId: user.id,
+            visibility: 'public',
+          });
+          await uploadFileToPresignedUrl(presigned, af.file);
+          attachmentKeys.push({ key: presigned.key, description: af.description || undefined, size: af.file.size });
+        }
+      }
+
+      const mappedReferences = rightState?.references?.length
+        ? rightState.references.map((ref) => {
+            if (ref.type === 'dosya' && ref.content && attachedFiles?.length && attachmentKeys?.length) {
+              const idx = attachedFiles.findIndex((af) => af.id === ref.content);
+              if (idx >= 0 && attachmentKeys[idx]) {
+                return { ...ref, content: attachmentKeys[idx].key };
+              }
+            }
+            return ref;
+          }) as QuestionReference[]
+        : undefined;
+
+      let featureTemplateId: string | undefined;
+      let featureFieldValues: CreateQuestionData['featureFieldValues'];
+      if (leftState?.featureTemplateId) {
+        const tpl = await questionFeatureTemplateService.getById(leftState.featureTemplateId);
+        const defs = tpl?.currentVersion?.fields
+          ? parseFeatureFieldDefs(tpl.currentVersion.fields)
+          : [];
+        featureTemplateId = leftState.featureTemplateId;
+        featureFieldValues = valuesFormToApi(leftState.featureFieldValues, defs);
+      }
+
+      const questionData: CreateQuestionData = {
+        summary: summary.slice(0, QUESTION_SUMMARY_MAX_LENGTH),
+        detail: detail.slice(0, QUESTION_DETAIL_MAX_LENGTH),
+        category: category?.trim() || undefined,
+        tags: tagsArray.slice(0, TAG_MAX_COUNT).map((tag) => tag.trim().slice(0, TAG_MAX_LENGTH)),
+        parent: {
+          id: askQuestionMode === 'question' ? targetQuestionId! : targetAnswerId!,
+          type: askQuestionMode,
+        },
+        thumbnailKey,
+        visibility: leftState?.visibility ?? true,
+        format: leftState?.format || undefined,
+        interest: leftState?.interest || undefined,
+        focus: leftState?.focus ? parseInt(leftState.focus, 10) : undefined,
+        references: mappedReferences,
+        metadata: rightState?.metadata?.length ? rightState.metadata : undefined,
+        attachments: attachmentKeys,
+        ...(featureTemplateId ? { featureTemplateId, featureFieldValues } : {}),
+      };
+
+      const newQuestion = await questionService.createQuestion(questionData);
+      if (newQuestion) {
+        handleCloseAskQuestionModal();
+        showSuccessToast(t('question_created', currentLanguage));
+        navigate(`/questions/${newQuestion.id}`);
+      }
+    } catch (err) {
+      console.error('Soru oluşturulurken hata:', err);
+      showErrorToast(t('error', currentLanguage));
+    } finally {
+      setAskQuestionSubmitting(false);
     }
   };
 
@@ -882,9 +1385,57 @@ const QuestionDetail: React.FC = () => {
     setRelatedQuestionsAnchor(null);
   };
 
+  const cardOpen = (location.state as { open?: string } | null)?.open;
+  const appliedCardOpen = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (embedded || !question || !cardOpen) return;
+    const key = `${question.id}:${cardOpen}`;
+    if (appliedCardOpen.current === key) return;
+    appliedCardOpen.current = key;
+
+    if (cardOpen === 'likes') {
+      setReactionMention({ questionId: question.id });
+      dispatch(closeModal());
+      dispatch(openModal());
+      if (question.likedByUsers.length > 0) dispatch(fetchLikedUsers(question.likedByUsers));
+      return;
+    }
+    if (cardOpen === 'dislikes') {
+      setReactionMention({ questionId: question.id });
+      dispatch(closeDislikesModal());
+      dispatch(openDislikesModal());
+      if (question.dislikedByUsers.length > 0) dispatch(fetchDislikedUsers(question.dislikedByUsers));
+      return;
+    }
+    if (cardOpen === 'comments' || cardOpen === 'answers') {
+      setDetailTab(cardOpen);
+      window.setTimeout(() => {
+        if (appliedCardOpen.current !== key) return;
+        const section = document.getElementById('answers-section');
+        if (section) scrollElementInView(section, 'start');
+      }, 350);
+      return;
+    }
+    if (cardOpen === 'related') {
+      const questionId = question.id;
+      window.setTimeout(() => {
+        if (appliedCardOpen.current !== key) return;
+        const trigger = document.getElementById('question-related-questions');
+        if (!trigger) return;
+        void handleShowRelatedQuestions(
+          { currentTarget: trigger } as React.MouseEvent<HTMLElement>,
+          questionId,
+          'question'
+        );
+      }, 350);
+    }
+  }, [question, cardOpen, embedded]);
+
   // Show liked users for question
   const handleShowLikedUsersForQuestion = async () => {
     if (!question || question.likedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id });
     dispatch(openModal());
     dispatch(fetchLikedUsers(question.likedByUsers));
   };
@@ -892,6 +1443,7 @@ const QuestionDetail: React.FC = () => {
   // Show disliked users for question
   const handleShowDislikedUsersForQuestion = async () => {
     if (!question || question.dislikedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id });
     dispatch(openDislikesModal());
     dispatch(fetchDislikedUsers(question.dislikedByUsers));
   };
@@ -899,7 +1451,8 @@ const QuestionDetail: React.FC = () => {
   // Show liked users for answer
   const handleShowLikedUsersForAnswer = async (answerId: string) => {
     const answer = answers.find(a => a.id === answerId);
-    if (!answer || answer.likedByUsers.length === 0) return;
+    if (!question || !answer || answer.likedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id, answerId });
     dispatch(openModal());
     dispatch(fetchLikedUsers(answer.likedByUsers));
   };
@@ -907,16 +1460,38 @@ const QuestionDetail: React.FC = () => {
   // Show disliked users for answer
   const handleShowDislikedUsersForAnswer = async (answerId: string) => {
     const answer = answers.find(a => a.id === answerId);
-    if (!answer || answer.dislikedByUsers.length === 0) return;
+    if (!question || !answer || answer.dislikedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id, answerId });
     dispatch(openDislikesModal());
     dispatch(fetchDislikedUsers(answer.dislikedByUsers));
   };
 
-  const handleOpenEditQuestionModal = () => {
+  const handleOpenEditQuestionModal = async () => {
     if (!question) return;
+    let featureTemplateId = '';
+    let featureFieldValues: Record<string, FeatureFieldFormValue> = {};
+    if (question.featureTemplateId) {
+      const tpl = await questionFeatureTemplateService.getById(question.featureTemplateId);
+      const defs = tpl?.currentVersion?.fields
+        ? parseFeatureFieldDefs(tpl.currentVersion.fields)
+        : [];
+      featureFieldValues = valuesApiToForm(
+        question.featureFieldValues as Record<string, unknown> | undefined,
+        defs,
+      );
+      featureTemplateId = question.featureTemplateId;
+    }
+    setEditInitialLeftState({
+      visibility: question.visibility ?? true,
+      format: question.format ?? '',
+      interest: question.interest ?? '',
+      focus: question.focus != null ? String(question.focus) : '',
+      featureTemplateId,
+      featureFieldValues,
+    });
     setEditQuestionForm({
-      title: question.title,
-      content: question.content,
+      summary: question.summary,
+      detail: question.detail,
       category: question.category ?? '',
       tags: question.tags.join(', '),
     });
@@ -928,26 +1503,48 @@ const QuestionDetail: React.FC = () => {
     if (updatingQuestion) return;
     setEditModalOpen(false);
     setEditValidationErrors({});
+    setEditInitialLeftState(undefined);
   };
 
   const handleEditQuestionChange = (field: string, value: string) => {
+    let v = value;
+    if (field === 'tags') {
+      const tags = v.split(',').map((t) => t.trim().slice(0, TAG_MAX_LENGTH)).filter(Boolean).slice(0, TAG_MAX_COUNT);
+      v = tags.join(', ');
+      setEditValidationErrors((prev) => {
+        if (prev.tags) {
+          const { tags: _, ...rest } = prev;
+          return rest;
+        }
+        return prev;
+      });
+    }
     setEditQuestionForm((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: v,
     }));
   };
 
   const validateEditForm = (): boolean => {
     const errors: typeof editValidationErrors = {};
 
-    if (editQuestionForm.title.trim().length < 10) {
-      errors.title = t('validation_title_min', currentLanguage);
+    if (editQuestionForm.summary.trim().length < QUESTION_SUMMARY_MIN_LENGTH) {
+      errors.summary = t('validation_summary_min', currentLanguage);
+    } else if (editQuestionForm.summary.length > QUESTION_SUMMARY_MAX_LENGTH) {
+      errors.summary = t('validation_summary_max', currentLanguage);
     }
 
-    if (editQuestionForm.content.trim().length < 20) {
-      errors.content = t('validation_content_min', currentLanguage);
-    } else if (editQuestionForm.content.length > CONTENT_MAX_LENGTH) {
-      errors.content = t('validation_content_max', currentLanguage);
+    if (editQuestionForm.detail.trim().length < QUESTION_DETAIL_MIN_LENGTH) {
+      errors.detail = t('validation_detail_min', currentLanguage);
+    } else if (editQuestionForm.detail.length > QUESTION_DETAIL_MAX_LENGTH) {
+      errors.detail = t('validation_detail_max', currentLanguage);
+    }
+
+    const tagsArray = editQuestionForm.tags.split(',').map((t) => t.trim()).filter(Boolean);
+    if (tagsArray.length > TAG_MAX_COUNT) {
+      errors.tags = t('validation_tag_max_count', currentLanguage);
+    } else if (tagsArray.some((t) => t.length > TAG_MAX_LENGTH)) {
+      errors.tags = t('validation_tag_max_chars', currentLanguage);
     }
 
     setEditValidationErrors(errors);
@@ -957,12 +1554,26 @@ const QuestionDetail: React.FC = () => {
   const handleUpdateQuestion = async ({
     thumbnailFile,
     removeThumbnail,
+    rightState,
+    attachedFiles,
+    leftState,
   }: {
     thumbnailFile?: File | null;
     removeThumbnail?: boolean;
+    rightState?: { references: { type: string; content: string; description: string }[]; metadata: { key: string; value: string }[] };
+    attachedFiles?: { id: string; file: File; description: string }[];
+    leftState?: CreateQuestionLeftState;
   }) => {
     if (!question) return;
     if (!validateEditForm()) {
+      return;
+    }
+
+    const soruCevapRefWithoutDesc = rightState?.references?.find(
+      (r) => referenceNeedsDescription(r.type) && r.content?.trim() && !r.description?.trim()
+    );
+    if (soruCevapRefWithoutDesc) {
+      showErrorToast(t('reference_description_required', currentLanguage));
       return;
     }
 
@@ -994,12 +1605,13 @@ const QuestionDetail: React.FC = () => {
 
       const tagsArray = editQuestionForm.tags
         .split(',')
-        .map((tag) => tag.trim())
-        .filter((tag) => tag.length > 0);
+        .map((tag) => tag.trim().slice(0, TAG_MAX_LENGTH))
+        .filter((tag) => tag.length > 0)
+        .slice(0, TAG_MAX_COUNT);
 
       const updatePayload: UpdateQuestionData = {
-        title: editQuestionForm.title,
-        content: editQuestionForm.content.slice(0, CONTENT_MAX_LENGTH),
+        summary: editQuestionForm.summary,
+        detail: editQuestionForm.detail.slice(0, QUESTION_DETAIL_MAX_LENGTH),
         category: editQuestionForm.category || undefined,
         tags: tagsArray,
       };
@@ -1010,6 +1622,61 @@ const QuestionDetail: React.FC = () => {
 
       if (removeThumbnail && !thumbnailFile) {
         updatePayload.removeThumbnail = true;
+      }
+
+      if (rightState?.references != null) {
+        let newAttachmentKeys: { key: string; description?: string; size?: number }[] = [];
+        if (attachedFiles?.length) {
+          for (const af of attachedFiles) {
+            const presigned = await contentAssetService.createPresignedUpload({
+              type: 'question-attachment',
+              filename: af.file.name,
+              mimeType: af.file.type,
+              contentLength: af.file.size,
+              ownerId: user!.id,
+              entityId: question.id,
+              visibility: 'public',
+            });
+            await uploadFileToPresignedUrl(presigned, af.file);
+            newAttachmentKeys.push({ key: presigned.key, description: af.description || undefined, size: af.file.size });
+          }
+        }
+        const mappedReferences = rightState.references.map((ref) => {
+          if (ref.type === 'dosya' && ref.content && attachedFiles?.length && newAttachmentKeys?.length) {
+            const idx = attachedFiles.findIndex((af) => af.id === ref.content);
+            if (idx >= 0 && newAttachmentKeys[idx]) {
+              return { ...ref, content: newAttachmentKeys[idx].key };
+            }
+          }
+          return ref;
+        }) as QuestionReference[];
+        updatePayload.references = filledReferences(mappedReferences);
+
+        const refKeys = mappedReferences.filter((r) => r.type === 'dosya' && r.content).map((r) => r.content);
+        const keptExisting = (question.attachments ?? []).filter((a) => refKeys.includes(a.key));
+        updatePayload.attachments = [...keptExisting, ...newAttachmentKeys];
+      }
+
+      if (rightState?.metadata != null) {
+        updatePayload.metadata = filledMetadata(rightState.metadata);
+      }
+
+      if (leftState) {
+        const parsedFocus = leftState.focus ? parseInt(leftState.focus, 10) : NaN;
+        updatePayload.focus =
+          !Number.isNaN(parsedFocus) && parsedFocus >= 1 && parsedFocus <= 10 ? parsedFocus : null;
+      }
+
+      if (leftState?.featureTemplateId) {
+        const tpl = await questionFeatureTemplateService.getById(leftState.featureTemplateId);
+        const defs = tpl?.currentVersion?.fields
+          ? parseFeatureFieldDefs(tpl.currentVersion.fields)
+          : [];
+        updatePayload.featureTemplateId = leftState.featureTemplateId;
+        updatePayload.featureFieldValues = valuesFormToApi(
+          leftState.featureFieldValues,
+          defs,
+        );
       }
 
       const result = await dispatch(
@@ -1076,50 +1743,101 @@ const QuestionDetail: React.FC = () => {
     }
   };
 
+  const wrapPage = (children: React.ReactNode, fullWidth = false) =>
+    embedded ? (
+      <Box
+        ref={embeddedScrollRef}
+        sx={{
+          height: '100%',
+          overflow: 'auto',
+          position: 'relative',
+          bgcolor: 'background.default',
+          ...getScrollbarSx(theme),
+        }}
+      >
+        {onClose && (
+          <Box
+            sx={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 30,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              px: 1,
+              pt: 1,
+              pointerEvents: 'none',
+            }}
+          >
+            <Tooltip title={t('close_panel', currentLanguage)} placement="left">
+              <IconButton
+                size="small"
+                onClick={onClose}
+                aria-label={t('close_panel', currentLanguage)}
+                sx={{
+                  pointerEvents: 'auto',
+                  color: theme.palette.text.secondary,
+                  bgcolor: theme.palette.background.paper,
+                  border: `1px solid ${theme.palette.divider}`,
+                  boxShadow: 1,
+                  '&:hover': {
+                    color: theme.palette.primary.main,
+                    bgcolor: `${theme.palette.primary.main}14`,
+                  },
+                }}
+              >
+                <Close fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
+        {children}
+      </Box>
+    ) : fullWidth ? (
+      <Layout fullWidth>{children}</Layout>
+    ) : (
+      <Layout>{children}</Layout>
+    );
+
   if (loadingQuestion) {
-    return (
-      <Layout>
-        <Container maxWidth="lg" sx={{ pt: 4, pb: 8, position: 'relative', zIndex: 1 }}>
-          <QuestionDetailSkeleton />
-        </Container>
-      </Layout>
+    return wrapPage(
+      <Container maxWidth="lg" sx={{ pt: 4, pb: 8, position: 'relative', zIndex: 1 }}>
+        <QuestionDetailSkeleton />
+      </Container>
     );
   }
 
   if (error || !question) {
-    return (
-      <Layout>
-        <Container maxWidth="lg" sx={{ pt: 4 }}>
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error || t('question_not_found', currentLanguage)}
-          </Alert>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBack />}
-            onClick={() => navigate('/')}
-            sx={{
-              color: theme.palette.text.primary,
-              borderColor: theme.palette.divider,
-              '&:hover': {
-                borderColor: theme.palette.primary.main,
-                background: `${theme.palette.primary.main}11`,
-              }
-            }}
-          >
-            {t('back', currentLanguage)}
-          </Button>
-        </Container>
-      </Layout>
+    return wrapPage(
+      <Container maxWidth="lg" sx={{ pt: 4 }}>
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error || t('question_not_found', currentLanguage)}
+        </Alert>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBack />}
+          onClick={() => (embedded && onClose ? onClose() : navigate('/'))}
+          sx={{
+            color: theme.palette.text.primary,
+            borderColor: theme.palette.divider,
+            '&:hover': {
+              borderColor: theme.palette.primary.main,
+              background: `${theme.palette.primary.main}11`,
+            }
+          }}
+        >
+          {t('back', currentLanguage)}
+        </Button>
+      </Container>
     );
   }
 
-  return (
-    <Layout>
+  return wrapPage(
+    <>
       {/* Papyrus Background for Question Detail Page */}
       {isPapirus && (
         <Box
           sx={{
-            position: 'fixed',
+            position: embedded ? 'absolute' : 'fixed',
             top: 0,
             left: 0,
             right: 0,
@@ -1135,34 +1853,77 @@ const QuestionDetail: React.FC = () => {
         />
       )}
 
-      <Container maxWidth="lg" sx={{ pt: 4, pb: 8, position: 'relative', zIndex: 1 }}>
-        {/* Geri Dön Butonu */}
-        <Button
-          variant="outlined"
-          startIcon={<ArrowBack />}
-          onClick={() => {
-            const from = (location.state as any)?.from;
-            if (from) {
-              navigate(from);
-            } else {
-              navigate(-1);
-            }
-          }}
-          sx={{
-            mb: 3,
-            color: theme.palette.text.primary,
-            borderColor: theme.palette.divider,
-            '&:hover': {
-              borderColor: theme.palette.primary.main,
-              background: `${theme.palette.primary.main}11`,
-            }
-          }}
-        >
-          {t('back', currentLanguage)}
-        </Button>
+      {/* Üst satır: Sabit tablar | Orta (kaymaz) | Paneller overlay olarak açılır */}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          maxWidth: '100%',
+          minWidth: 0,
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'row', width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'clip', alignItems: 'flex-start', position: 'relative' }}>
+          {/* Sol tab - her zaman 40px, panel açıkken overlay */}
+          {!embedded && (
+          <Box sx={{ width: 40, flexShrink: 0, pt: 4, pb: 4, display: 'flex', alignItems: 'flex-start' }}>
+            {!leftPanelOpen && (
+              <Tooltip title={t('open_panel', currentLanguage)} placement="right">
+                <IconButton
+                  onClick={() => setLeftPanelOpen(true)}
+                  size="small"
+                  sx={{
+                    width: 40,
+                    height: 80,
+                    borderRadius: '0 8px 8px 0',
+                    color: theme.palette.text.secondary,
+                    bgcolor: theme.palette.background.paper,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderLeft: 0,
+                    boxShadow: 2,
+                    '&:hover': { color: theme.palette.primary.main, bgcolor: `${theme.palette.primary.main}11` },
+                  }}
+                >
+                  <ChevronRight />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+          )}
 
-        {/* Soru Detayı */}
-        <Box sx={{ position: 'relative' }}>
+          {/* Orta - sabit konumda, paneller overlay ile üzerine biner */}
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+            <Container maxWidth="lg" sx={{ pt: embedded ? 0 : 4, pb: 0, position: 'relative', zIndex: 1, width: '100%' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', pb: 4 }}>
+              {!embedded && (
+              <Button
+                variant="outlined"
+                startIcon={<ArrowBack />}
+                onClick={() => {
+                  const from = (location.state as any)?.from;
+                  if (from) {
+                    navigate(from);
+                  } else {
+                    navigate(-1);
+                  }
+                }}
+                sx={{
+                  mb: 3,
+                  alignSelf: 'flex-start',
+                  color: theme.palette.text.primary,
+                  borderColor: theme.palette.divider,
+                  '&:hover': {
+                    borderColor: theme.palette.primary.main,
+                    background: `${theme.palette.primary.main}11`,
+                  }
+                }}
+              >
+                {t('back', currentLanguage)}
+              </Button>
+              )}
+
+              {/* Soru Detayı */}
+              <Box sx={{ position: 'relative' }}>
           <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
             {/* Action Buttons - Sağ Üst Köşe - Doğrudan QuestionCard içinde */}
             <ActionButtonsContainer className="action-buttons-container">
@@ -1170,8 +1931,8 @@ const QuestionDetail: React.FC = () => {
                 targetType="question"
                 targetId={question.id}
                 targetData={{
-                  title: question.title,
-                  content: question.content,
+                  title: question.summary,
+                  content: question.detail,
                   author: question.author?.name,
                   authorId: question.author?.id,
                   created_at: question.createdAt,
@@ -1189,6 +1950,12 @@ const QuestionDetail: React.FC = () => {
                 canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
                 isBookmarked={!!bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)}
                 bookmarkId={bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)?._id || null}
+                messageRecipient={{
+                  id: question.userInfo?._id || question.author.id,
+                  name: question.author.name,
+                  profile_image: question.userInfo?.profile_image || question.author.avatar,
+                }}
+                mention={{ questionId: question.id }}
                 onLike={handleLikeQuestion}
                 onUnlike={handleUnlikeQuestion}
                 onDislike={handleDislikeQuestion}
@@ -1289,9 +2056,7 @@ const QuestionDetail: React.FC = () => {
                     >
                       {question.userInfo?.name || question.author.name}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                      {question.timeAgo}
-                    </Typography>
+                    <ContentTime value={question.createdAt} currentLanguage={currentLanguage} />
                   </Box>
                 </Box>
 
@@ -1342,7 +2107,7 @@ const QuestionDetail: React.FC = () => {
                         pr: 10, // ActionButtons için sağdan boşluk bırak
                       }}
                     >
-                      {question.title}
+                      {question.summary}
                     </Typography>
 
                     <Box sx={{
@@ -1352,12 +2117,22 @@ const QuestionDetail: React.FC = () => {
                       pr: 10,
                       maxWidth: '100%',
                     }}>
-                      <ExpandableMarkdown content={question.content} maxLength={600} maxHeight={420} />
+                      <ExpandableMarkdown
+                        content={question.detail}
+                        maxLength={600}
+                        maxHeight={420}
+                        onRefHover={setHoveredRefIndex}
+                        onRefClick={(idx) => {
+                          setHoveredRefIndex(idx);
+                          if (!rightPanelOpen) setRightPanelOpen(true);
+                        }}
+                        highlightedRefIndex={hoveredRefIndex}
+                      />
                     </Box>
                   </Box>
 
                   {/* Thumbnail Container - Dikey olarak ortalanmış */}
-                  {(questionThumbnailUrl || question?.thumbnail?.url) && (
+                  {(questionThumbnailUrl || question?.thumbnail?.url || question?.thumbnail?.key) && (
                     <Box
                       sx={{
                         display: 'flex',
@@ -1385,34 +2160,22 @@ const QuestionDetail: React.FC = () => {
                         })}
                         onClick={() => setQuestionThumbnailPreviewOpen(true)}
                       >
-                        <img
-                          src={questionThumbnailUrl || question?.thumbnail?.url || ''}
-                          alt={question.title}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={async (e) => {
-                            const img = e.currentTarget;
-                            const currentSrc = img.src;
-
-                            // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene (URL expire olmuş olabilir)
-                            if (question?.thumbnail?.key) {
-                              try {
-                                const newUrl = await contentAssetService.resolveAssetUrl({
-                                  key: question.thumbnail.key,
-                                  type: 'question-thumbnail',
-                                  entityId: question.id,
-                                });
-                                if (newUrl && newUrl !== currentSrc) {
-                                  setQuestionThumbnailUrl(newUrl);
-                                  img.src = newUrl;
-                                  return; // Yeniden yükleme başarılı
-                                }
-                              } catch (error) {
-                                logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
-                              }
+                        <DeferredImage
+                          src={questionThumbnailUrl || question?.thumbnail?.url || undefined}
+                          alt={question.summary}
+                          onError={async () => {
+                            if (!question?.thumbnail?.key) return;
+                            try {
+                              const newUrl = await contentAssetService.resolveAssetUrl({
+                                key: question.thumbnail.key,
+                                type: 'question-thumbnail',
+                                entityId: question.id,
+                              });
+                              const current = questionThumbnailUrl || question?.thumbnail?.url;
+                              if (newUrl && newUrl !== current) setQuestionThumbnailUrl(newUrl);
+                            } catch (error) {
+                              logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
                             }
-
-                            // Başarısız olursa gizle
-                            img.style.display = 'none';
                           }}
                         />
                       </Box>
@@ -1492,7 +2255,7 @@ const QuestionDetail: React.FC = () => {
                       {question.dislikesCount}
                     </Typography>
                   </Box>
-                  {user && questionRelatedQuestionsCount > 0 && (
+                  <Tooltip title={t('related_questions', currentLanguage)}>
                     <Box
                       sx={{
                         display: 'flex',
@@ -1500,114 +2263,420 @@ const QuestionDetail: React.FC = () => {
                         gap: 0.5,
                         cursor: 'pointer',
                       }}
+                      id="question-related-questions"
                       onClick={(e) => handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, question.id, 'question')}
-                      title={t('related_questions', currentLanguage)}
                     >
                       <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                       <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                         {questionRelatedQuestionsCount}
                       </Typography>
                     </Box>
-                  )}
+                  </Tooltip>
                 </Box>
               </Box>
             </Box>
+            <ReportContentButton />
           </QuestionCard>
-        </Box>
+              </Box>
 
-        {/* Cevap Yazma Bölümü */}
-        {user && (
-          <QuestionCard isPapirus={isPapirus} isAnswerWriting={true} isMagnefite={isMagnefite}>
-            <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
-              {t('write_answer', currentLanguage)}
-            </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
-              * {t('validation_answer_min', currentLanguage)}
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <RichTextEditor
-                value={newAnswer}
-                onChange={(value) => setNewAnswer((value || '').slice(0, CONTENT_MAX_LENGTH))}
-                minHeight={300}
-                maxLength={CONTENT_MAX_LENGTH}
-                error={!!answerValidationError}
-                helperText={answerValidationError}
-              />
-            </Box>
-            <ActionButton
-              onClick={handleSubmitAnswer}
-              disabled={!newAnswer.trim() || newAnswer.trim().length < 5 || submittingAnswer || newAnswer.length > CONTENT_MAX_LENGTH}
-              endIcon={<Send />}
-              isMagnefite={isMagnefite}
-            >
-              {submittingAnswer ? t('sending', currentLanguage) : t('send_answer', currentLanguage)}
-            </ActionButton>
-          </QuestionCard>
-        )}
+              </Box>
+            </Container>
+          </Box>
 
-        {/* Cevaplar */}
-        <Box id="answers-section" sx={{ mt: 4 }}>
-          <Typography variant="h5" sx={(theme) => ({ mb: 3, color: theme.palette.text.primary, fontWeight: 600 })}>
-            {t('answers', currentLanguage)} ({totalAnswers})
-          </Typography>
-
-          {answers.length === 0 ? (
-            <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
-              <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
-                {t('no_data', currentLanguage)}
-              </Typography>
-            </QuestionCard>
-          ) : (
-            <>
-              {answers.map((answer) => (
-                <Box
-                  key={answer.id}
-                  id={`answer-${answer.id}`}
+          {/* Sağ tab - her zaman 40px, panel açıkken overlay */}
+          {!embedded && (
+          <Box sx={{ width: 40, flexShrink: 0, pt: 4, pb: 4, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end' }}>
+            {!rightPanelOpen && (
+              <Tooltip title={t('open_panel', currentLanguage)} placement="left">
+                <IconButton
+                  onClick={() => setRightPanelOpen(true)}
+                  size="small"
+                  sx={{
+                    width: 40,
+                    height: 80,
+                    borderRadius: '8px 0 0 8px',
+                    color: theme.palette.text.secondary,
+                    bgcolor: theme.palette.background.paper,
+                    border: `1px solid ${theme.palette.divider}`,
+                    borderRight: 0,
+                    boxShadow: 2,
+                    '&:hover': { color: theme.palette.primary.main, bgcolor: `${theme.palette.primary.main}11` },
+                  }}
                 >
-                  <AnswerCard
-                    answer={answer}
-                    isAlternateTexture={false}
-                    relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
-                    isHighlighted={highlightedAnswerId === answer.id}
-                    onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
-                      handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId, 'answer');
+                  <ChevronLeft />
+                  <Box
+                    aria-hidden
+                    sx={{
+                      position: 'absolute',
+                      bottom: 10,
+                      left: '50%',
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      transform: 'translateX(-50%)',
+                      bgcolor: referenceNotchColor(
+                        themeName,
+                        theme.palette.mode,
+                        filledReferences(question?.references).length > 0 ||
+                        filledMetadata(question?.metadata).length > 0 ||
+                        (question?.attachments?.length ?? 0) > 0
+                      ),
                     }}
-                    onLike={handleLikeAnswer}
-                    onUnlike={handleUnlikeAnswer}
-                    onDislike={handleDislikeAnswer}
-                    onUndislike={handleUndoDislikeAnswer}
-                    onDelete={handleDeleteAnswer}
-                    onHelp={handleAskQuestionAboutAnswer}
-                    onShowLikedUsers={handleShowLikedUsersForAnswer}
-                    onShowDislikedUsers={handleShowDislikedUsersForAnswer}
-                    questionId={question.id}
-                    questionTitle={question.title}
-                    showParentInfo={false}
                   />
-                </Box>
-              ))}
-              {Math.ceil(totalAnswers / answersLimit) > 1 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                  <Pagination
-                    count={Math.ceil(totalAnswers / answersLimit)}
-                    page={answersPage}
-                    onChange={(_, page) => {
-                      setAnswersPage(page);
-                      // Scroll to top of answers section
-                      const answersSection = document.getElementById('answers-section');
-                      if (answersSection) {
-                        answersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
+                </IconButton>
+              </Tooltip>
+            )}
+          </Box>
+          )}
+
+          {/* Sol panel overlay - açıkken orta alanın üzerine biner */}
+          {!embedded && leftPanelOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width: 'min(320px, 100%)',
+                maxHeight: 'calc(100vh - 180px)',
+                pt: 4,
+                pb: 4,
+                pl: 2,
+                pr: 1,
+                boxSizing: 'border-box',
+                zIndex: 20,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+                <QuestionDetailLeftPanel
+                  question={question}
+                  currentLanguage={currentLanguage}
+                  featureTemplateName={featureTemplateDisplayName}
+                  featureFieldRows={featureFieldDisplayRows}
+                  showFocus={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id))}
+                />
+                <Tooltip title={t('close_panel', currentLanguage)} placement="right">
+                  <IconButton
+                    onClick={() => setLeftPanelOpen(false)}
+                    size="small"
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      color: theme.palette.text.secondary,
+                      bgcolor: theme.palette.background.paper,
+                      boxShadow: 1,
+                      '&:hover': { color: theme.palette.primary.main, bgcolor: `${theme.palette.primary.main}22` },
                     }}
-                    color="primary"
-                    size="large"
-                  />
-                </Box>
-              )}
-            </>
+                  >
+                    <ChevronLeft />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+          )}
+
+          {/* Sağ panel overlay - açıkken orta alanın üzerine biner */}
+          {!embedded && rightPanelOpen && (
+            <Box
+              sx={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                width: 'min(500px, 100%)',
+                height: 'calc(100vh - 180px)',
+                maxHeight: 'calc(100vh - 180px)',
+                pt: 4,
+                pb: 4,
+                pl: 1,
+                pr: 2,
+                boxSizing: 'border-box',
+                zIndex: 20,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+              }}
+            >
+              <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+                <QuestionDetailRightPanel
+                  question={question}
+                  currentLanguage={currentLanguage}
+                  answers={answers}
+                  highlightedRefIndex={hoveredRefIndex}
+                  onRefHover={(idx) => setHoveredRefIndex(idx ?? null)}
+                  onRefHighlightClear={() => setHoveredRefIndex(null)}
+                />
+                <Tooltip title={t('close_panel', currentLanguage)} placement="left">
+                  <IconButton
+                    onClick={() => setRightPanelOpen(false)}
+                    size="small"
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      left: 8,
+                      color: theme.palette.text.secondary,
+                      bgcolor: theme.palette.background.paper,
+                      boxShadow: 1,
+                      zIndex: 2,
+                      '&:hover': { color: theme.palette.primary.main, bgcolor: `${theme.palette.primary.main}22` },
+                    }}
+                  >
+                    <ChevronRight />
+                    <Box
+                      aria-hidden
+                      sx={{
+                        position: 'absolute',
+                        bottom: 4,
+                        left: '50%',
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        transform: 'translateX(-50%)',
+                        bgcolor: referenceNotchColor(
+                          themeName,
+                          theme.palette.mode,
+                          filledReferences(question?.references).length > 0 ||
+                          filledMetadata(question?.metadata).length > 0 ||
+                          (question?.attachments?.length ?? 0) > 0
+                        ),
+                      }}
+                    />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
           )}
         </Box>
-      </Container>
+
+        {/* Cevaplar - tam genişlik, sabit hizalama (paneller overlay) */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', maxWidth: '100%', minWidth: 0 }}>
+          {!embedded && <Box sx={{ width: 40, flexShrink: 0 }} />}
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+            <Container maxWidth="lg" sx={{ pt: 0, pb: 8, position: 'relative', zIndex: 1, width: '100%', overflow: 'visible' }}>
+              <Box id="answers-section" sx={{ mt: 4 }}>
+                <Tabs
+                  value={detailTab}
+                  onChange={(_, value: 'answers' | 'comments') => setDetailTab(value)}
+                  sx={{ mb: 2 }}
+                >
+                  <Tab value="answers" label={`${t('answers', currentLanguage)} (${totalAnswers})`} />
+                  <Tab
+                    value="comments"
+                    label={`${t('comments', currentLanguage)} (${comments.filter(item => item.targetType === 'question' && item.targetId === question.id && !item.deleted).length})`}
+                  />
+                </Tabs>
+
+                {detailTab === 'comments' ? (
+                  <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
+                    <CommentThread
+                      comments={comments.filter(item => item.targetType === 'question' && item.targetId === question.id)}
+                      currentUserId={user?.id}
+                      currentLanguage={currentLanguage}
+                      onCreate={(body, parentId) => handleCreateComment('question', question.id, body, parentId)}
+                      onUpdate={handleUpdateComment}
+                      onDelete={handleDeleteComment}
+                      onReact={handleReactComment}
+                      questionOwnerId={question.userInfo?._id || question.author.id}
+                      questionId={question.id}
+                      showHeading={false}
+                      composeMode="line"
+                      showReport
+                      onReveal={element => scrollElementInView(element, 'center')}
+                    />
+                  </QuestionCard>
+                ) : (
+                <>
+                {user && (
+                  <Box sx={{ mb: 2 }}>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      endIcon={
+                        <ExpandMore
+                          sx={{
+                            transform: answerComposerOpen ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 200ms ease',
+                            position: 'relative',
+                            zIndex: 1,
+                          }}
+                        />
+                      }
+                      onClick={() => setAnswerComposerOpen(open => !open)}
+                      sx={theme => ({
+                        py: 1.35,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        animation: 'answerButtonPulse 9s ease-in-out infinite',
+                        '@keyframes answerButtonPulse': {
+                          '0%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0.28)}` },
+                          '45%': { boxShadow: `0 0 0 8px ${alpha(theme.palette.primary.main, 0)}` },
+                          '100%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0)}` },
+                        },
+                        '@keyframes answerButtonSheen': {
+                          '0%': { transform: 'translateX(-140%)' },
+                          '22%': { transform: 'translateX(140%)' },
+                          '100%': { transform: 'translateX(140%)' },
+                        },
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: 0,
+                          width: '45%',
+                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',
+                          animation: 'answerButtonSheen 14s ease-in-out infinite',
+                          pointerEvents: 'none',
+                        },
+                        '@media (prefers-reduced-motion: reduce)': {
+                          animation: 'none',
+                          '&::before': { animation: 'none', display: 'none' },
+                        },
+                      })}
+                    >
+                      {t('give_answer', currentLanguage)}
+                    </Button>
+                    <Box sx={{ position: 'relative', mt: answerComposerOpen ? 2 : 0 }}>
+                    <Collapse in={answerComposerOpen}>
+                        <QuestionCard isPapirus={isPapirus} isAnswerWriting isMagnefite={isMagnefite} sx={{ mt: 0, mb: 0 }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+                            * {t('validation_answer_min', currentLanguage)}
+                          </Typography>
+                          <Box sx={{ mb: 2 }}>
+                            <RichTextEditor
+                              value={newAnswer}
+                              onChange={(value) => setNewAnswer((value || '').slice(0, CONTENT_MAX_LENGTH))}
+                              onActivate={() => setAnswerRefsOpen(true)}
+                              minHeight={300}
+                              maxLength={CONTENT_MAX_LENGTH}
+                              error={!!answerValidationError}
+                              helperText={answerValidationError}
+                              references={answerReferences}
+                            />
+                          </Box>
+                          <ActionButton
+                            onClick={handleSubmitAnswer}
+                            disabled={!newAnswer.trim() || newAnswer.trim().length < 5 || submittingAnswer || newAnswer.length > CONTENT_MAX_LENGTH}
+                            endIcon={<Send />}
+                            isMagnefite={isMagnefite}
+                          >
+                            {submittingAnswer ? t('sending', currentLanguage) : t('send_answer', currentLanguage)}
+                          </ActionButton>
+                        </QuestionCard>
+                    </Collapse>
+                    {answerComposerOpen && (
+                      <InlineSidePanel
+                        open={answerRefsOpen}
+                        onToggle={() => setAnswerRefsOpen(open => !open)}
+                        label={t('references', currentLanguage)}
+                        buttonPosition="corner"
+                        hasContent={
+                          filledReferences(answerReferences).length > 0 ||
+                          filledMetadata(answerMetadata).length > 0 ||
+                          answerFiles.length > 0
+                        }
+                      >
+                        <AnswerComposeExtras
+                          currentLanguage={currentLanguage}
+                          references={answerReferences}
+                          onReferencesChange={setAnswerReferences}
+                          metadata={answerMetadata}
+                          onMetadataChange={setAnswerMetadata}
+                          files={answerFiles}
+                          onFilesChange={setAnswerFiles}
+                        />
+                      </InlineSidePanel>
+                    )}
+                    </Box>
+                  </Box>
+                )}
+                <ItemsPerPageSelector
+                  variant="compact"
+                  itemsPerPage={answersLimit}
+                  totalQuestions={totalAnswers}
+                  onItemsPerPageChange={(e) => {
+                    setAnswersLimit(parseInt(e.target.value, 10));
+                    setAnswersPage(1);
+                  }}
+                  currentLanguage={currentLanguage}
+                  dateSort={dateSort}
+                  onDateSortChange={(e) => {
+                    setDateSort(e.target.value as DateSortOrder);
+                    setAnswersPage(1);
+                  }}
+                />
+
+                {answers.length === 0 ? (
+                  <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
+                    <Typography sx={(theme) => ({ textAlign: 'center', color: theme.palette.text.secondary })}>
+                      {t('no_data', currentLanguage)}
+                    </Typography>
+                  </QuestionCard>
+                ) : (
+                  <>
+                    {answers.map((answer) => (
+                      <Box
+                        key={answer.id}
+                        id={`answer-${answer.id}`}
+                      >
+                        <AnswerCard
+                          answer={answer}
+                          isAlternateTexture={false}
+                          relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
+                          isHighlighted={highlightedAnswerId === answer.id}
+                          onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
+                            handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, answerId, 'answer');
+                          }}
+                          onLike={handleLikeAnswer}
+                          onUnlike={handleUnlikeAnswer}
+                          onDislike={handleDislikeAnswer}
+                          onUndislike={handleUndoDislikeAnswer}
+                          onDelete={handleDeleteAnswer}
+                          onHelp={handleAskQuestionAboutAnswer}
+                          onShowLikedUsers={handleShowLikedUsersForAnswer}
+                          onShowDislikedUsers={handleShowDislikedUsersForAnswer}
+                          questionOwnerId={question.userInfo?._id || question.author.id}
+                          questionId={question.id}
+                          questionSummary={question.summary}
+                          showReport
+                          showParentInfo={false}
+                          comments={comments.filter(item => item.targetType === 'answer' && item.targetId === answer.id)}
+                          onCreateComment={(body, parentId) => handleCreateComment('answer', answer.id, body, parentId)}
+                          onUpdateComment={handleUpdateComment}
+                          onDeleteComment={handleDeleteComment}
+                          onReactComment={handleReactComment}
+                          onRevealComment={element => scrollElementInView(element, 'center')}
+                        />
+                      </Box>
+                    ))}
+                    {Math.ceil(totalAnswers / answersLimit) > 1 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                        <Pagination
+                          count={Math.ceil(totalAnswers / answersLimit)}
+                          page={answersPage}
+                          onChange={(_, page) => {
+                            setAnswersPage(page);
+                            const answersSection = document.getElementById('answers-section');
+                            if (answersSection) {
+                              scrollElementInView(answersSection, 'start');
+                            }
+                          }}
+                          color="primary"
+                          size="large"
+                        />
+                      </Box>
+                    )}
+                  </>
+                )}
+                </>
+                )}
+              </Box>
+            </Container>
+          </Box>
+          {!embedded && <Box sx={{ width: 40, flexShrink: 0 }} />}
+        </Box>
+      </Box>
 
       <Dialog
         open={questionThumbnailPreviewOpen}
@@ -1615,51 +2684,76 @@ const QuestionDetail: React.FC = () => {
         maxWidth="md"
       >
         {(questionThumbnailUrl || question?.thumbnail?.url || question?.thumbnail?.key) && (
-          <Box sx={{ p: 0, m: 0 }}>
-            <img
-              src={questionThumbnailUrl || question?.thumbnail?.url || ''}
-              alt={question?.title || 'Question thumbnail'}
-              style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
-              onError={async (e) => {
-                const img = e.currentTarget;
-                const currentSrc = img.src;
-
-                // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
-                if (question?.thumbnail?.key) {
-                  try {
-                    const newUrl = await contentAssetService.resolveAssetUrl({
-                      key: question.thumbnail.key,
-                      type: 'question-thumbnail',
-                      entityId: question.id,
-                    });
-                    if (newUrl && newUrl !== currentSrc) {
-                      setQuestionThumbnailUrl(newUrl);
-                      img.src = newUrl;
-                      return;
-                    }
-                  } catch (error) {
-                    logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
-                  }
+          <Box sx={{ p: 0, m: 0, minHeight: 240 }}>
+            <DeferredImage
+              src={questionThumbnailUrl || question?.thumbnail?.url || undefined}
+              alt={question?.summary || 'Question thumbnail'}
+              objectFit="contain"
+              onError={async () => {
+                if (!question?.thumbnail?.key) return;
+                try {
+                  const newUrl = await contentAssetService.resolveAssetUrl({
+                    key: question.thumbnail.key,
+                    type: 'question-thumbnail',
+                    entityId: question.id,
+                  });
+                  const current = questionThumbnailUrl || question?.thumbnail?.url;
+                  if (newUrl && newUrl !== current) setQuestionThumbnailUrl(newUrl);
+                } catch (error) {
+                  logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
                 }
-
-                img.style.display = 'none';
               }}
             />
           </Box>
         )}
       </Dialog>
 
-      <CreateQuestionModal
+      <CreateQuestionFlow
         open={editModalOpen}
         onClose={handleCloseEditQuestionModal}
-        onSubmit={handleUpdateQuestion}
+        onSubmit={(opt) =>
+          handleUpdateQuestion({
+            thumbnailFile: opt.thumbnailFile,
+            removeThumbnail: opt.removeThumbnail,
+            rightState: opt.rightState,
+            attachedFiles: opt.attachedFiles,
+            leftState: opt.leftState,
+          })
+        }
         question={editQuestionForm}
-        onQuestionChange={handleEditQuestionChange}
+        onQuestionChange={(field, value) => {
+          let v = value || '';
+          if (field === 'summary') v = v.slice(0, QUESTION_SUMMARY_MAX_LENGTH);
+          else if (field === 'detail') v = v.slice(0, QUESTION_DETAIL_MAX_LENGTH);
+          else if (field === 'tags') {
+            const tags = v.split(',').map((t) => t.trim().slice(0, TAG_MAX_LENGTH)).filter(Boolean).slice(0, TAG_MAX_COUNT);
+            v = tags.join(', ');
+            if (editValidationErrors.tags) {
+              setEditValidationErrors((prev) => {
+                const { tags: _t, ...rest } = prev;
+                return rest;
+              });
+            }
+          }
+          handleEditQuestionChange(field, v);
+        }}
         validationErrors={editValidationErrors}
         isSubmitting={updatingQuestion}
         currentLanguage={currentLanguage}
         mode="edit"
         initialThumbnailUrl={questionThumbnailUrl}
+        initialLeftState={editInitialLeftState}
+        initialRightState={question ? {
+          references: (question.references ?? []).map((r) => ({
+            type: r.type as 'link' | 'soru' | 'cevap' | 'yorum' | 'dosya',
+            content: r.content,
+            description: r.description ?? '',
+          })),
+          metadata: question.metadata ?? [],
+        } : undefined}
+        existingAttachments={question?.attachments ?? []}
+        questionId={question?.id}
+        ownerId={question?.author?.id}
       />
 
       {/* Likes Modal */}
@@ -1668,6 +2762,7 @@ const QuestionDetail: React.FC = () => {
         onClose={() => dispatch(closeModal())}
         users={likesModalUsers}
         title={t('users_who_liked', currentLanguage)}
+        mention={reactionMention ?? undefined}
       />
 
       {/* Dislikes Modal */}
@@ -1676,16 +2771,37 @@ const QuestionDetail: React.FC = () => {
         onClose={() => dispatch(closeDislikesModal())}
         users={dislikedUsers}
         title={t('users_who_disliked', currentLanguage)}
+        mention={reactionMention ?? undefined}
       />
 
-      {/* Ask Question Modal */}
-      <AskQuestionModal
+      {/* Ask Question Modal - CreateQuestionFlow (merkezi modal, soru oluşturma ile aynı) */}
+      <CreateQuestionFlow
         open={askQuestionModalOpen}
-        onClose={() => setAskQuestionModalOpen(false)}
+        onClose={handleCloseAskQuestionModal}
         onSubmit={handleSubmitRelatedQuestion}
-        aboutQuestion={askQuestionMode === 'question' && targetQuestionId && question ? { id: targetQuestionId, title: question.title } : undefined}
+        question={askQuestionForm}
+        onQuestionChange={(field, value) => {
+          let v = value || '';
+          if (field === 'summary') v = v.slice(0, QUESTION_SUMMARY_MAX_LENGTH);
+          else if (field === 'detail') v = v.slice(0, QUESTION_DETAIL_MAX_LENGTH);
+          else if (field === 'tags') {
+            const tags = v.split(',').map((t) => t.trim().slice(0, TAG_MAX_LENGTH)).filter(Boolean).slice(0, TAG_MAX_COUNT);
+            v = tags.join(', ');
+            if (askQuestionValidationErrors.tags) {
+              setAskQuestionValidationErrors((prev) => {
+                const { tags: _t, ...rest } = prev;
+                return rest;
+              });
+            }
+          }
+          setAskQuestionForm((prev) => ({ ...prev, [field]: v }));
+        }}
+        validationErrors={askQuestionValidationErrors}
+        isSubmitting={askQuestionSubmitting}
+        currentLanguage={currentLanguage}
+        mode="create"
+        aboutQuestion={askQuestionMode === 'question' && targetQuestionId && question ? { id: targetQuestionId, summary: question.summary } : undefined}
         aboutAnswer={askQuestionMode === 'answer' && targetAnswerId ? { id: targetAnswerId, content: answers.find(a => a.id === targetAnswerId)?.content || '' } : undefined}
-        title={askQuestionMode === 'question' ? t('ask_question_about_question', currentLanguage) : t('ask_question_about_answer', currentLanguage)}
       />
 
       {/* Related Questions Popover */}
@@ -1712,7 +2828,8 @@ const QuestionDetail: React.FC = () => {
           contentType="question"
         />
       )}
-    </Layout>
+    </>,
+    true
   );
 };
 

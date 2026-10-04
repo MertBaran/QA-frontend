@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { authService } from '../../services/authService';
 
-const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]).{8,}$/;
+const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{}|;:,.<>?]).{8,}$/;
 const PASSWORD_REQUIREMENT =
   'En az 8 karakter, bir büyük harf, bir küçük harf, bir rakam ve bir özel karakter içermelidir';
 

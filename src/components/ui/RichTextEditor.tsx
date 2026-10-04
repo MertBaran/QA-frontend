@@ -1,9 +1,18 @@
-import React, { useCallback, useRef, useMemo, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import MdEditor from 'react-markdown-editor-lite';
 import 'react-markdown-editor-lite/lib/index.css';
-import { Box, Typography, useTheme, Theme } from '@mui/material';
+import { Box, Typography, TextField, useTheme, Theme, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { styled, SxProps } from '@mui/material/styles';
-import MarkdownIt from 'markdown-it';
+import { InsertLink, Quiz, Chat, ChatBubbleOutline, InsertDriveFile } from '@mui/icons-material';
+import type MarkdownIt from 'markdown-it';
+import { getScrollbarSx } from '../../theme/scrollbarStyles';
+import MarkdownRenderer from './MarkdownRenderer';
+import {
+  MD_EDITOR_PLUGINS_WITH_STYLES,
+  registerMdEditorStylePlugins,
+} from './mdEditorStylePlugins';
+
+registerMdEditorStylePlugins();
 
 // Type for MdEditor ref (react-markdown-editor-lite doesn't export this type properly)
 // Using any for now as the library doesn't provide proper TypeScript types
@@ -23,6 +32,11 @@ const OPACITY_TOOLBAR_HOVER_LIGHT = 0.067; // 11 in hex = ~0.067
 const OPACITY_TOOLBAR_ACTIVE_DARK = 0.2; // 33 in hex = ~0.2
 const OPACITY_TOOLBAR_ACTIVE_LIGHT = 0.133; // 22 in hex = ~0.133
 
+/** Parent state (Redux vb.) senkronu — yazarken her tuşta değil */
+const PARENT_SYNC_DEBOUNCE_MS = 200;
+/** Canlı önizleme paneli — yazmayı bırakınca güncellenir */
+const PREVIEW_DEBOUNCE_MS = 280;
+
 const EDITOR_VIEW_CONFIG = {
   menu: true,
   md: true,
@@ -38,26 +52,70 @@ const EDITOR_CAN_VIEW_CONFIG = {
   hideMenu: false,
 } as const;
 
-// ============================================================================
-// Markdown Parser Configuration
-// ============================================================================
-
-const createMarkdownParser = (): MarkdownIt => {
-  return new MarkdownIt({
-    html: true,
-    linkify: true,
-    typographer: true,
-  });
+const EDITOR_CONFIG = {
+  // afterRender + markdown-it parse her tuşta çift onChange/CPU üretiyordu
+  onChangeTrigger: 'beforeRender' as const,
 };
 
-// Singleton instance for performance
-const markdownParser = createMarkdownParser();
+const REF_TRIGGER = '/ref';
+const REF_LEN = REF_TRIGGER.length;
+
+/** Matches [text]/ref - user provides link text in brackets before /ref */
+const REF_WITH_LINK_TEXT = /\[([^\]]*)\]\s*\/ref$/;
+
+/** /ref seçiminde gösterim - numara - açıklama formatında */
+function getRefDisplayLabel(
+  ref: { type: string; content: string; description: string },
+  index: number,
+  lang: string = 'tr'
+): string {
+  const n = index + 1;
+  const typeLabels: Record<string, { tr: string; en: string; de: string }> = {
+    soru: { tr: 'soru', en: 'question', de: 'Frage' },
+    cevap: { tr: 'cevap', en: 'answer', de: 'Antwort' },
+    yorum: { tr: 'yorum', en: 'comment', de: 'Kommentar' },
+    link: { tr: 'link', en: 'link', de: 'Link' },
+    dosya: { tr: 'dosya', en: 'file', de: 'Datei' },
+  };
+  const typeKey = (lang === 'en' ? 'en' : lang === 'de' ? 'de' : 'tr') as 'tr' | 'en' | 'de';
+  const typeLabel = typeLabels[ref.type]?.[typeKey] ?? ref.type;
+  let desc: string;
+  if (ref.description?.trim()) {
+    desc = ref.description.trim();
+  } else {
+    switch (ref.type) {
+      case 'link':
+        desc = ref.content?.trim()?.slice(0, 60) || `ref-${n} ${typeLabel}`;
+        break;
+      case 'dosya':
+        desc = ref.content?.split('/').pop()?.slice(0, 40) || `ref-${n} ${typeLabel}`;
+        break;
+      case 'soru':
+      case 'cevap':
+      case 'yorum':
+      default:
+        desc = `ref-${n} ${typeLabel}`;
+    }
+  }
+  return `${n} - ${desc}`;
+}
+
+function RefTypeIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'link': return <InsertLink fontSize="small" />;
+    case 'soru': return <Quiz fontSize="small" />;
+    case 'cevap': return <Chat fontSize="small" />;
+    case 'yorum': return <ChatBubbleOutline fontSize="small" />;
+    case 'dosya': return <InsertDriveFile fontSize="small" />;
+    default: return <InsertLink fontSize="small" />;
+  }
+}
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export const CONTENT_MAX_LENGTH = 8000;
+export const CONTENT_MAX_LENGTH = 10000;
 const DEFAULT_MAX_LENGTH = CONTENT_MAX_LENGTH;
 
 export interface RichTextEditorProps {
@@ -79,13 +137,20 @@ export interface RichTextEditorProps {
   helperText?: string;
   /** Custom styles applied to the editor container */
   sx?: SxProps<Theme>;
+  /** When true, editor fills parent height (use with flex parent) */
+  fillHeight?: boolean;
   /** Custom markdown parser configuration */
   markdownParser?: MarkdownIt;
-}
-
-interface EditorState {
-  internalValue: string;
-  isInitialized: boolean;
+  /** References list - when provided, enables ref: link syntax and hover highlight */
+  references?: { type: string; content: string; description: string }[];
+  /** Currently hovered reference index for highlight sync */
+  hoveredRefIndex?: number | null;
+  /** Callback when user hovers over a reference link in content */
+  onRefHover?: (refIndex: number | null) => void;
+  /** Dil kodu - referans etiketleri için (ref-1 soru vb.) */
+  currentLanguage?: string;
+  /** Yazma alanına tıklanınca, örneğin referans çentiğini açmak için */
+  onActivate?: () => void;
 }
 
 // ============================================================================
@@ -117,11 +182,32 @@ const EditorContainer = styled(Box, {
     return `${theme.palette.primary.main}${Math.round(OPACITY_FOCUS_SHADOW * 255).toString(16).padStart(2, '0')}`;
   };
 
-  const getToolbarBackground = () => {
-    return theme.palette.mode === 'dark'
-      ? theme.palette.background.default
-      : theme.palette.grey[100];
+  const getEditorChrome = () => '#F7F7F8';
+
+  const getEditorScrollbarSx = () => {
+    const track = getEditorChrome();
+    const thumb = '#E4E5E7';
+    return {
+      '&::-webkit-scrollbar': {
+        width: 10,
+        height: 10,
+      },
+      '&::-webkit-scrollbar-track': {
+        background: track,
+      },
+      '&::-webkit-scrollbar-thumb': {
+        background: thumb,
+        borderRadius: 5,
+        '&:hover': {
+          background: '#D4D6D8',
+        },
+      },
+      scrollbarWidth: 'thin' as const,
+      scrollbarColor: `${thumb} ${track}`,
+    };
   };
+
+  const getToolbarBackground = () => getEditorChrome();
 
   const getToolbarHoverBackground = () => {
     const baseColor = theme.palette.primary.main;
@@ -162,17 +248,19 @@ const EditorContainer = styled(Box, {
       backgroundColor: `${theme.palette.background.paper} !important`,
       color: `${theme.palette.text.primary} !important`,
       borderRight: `1px solid ${theme.palette.divider} !important`,
+      ...getEditorScrollbarSx(),
       '&:last-child': {
         borderRight: 'none !important',
       },
     },
-    '& .rc-md-editor .editor-container .section-container .section .input, & .rc-md-editor .editor-container .sec-md .input': {
+    '& .rc-md-editor .editor-container .section-container .section .input, & .rc-md-editor .editor-container .sec-md .input, & .rc-md-editor textarea': {
       backgroundColor: `${theme.palette.background.paper} !important`,
       color: `${theme.palette.text.primary} !important`,
       fontSize: '16px !important',
       lineHeight: '1.6 !important',
       fontFamily: 'inherit !important',
       padding: '10px 15px !important',
+      ...getEditorScrollbarSx(),
       '&::placeholder': {
         color: `${theme.palette.text.secondary} !important`,
         opacity: OPACITY_PLACEHOLDER,
@@ -186,7 +274,8 @@ const EditorContainer = styled(Box, {
       fontFamily: 'inherit !important',
       padding: '10px 15px !important',
     },
-    '& .rc-md-editor .toolbar': {
+    '& .rc-md-editor .rc-md-navigation, & .rc-md-editor .toolbar': {
+      background: `${getToolbarBackground()} !important`,
       backgroundColor: `${getToolbarBackground()} !important`,
       borderBottom: `1px solid ${theme.palette.divider} !important`,
       padding: '8px 4px !important',
@@ -222,53 +311,6 @@ const ErrorText = styled(Typography)(({ theme }) => ({
 }));
 
 // ============================================================================
-// Helper Hooks
-// ============================================================================
-
-/**
- * Manages internal editor state with controlled reset behavior
- */
-const useEditorState = (externalValue: string): [string, (value: string) => void] => {
-  const [state, setState] = React.useState<EditorState>({
-    internalValue: externalValue,
-    isInitialized: false,
-  });
-
-  // Initialize on mount
-  useEffect(() => {
-    if (!state.isInitialized) {
-      setState({
-        internalValue: externalValue,
-        isInitialized: true,
-      });
-    }
-  }, [externalValue, state.isInitialized]);
-
-  // Reset when external value becomes empty
-  useEffect(() => {
-    if (
-      state.isInitialized &&
-      externalValue === '' &&
-      state.internalValue !== ''
-    ) {
-      setState((prev) => ({
-        ...prev,
-        internalValue: '',
-      }));
-    }
-  }, [externalValue, state.internalValue, state.isInitialized]);
-
-  const updateValue = useCallback((newValue: string) => {
-    setState((prev) => ({
-      ...prev,
-      internalValue: newValue,
-    }));
-  }, []);
-
-  return [state.internalValue, updateValue];
-};
-
-// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -276,17 +318,8 @@ const useEditorState = (externalValue: string): [string, (value: string) => void
  * A rich text editor component with markdown support.
  * Built on top of react-markdown-editor-lite with Material-UI theming.
  *
- * @example
- * ```tsx
- * <RichTextEditor
- *   value={content}
- *   onChange={(value) => setContent(value || '')}
- *   placeholder="Enter your content..."
- *   minHeight={300}
- *   error={hasError}
- *   helperText={errorMessage}
- * />
- * ```
+ * Typing is buffered locally and parent onChange is debounced so Redux/heavy
+ * parents do not re-render on every keystroke.
  */
 const RichTextEditor: React.FC<RichTextEditorProps> = ({
   value,
@@ -298,58 +331,436 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   error = false,
   helperText,
   sx,
-  markdownParser: customParser,
+  fillHeight = false,
+  references,
+  hoveredRefIndex,
+  onRefHover,
+  currentLanguage = 'tr',
+  onActivate,
 }) => {
   const theme = useTheme();
   const editorRef = useRef<MdEditorRef>(null);
-  const [internalValue, setInternalValue] = useEditorState(value);
-  const parser = useMemo(() => customParser || markdownParser, [customParser]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const lastEmittedRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [refDropdownOpen, setRefDropdownOpen] = useState(false);
+  const [refReplaceStart, setRefReplaceStart] = useState(0);
+  const [refReplaceLength, setRefReplaceLength] = useState(0);
+  const [refLinkText, setRefLinkText] = useState<string | null>(null);
+
+  const [previewOn, setPreviewOn] = useState(false);
+  const [previewContent, setPreviewContent] = useState(value);
+  const previewApiRef = useRef({
+    toggle: () => {},
+  });
+  previewApiRef.current.toggle = () => setPreviewOn((v) => !v);
+
+  const previewPluginConfig = useRef({
+    'preview-toggle': {
+      onToggle: () => previewApiRef.current.toggle(),
+    },
+  }).current;
+
+  // Parent dışarıdan değeri değiştirdiğinde (reset / yükleme) draft'ı senkronla
+  useEffect(() => {
+    if (value !== lastEmittedRef.current) {
+      lastEmittedRef.current = value;
+      setDraft(value);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    }
+  }, [value]);
+
+  const emitToParent = useCallback((text: string) => {
+    lastEmittedRef.current = text;
+    onChangeRef.current(text);
+  }, []);
+
+  const flushToParent = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const current = draftRef.current;
+    if (current !== lastEmittedRef.current) {
+      emitToParent(current);
+    }
+  }, [emitToParent]);
+
+  // Unmount'ta son karakterleri kaybetme
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      const current = draftRef.current;
+      if (current !== lastEmittedRef.current) {
+        onChangeRef.current(current);
+        lastEmittedRef.current = current;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!onRefHover || !containerRef.current) return;
+    const el = containerRef.current;
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest?.('.content-ref');
+      if (target) {
+        const refIdx = target.getAttribute('data-ref');
+        if (refIdx != null) onRefHover(parseInt(refIdx, 10));
+      }
+    };
+    const handleMouseOut = (e: MouseEvent) => {
+      const related = e.relatedTarget as HTMLElement;
+      if (!related?.closest?.('.content-ref')) onRefHover(null);
+    };
+    el.addEventListener('mouseover', handleMouseOver);
+    el.addEventListener('mouseout', handleMouseOut);
+    return () => {
+      el.removeEventListener('mouseover', handleMouseOver);
+      el.removeEventListener('mouseout', handleMouseOut);
+    };
+  }, [onRefHover]);
 
   // Reset editor instance when value is cleared externally
   useEffect(() => {
     if (
       value === '' &&
-      internalValue === '' &&
+      draft === '' &&
       editorRef.current &&
       typeof editorRef.current.setValue === 'function'
     ) {
       try {
         editorRef.current.setValue('');
       } catch (err) {
-        // Silently handle errors if editor is not ready
         console.warn('Failed to reset editor:', err);
       }
     }
-  }, [value, internalValue]);
+  }, [value, draft]);
 
   const handleChange = useCallback(
     ({ text }: { text: string; html: string }) => {
       const truncated = text.length > maxLength ? text.slice(0, maxLength) : text;
-      setInternalValue(truncated);
-      onChange(truncated);
+      setDraft(truncated);
+      draftRef.current = truncated;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        emitToParent(truncated);
+      }, PARENT_SYNC_DEBOUNCE_MS);
     },
-    [onChange, setInternalValue, maxLength]
+    [maxLength, emitToParent]
   );
 
-  const renderHTML = useCallback(
-    (text: string) => parser.render(text),
-    [parser]
+  // Preview kapalı: markdown-it parse'ı her tuşta boşa çalışmasın
+  const renderHTML = useCallback((_text: string) => '', []);
+
+  // Önizleme paneli: açıkken draft'ı debounce ile MarkdownRenderer'a ver
+  useEffect(() => {
+    if (!previewOn) return;
+    const timer = setTimeout(() => setPreviewContent(draft), PREVIEW_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [draft, previewOn]);
+
+  useEffect(() => {
+    if (previewOn) setPreviewContent(draftRef.current);
+  }, [previewOn]);
+
+  const editorHeight = fillHeight ? '100%' : `${minHeight}px`;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.querySelectorAll('.content-ref.ref-highlighted').forEach((s) => (s as HTMLElement).classList.remove('ref-highlighted'));
+    if (hoveredRefIndex != null) {
+      container.querySelectorAll(`.content-ref[data-ref="${hoveredRefIndex}"]`).forEach((s) => (s as HTMLElement).classList.add('ref-highlighted'));
+    }
+    return () => container.querySelectorAll('.content-ref.ref-highlighted').forEach((s) => (s as HTMLElement).classList.remove('ref-highlighted'));
+  }, [hoveredRefIndex]);
+
+  // /ref slash command: show reference selector when user types /ref
+  useEffect(() => {
+    if (disabled || !references?.length) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const textarea = container.querySelector('textarea');
+      if (!textarea || e.target !== textarea) return;
+
+      const target = textarea;
+      const value = target.value;
+      const start = target.selectionStart;
+      const beforeCursor = value.slice(0, start);
+
+      const openRefDropdown = (replaceStart: number, replaceLen: number, linkText: string | null) => {
+        setRefReplaceStart(replaceStart);
+        setRefReplaceLength(replaceLen);
+        setRefLinkText(linkText);
+        setRefDropdownOpen(true);
+      };
+
+      const matchWithBrackets = beforeCursor.match(REF_WITH_LINK_TEXT);
+      if (matchWithBrackets) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const fullMatch = matchWithBrackets[0];
+          openRefDropdown(start - fullMatch.length, fullMatch.length, matchWithBrackets[1]);
+        }
+      } else if (e.key === 'f' && beforeCursor.endsWith('/re')) {
+        const linkBefore = beforeCursor.match(/\[([^\]]*)\]\s*\/re$/);
+        setTimeout(() => {
+          const v = (textarea as HTMLTextAreaElement).value;
+          const s = (textarea as HTMLTextAreaElement).selectionStart;
+          const b = v.slice(0, s);
+          const m = b.match(REF_WITH_LINK_TEXT);
+          if (m) {
+            openRefDropdown(s - m[0].length, m[0].length, m[1]);
+          } else if (b.endsWith(REF_TRIGGER)) {
+            openRefDropdown(s - REF_LEN, REF_LEN, null);
+          } else if (linkBefore) {
+            openRefDropdown(start - linkBefore[0].length, linkBefore[0].length + 1, linkBefore[1]);
+          } else {
+            openRefDropdown(start - 3, REF_LEN, null);
+          }
+        }, 0);
+      } else if (beforeCursor.endsWith(REF_TRIGGER)) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          openRefDropdown(start - REF_LEN, REF_LEN, null);
+        }
+      }
+    };
+
+    container.addEventListener('keydown', handleKeyDown, true);
+    return () => container.removeEventListener('keydown', handleKeyDown, true);
+  }, [disabled, references?.length]);
+
+  const handleRefSelect = useCallback(
+    (index: number) => {
+      if (!references?.[index]) return;
+
+      const linkText = refLinkText ?? getRefDisplayLabel(references[index], index, currentLanguage);
+      const toInsert = `[${linkText}](ref:${index})`;
+
+      const replaceLen = refReplaceLength || REF_LEN;
+      const text = draftRef.current;
+      const before = text.slice(0, refReplaceStart);
+      const after = text.slice(refReplaceStart + replaceLen);
+      const newText = (before + toInsert + after).slice(0, maxLength);
+      const newCursorPos = refReplaceStart + toInsert.length;
+
+      setDraft(newText);
+      draftRef.current = newText;
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+      emitToParent(newText);
+      setRefDropdownOpen(false);
+      setRefLinkText(null);
+
+      setTimeout(() => {
+        const textarea = containerRef.current?.querySelector('textarea');
+        if (textarea) {
+          (textarea as HTMLTextAreaElement).focus();
+          (textarea as HTMLTextAreaElement).setSelectionRange(newCursorPos, newCursorPos);
+        }
+      }, 50);
+    },
+    [references, refReplaceStart, refReplaceLength, refLinkText, emitToParent, maxLength, currentLanguage]
   );
+
+  if (disabled) {
+    return (
+      <Box ref={containerRef} sx={fillHeight ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : undefined}>
+        <EditorContainer hasError={error} sx={[sx, fillHeight && { flex: 1, minHeight: 0 }].filter(Boolean) as SxProps<Theme>}>
+          <TextField
+            fullWidth
+            multiline
+            value={draft}
+            inputProps={{ readOnly: true }}
+            variant="outlined"
+            sx={{
+              height: fillHeight ? '100%' : undefined,
+              minHeight: fillHeight ? minHeight : undefined,
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: `${theme.palette.background.paper} !important`,
+                color: `${theme.palette.text.primary} !important`,
+                fontSize: '16px !important',
+                lineHeight: 1.6,
+                fontFamily: 'inherit',
+                height: fillHeight ? '100%' : undefined,
+                minHeight: fillHeight ? '100%' : minHeight,
+                alignItems: 'flex-start',
+                '& fieldset': { borderColor: theme.palette.divider },
+                '& .MuiInputBase-input': {
+                  padding: '10px 15px',
+                  overflowY: 'auto !important',
+                },
+              },
+            }}
+          />
+        </EditorContainer>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5, minHeight: 20 }}>
+          <span />
+          <Typography variant="caption" sx={{ color: theme.palette.text.secondary, ml: 'auto' }}>
+            {draft.length} / {maxLength}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <EditorContainer hasError={error} sx={sx}>
-        <MdEditor
-          ref={editorRef}
-          value={internalValue}
-          style={{ height: `${minHeight}px` }}
-          renderHTML={renderHTML}
-          onChange={handleChange}
-          placeholder={placeholder}
-          view={EDITOR_VIEW_CONFIG}
-          canView={EDITOR_CAN_VIEW_CONFIG}
-        />
+    <Box
+      ref={containerRef}
+      onMouseDownCapture={() => onActivate?.()}
+      onBlur={(e) => {
+        // Focus container dışına çıkınca parent'a hemen yaz
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          flushToParent();
+        }
+      }}
+      sx={fillHeight ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : undefined}
+    >
+      <EditorContainer
+          hasError={error}
+          sx={[
+            references?.length
+              ? {
+                  '& .content-ref': {
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    textDecorationStyle: 'dotted',
+                    textUnderlineOffset: 2,
+                    color: (t: { palette: { primary: { main: string } } }) => t.palette.primary.main,
+                    borderRadius: 2,
+                    px: 0.25,
+                    transition: 'background-color 0.15s',
+                    '&:hover, &.ref-highlighted': {
+                      backgroundColor: (t: { palette: { primary: { main: string }; mode: string } }) =>
+                        t.palette.mode === 'dark' ? `${t.palette.primary.main}30` : `${t.palette.primary.main}20`,
+                    },
+                  },
+                }
+              : {},
+            sx,
+            fillHeight
+              ? {
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  '& .rc-md-editor': { flex: 1, minHeight: 0 },
+                }
+              : undefined,
+          ].filter(Boolean) as SxProps<Theme>
+        }
+        >
+        <Box
+          sx={{
+            display: 'flex',
+            height: editorHeight,
+            minHeight: fillHeight ? minHeight : undefined,
+            flex: fillHeight ? 1 : undefined,
+            minWidth: 0,
+          }}
+        >
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              '& .rc-md-editor': { height: '100% !important', flex: 1, minHeight: 0 },
+            }}
+          >
+            <MdEditor
+              ref={editorRef}
+              value={draft}
+              style={{ height: '100%', ...(fillHeight && { minHeight: '100%' }) }}
+              renderHTML={renderHTML}
+              onChange={handleChange}
+              onBlur={flushToParent}
+              placeholder={placeholder}
+              view={EDITOR_VIEW_CONFIG}
+              canView={EDITOR_CAN_VIEW_CONFIG}
+              config={EDITOR_CONFIG}
+              plugins={MD_EDITOR_PLUGINS_WITH_STYLES}
+              pluginConfig={previewPluginConfig}
+            />
+          </Box>
+          {previewOn && (
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                overflow: 'auto',
+                borderLeft: `1px solid ${theme.palette.divider}`,
+                px: 1.5,
+                py: 1.25,
+                backgroundColor: theme.palette.background.paper,
+                ...getScrollbarSx(theme),
+              }}
+            >
+              {previewContent.trim() ? (
+                <MarkdownRenderer
+                  content={previewContent}
+                  highlightedRefIndex={hoveredRefIndex}
+                  onRefHover={onRefHover}
+                />
+              ) : (
+                <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
+                  {currentLanguage === 'tr' ? 'Önizleme burada görünecek…' : 'Preview will appear here…'}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </Box>
       </EditorContainer>
+      <Menu
+        open={refDropdownOpen}
+        onClose={() => setRefDropdownOpen(false)}
+        anchorEl={containerRef.current}
+        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        PaperProps={{
+          sx: {
+            maxHeight: 320,
+            minWidth: 320,
+            mt: 1,
+            ...getScrollbarSx(theme),
+          },
+        }}
+      >
+        {references?.map((ref, idx) => (
+          <MenuItem
+            key={idx}
+            onClick={() => handleRefSelect(idx)}
+            sx={{ py: 1.5 }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              <RefTypeIcon type={ref.type} />
+            </ListItemIcon>
+            <ListItemText
+              primary={getRefDisplayLabel(ref, idx, currentLanguage)}
+              secondary={ref.type === 'link' && ref.content && ref.content.length > 60 ? ref.content.slice(0, 60) + '...' : undefined}
+              primaryTypographyProps={{ variant: 'body2', fontWeight: 500 }}
+              secondaryTypographyProps={{ variant: 'caption' }}
+            />
+          </MenuItem>
+        ))}
+      </Menu>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.5, minHeight: 20 }}>
         {error && helperText ? (
           <ErrorText variant="caption">{helperText}</ErrorText>
@@ -359,13 +770,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         <Typography
           variant="caption"
           sx={{
-            color: internalValue.length >= maxLength
+            color: draft.length >= maxLength
               ? theme.palette.error.main
               : theme.palette.text.secondary,
             ml: 'auto',
           }}
         >
-          {internalValue.length} / {maxLength}
+          {draft.length} / {maxLength}
         </Typography>
       </Box>
     </Box>
@@ -397,7 +808,11 @@ const arePropsEqual = (
     prevProps.disabled === nextProps.disabled &&
     prevProps.minHeight === nextProps.minHeight &&
     prevProps.maxLength === nextProps.maxLength &&
-    prevProps.placeholder === nextProps.placeholder
+    prevProps.placeholder === nextProps.placeholder &&
+    prevProps.fillHeight === nextProps.fillHeight &&
+    prevProps.hoveredRefIndex === nextProps.hoveredRefIndex &&
+    prevProps.references === nextProps.references &&
+    prevProps.currentLanguage === nextProps.currentLanguage
   );
 };
 

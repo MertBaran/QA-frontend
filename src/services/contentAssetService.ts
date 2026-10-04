@@ -5,7 +5,9 @@ export type ContentAssetType =
   | 'question-attachment'
   | 'answer-attachment'
   | 'user-profile-avatar'
-  | 'user-profile-background';
+  | 'user-profile-background'
+  | 'bookmark-collection-cover'
+  | 'message-voice';
 
 export type ContentAssetVisibility = 'public' | 'private';
 
@@ -49,6 +51,14 @@ export interface DeleteAssetRequest {
   entityId?: string;
 }
 
+export interface DownloadAssetRequest {
+  key: string;
+  type: ContentAssetType;
+  ownerId?: string;
+  entityId?: string;
+  filename?: string;
+}
+
 class ContentAssetService {
   async createPresignedUpload(
     payload: CreatePresignedAssetUploadRequest,
@@ -80,6 +90,19 @@ class ContentAssetService {
 
   async deleteAsset(payload: DeleteAssetRequest): Promise<void> {
     await api.delete(`${BASE_PATH}/`, { data: payload });
+  }
+
+  async downloadAsset(payload: DownloadAssetRequest): Promise<Blob> {
+    const params = new URLSearchParams();
+    params.set('key', payload.key);
+    params.set('type', payload.type);
+    if (payload.ownerId) params.set('ownerId', payload.ownerId);
+    if (payload.entityId) params.set('entityId', payload.entityId);
+    if (payload.filename) params.set('filename', payload.filename);
+    const response = await api.get(`${BASE_PATH}/download?${params.toString()}`, {
+      responseType: 'blob',
+    });
+    return response.data as Blob;
   }
 }
 

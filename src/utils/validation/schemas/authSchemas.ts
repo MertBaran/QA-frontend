@@ -15,7 +15,7 @@ export const loginSchema = yup.object({
 
 // Register validation schema
 // Password validation regex: min 8 chars, uppercase, lowercase, number, special char
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]).{8,}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{}|;:,.<>?]).{8,}$/;
 
 export const createPasswordChangeSchema = (lang: string) =>
   yup.object({
