@@ -17,7 +17,7 @@ export const config: EnvironmentConfig = {
   apiUrl: process.env.REACT_APP_API_URL || 'http://localhost:5000/api',
   sentryDsn: process.env.REACT_APP_SENTRY_DSN,
   appName: process.env.REACT_APP_NAME || 'QA Platform',
-  appVersion: process.env.REACT_APP_VERSION || '1.0.0',
+  appVersion: process.env.REACT_APP_VERSION || '1.8.0',
   isDevelopment: process.env.NODE_ENV === 'development',
   isProduction: process.env.NODE_ENV === 'production',
   isTest: process.env.NODE_ENV === 'test',
