@@ -54,7 +54,7 @@ REACT_APP_SENTRY_DSN=YOUR_SENTRY_DSN_HERE
 
 # App Configuration
 REACT_APP_NAME=QA Platform
-REACT_APP_VERSION=1.0.0
+REACT_APP_VERSION=1.8.0
 ```
 
 ## Project Structure
