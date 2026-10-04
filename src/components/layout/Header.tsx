@@ -13,7 +13,7 @@ import {
   useMediaQuery,
   Drawer,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   Divider,
   Badge,
@@ -26,12 +26,11 @@ import {
   Person,
   QuestionAnswer,
   Notifications,
-  TrendingUp,
-  Home,
   AdminPanelSettings,
   Settings,
-  Search as SearchIcon,
   FilterList,
+  Hub,
+  ManageSearch,
 } from '@mui/icons-material';
 import preferLanguageIconBlack from '../../asset/icons/home/prefer_language_black.png';
 import preferLanguageIconWhite from '../../asset/icons/home/prefer_language_white.png';
@@ -196,6 +195,7 @@ const Header = () => {
     params.set('q', trimmedQuery);
     params.delete('includeAnswers');
     navigate(`/search?${params.toString()}`);
+    setMobileOpen(false);
   };
 
   const handleLanguageMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -328,88 +328,114 @@ const Header = () => {
       }}
       sx={{
         display: { xs: 'block', md: 'none' },
-        '& .MuiDrawer-paper': { 
-          boxSizing: 'border-box', 
-          width: 280,
-          background: 'linear-gradient(135deg,rgb(15, 64, 84) 0%,rgb(29, 83, 103) 100%)',
-          color: (theme) => theme.palette.text.primary,
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: 300,
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          backgroundImage: 'none',
+          borderRight: 1,
+          borderColor: 'divider',
         },
       }}
     >
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography variant="h5" sx={(theme) => ({ 
-          background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          fontWeight: 700,
-        })}>
-          <QuestionAnswer sx={{ mr: 1, verticalAlign: 'middle' }} />
-          QA Platform
+      <Box
+        onClick={() => handleNavigation('/')}
+        sx={{ display: 'flex', alignItems: 'center', gap: 1, px: 2, py: 2.5, cursor: 'pointer' }}
+      >
+        <QuestionAnswer sx={{ fontSize: 28, color: 'primary.main' }} />
+        <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          {t('qa_platform', currentLanguage)}
         </Typography>
       </Box>
-      <Divider sx={(theme) => ({ borderColor: theme.palette.divider })} />
-      <List>
-        <ListItem button onClick={() => handleNavigation('/')} sx={{ py: 2 }}>
-          <Home sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-          <ListItemText primary="Home" />
-        </ListItem>
-        <ListItem button onClick={() => handleNavigation('/questions')} sx={{ py: 2 }}>
-          <QuestionAnswer sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-          <ListItemText primary="Questions" />
-        </ListItem>
-        <ListItem button onClick={() => handleNavigation('/trending')} sx={{ py: 2 }}>
-          <TrendingUp sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-          <ListItemText primary="Trending" />
-        </ListItem>
-        <ListItem button onClick={() => handleNavigation('/search')} sx={{ py: 2 }}>
-          <SearchIcon sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-          <ListItemText primary={t('search', currentLanguage)} />
-        </ListItem>
-        {isAuthenticated && (
-          <ListItem button onClick={() => handleNavigation('/ask')} sx={{ py: 2 }}>
-            <QuestionAnswer sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-            <ListItemText primary="Ask Question" />
-          </ListItem>
-        )}
+      <Divider />
+      <List sx={{ px: 1, py: 1 }}>
+        <ListItemButton
+          selected={location.pathname.startsWith('/inquire')}
+          onClick={() => handleNavigation('/inquire')}
+        >
+          <Hub sx={{ mr: 2, color: 'primary.main' }} />
+          <ListItemText primary={t('inquire', currentLanguage)} />
+        </ListItemButton>
+        <ListItemButton
+          selected={location.pathname.startsWith('/query')}
+          onClick={() => handleNavigation('/query')}
+        >
+          <ManageSearch sx={{ mr: 2, color: 'primary.main' }} />
+          <ListItemText primary={t('query', currentLanguage)} />
+        </ListItemButton>
       </List>
-      <Divider sx={(theme) => ({ borderColor: theme.palette.divider })} />
+      <Box sx={{ px: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <HeaderSearchField
+          value={searchQuery}
+          placeholder={t('search', currentLanguage)}
+          searchLabel={t('search', currentLanguage)}
+          clearLabel={t('clear', currentLanguage)}
+          onChange={setSearchQuery}
+          onSubmit={handleSearch}
+          errorFlash={searchErrorFlash}
+          onErrorFlashEnd={() => setSearchErrorFlash(false)}
+        />
+        <IconButton
+          aria-label={t('filter', currentLanguage)}
+          onClick={() => {
+            setMobileOpen(false);
+            handleOpenFilter();
+          }}
+          sx={{
+            flexShrink: 0,
+            border: 1,
+            borderColor: activeFilters.length > 0 ? 'primary.main' : 'divider',
+            color: activeFilters.length > 0 ? 'primary.main' : 'text.secondary',
+          }}
+        >
+          <Badge color="primary" variant="dot" invisible={activeFilters.length === 0} overlap="circular">
+            <FilterList />
+          </Badge>
+        </IconButton>
+      </Box>
+      <Divider />
       {isAuthenticated ? (
-        <List>
-          <ListItem button onClick={() => handleNavigation('/profile')} sx={{ py: 2 }}>
-            <Person sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
+        <List sx={{ px: 1, py: 1 }}>
+          <ListItemButton onClick={() => handleNavigation('/profile')}>
+            <Person sx={{ mr: 2, color: 'primary.main' }} />
             <ListItemText primary={t('profile', currentLanguage)} />
-          </ListItem>
-
-          {/* Admin Panel Link - Sadece admin yetkisi olan kullanıcılar için */}
-          {hasAdminPermission && (
-            <ListItem button onClick={() => handleNavigation('/admin/dashboard')} sx={{ py: 2 }}>
-              <AdminPanelSettings sx={(theme) => ({ mr: 2, color: theme.palette.warning.main })} />
-              <ListItemText primary={t('admin_dashboard', currentLanguage)} />
-            </ListItem>
-          )}
-          
-          <ListItem
-            button
+          </ListItemButton>
+          <ListItemButton
             onClick={() => {
+              setMobileOpen(false);
+              openSettingsModal?.();
+            }}
+          >
+            <Settings sx={{ mr: 2, color: 'text.secondary' }} />
+            <ListItemText primary={t('settings', currentLanguage)} />
+          </ListItemButton>
+          {hasAdminPermission && (
+            <ListItemButton onClick={() => handleNavigation('/admin/dashboard')}>
+              <AdminPanelSettings sx={{ mr: 2, color: 'warning.main' }} />
+              <ListItemText primary={t('admin_dashboard', currentLanguage)} />
+            </ListItemButton>
+          )}
+          <ListItemButton
+            onClick={() => {
+              setMobileOpen(false);
               void handleLogout();
             }}
-            sx={{ py: 2 }}
           >
-            <Logout sx={(theme) => ({ mr: 2, color: theme.palette.error.main })} />
+            <Logout sx={{ mr: 2, color: 'error.main' }} />
             <ListItemText primary={t('logout', currentLanguage)} />
-          </ListItem>
+          </ListItemButton>
         </List>
       ) : (
-        <List>
-          <ListItem button onClick={() => handleNavigation('/login')} sx={{ py: 2 }}>
-            <Person sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-            <ListItemText primary="Login" />
-          </ListItem>
-          <ListItem button onClick={() => handleNavigation('/register')} sx={{ py: 2 }}>
-            <Person sx={(theme) => ({ mr: 2, color: theme.palette.primary.main })} />
-            <ListItemText primary="Register" />
-          </ListItem>
+        <List sx={{ px: 1, py: 1 }}>
+          <ListItemButton onClick={() => handleNavigation('/login')}>
+            <Person sx={{ mr: 2, color: 'primary.main' }} />
+            <ListItemText primary={t('login', currentLanguage)} />
+          </ListItemButton>
+          <ListItemButton onClick={() => handleNavigation('/register')}>
+            <Person sx={{ mr: 2, color: 'primary.main' }} />
+            <ListItemText primary={t('register', currentLanguage)} />
+          </ListItemButton>
         </List>
       )}
     </Drawer>
@@ -444,42 +470,51 @@ const Header = () => {
           <Box
             sx={{
               flex: '1 1 0%',
-              minWidth: 0,
-              overflow: 'hidden',
+              minWidth: 48,
               display: 'flex',
               alignItems: 'center',
+              overflow: 'hidden',
             }}
           >
-            {isMobile ? (
+            {isMobile && (
               <IconButton
                 color="inherit"
                 aria-label="open drawer"
                 edge="start"
                 onClick={handleMobileDrawerToggle}
+                sx={{ flexShrink: 0 }}
               >
                 <MenuIcon />
               </IconButton>
-            ) : (
+            )}
+            <Box
+              onClick={() => navigate('/')}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                flexShrink: 0,
+                cursor: 'pointer',
+                minWidth: 36,
+              }}
+            >
+              <QuestionAnswer sx={{ fontSize: 28, color: 'primary.main' }} />
               <Typography
                 variant="h5"
                 noWrap
-                component="div"
+                component="span"
                 sx={{
-                  cursor: 'pointer',
+                  ml: 1,
                   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   fontWeight: 700,
-                  display: { xs: 'none', xl: 'flex' },
-                  alignItems: 'center',
+                  display: { xs: 'none', xl: 'inline' },
                 }}
-                onClick={() => navigate('/')}
               >
-                <QuestionAnswer sx={{ mr: 1, fontSize: 28 }} />
                 {t('qa_platform', currentLanguage)}
               </Typography>
-            )}
+            </Box>
           </Box>
 
           {/* Orta: soru listesi ile aynı maxWidth="lg" hizası */}

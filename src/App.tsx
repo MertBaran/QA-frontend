@@ -127,6 +127,10 @@ function AppContent() {
               color: `${theme.palette.text.primary} !important`,
               backgroundColor: `${theme.palette.background.paper} !important`,
             },
+            '#root .rc-md-editor .rc-md-navigation': {
+              background: '#F7F7F8 !important',
+              backgroundColor: '#F7F7F8 !important',
+            },
             '#root .rc-md-editor .editor-container .sec-html .html-wrap': {
               color: `${theme.palette.text.primary} !important`,
             },

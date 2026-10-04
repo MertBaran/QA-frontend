@@ -1,9 +1,16 @@
 import { createSlice } from '@reduxjs/toolkit';
 import { ThemeState } from '../../models/ThemeState';
 
+const getSystemColorMode = (): ThemeState['mode'] => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'light';
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
+
 const initialState: ThemeState = {
-  name: 'molume', // molume, papirus, magnefite
-  mode: 'light', // light, dark
+  name: 'magnefite',
+  mode: getSystemColorMode(),
   language: 'tr', // tr, en
   fontSize: 'medium', // small, medium, large
   notifications: {

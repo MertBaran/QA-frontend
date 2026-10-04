@@ -319,11 +319,12 @@ const Login = () => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              filter: mode === 'dark' ? 'brightness(0.35)' : 'brightness(0.55)',
+              filter: mode === 'dark' ? 'brightness(0.35)' : 'none',
               pointerEvents: 'none',
               zIndex: 0,
             }}
           />
+          {mode === 'dark' && (
           <Box
             sx={{
               position: 'fixed',
@@ -331,13 +332,12 @@ const Login = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              background: mode === 'dark'
-                ? 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)'
-                : 'linear-gradient(180deg, rgba(225, 226, 228, 0.82) 0%, rgba(209, 212, 216, 0.78) 50%, rgba(209, 212, 216, 0.9) 100%)',
+              background: 'linear-gradient(180deg, rgba(15, 15, 15, 0.75) 0%, rgba(15, 15, 15, 0.6) 60%, rgba(15, 15, 15, 0.8) 100%)',
               pointerEvents: 'none',
               zIndex: 0,
             }}
           />
+          )}
         </>
       )}
       <Container component="main" maxWidth="xs" sx={{ position: 'relative', zIndex: 1 }}>

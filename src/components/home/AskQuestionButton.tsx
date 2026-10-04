@@ -74,10 +74,6 @@ const AskQuestionButton: React.FC<AskQuestionButtonProps> = ({
   const entryAngle = sheen.entryAngle;
   const tone = resolveTone(themeName, isDark, theme.palette.success);
 
-  const mint = alpha('#B8F5D0', isDark ? 0.85 : 0.75);
-  const glassCyan = alpha('#7EE7FF', isDark ? 0.7 : 0.6);
-  const lime = alpha('#D4FF8A', isDark ? 0.65 : 0.55);
-
   const chromatic = `conic-gradient(
     from 0deg,
     transparent 0deg,
@@ -116,6 +112,9 @@ const AskQuestionButton: React.FC<AskQuestionButtonProps> = ({
     transparent 360deg
   )`;
 
+  const mint = alpha('#B8F5D0', isDark ? 0.85 : 0.75);
+  const glassCyan = alpha('#7EE7FF', isDark ? 0.7 : 0.6);
+  const lime = alpha('#D4FF8A', isDark ? 0.65 : 0.55);
   const fillSheen = alpha('#fff', isDark ? 0.35 : 0.42);
   const waveFrom = `conic-gradient(
     from ${entryAngle}deg,

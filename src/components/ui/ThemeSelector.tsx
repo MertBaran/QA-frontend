@@ -33,9 +33,9 @@ const StyledMenuItem = styled(MenuItem)(({ theme }) => ({
 
 const themes = [
   {
-    id: 'molume' as const,
-    nameKey: 'molume',
-    icon: themeMolumeIcon,
+    id: 'magnefite' as const,
+    nameKey: 'magnefite',
+    icon: themeMagnefiteIcon,
   },
   {
     id: 'papirus' as const,
@@ -43,9 +43,9 @@ const themes = [
     icon: themePapirusIcon,
   },
   {
-    id: 'magnefite' as const,
-    nameKey: 'magnefite',
-    icon: themeMagnefiteIcon,
+    id: 'molume' as const,
+    nameKey: 'molume',
+    icon: themeMolumeIcon,
   },
 ];
 
