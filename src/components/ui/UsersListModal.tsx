@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Button,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -15,7 +16,8 @@ import {
 import { Close } from '@mui/icons-material';
 import { styled, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
-import { useAppSelector } from '../../store/hooks';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { requestMessageCompose } from '../../store/messaging/messagingSlice';
 import { t } from '../../utils/translations';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import { User } from '../../types/user';
@@ -62,6 +64,7 @@ interface UsersListModalProps {
   users: User[];
   title: string;
   loading?: boolean;
+  mention?: { questionId: string; answerId?: string };
 }
 
 const UsersListModal: React.FC<UsersListModalProps> = ({ 
@@ -70,8 +73,11 @@ const UsersListModal: React.FC<UsersListModalProps> = ({
   users, 
   title,
   loading = false,
+  mention,
 }) => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const currentUserId = useAppSelector(state => state.auth.user?.id);
   const theme = useTheme();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName } = useAppSelector(state => state.theme);
@@ -171,7 +177,30 @@ const UsersListModal: React.FC<UsersListModalProps> = ({
                   secondary={user.title || user.email}
                   primaryTypographyProps={{ color: theme.palette.text.primary }}
                   secondaryTypographyProps={{ color: theme.palette.text.secondary }}
+                  sx={{ pr: 1 }}
                 />
+                {currentUserId && currentUserId !== user.id && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={event => {
+                      event.stopPropagation();
+                      onClose();
+                      dispatch(requestMessageCompose({
+                        recipient: {
+                          id: user.id,
+                          name: user.name,
+                          profile_image: user.profile_image,
+                        },
+                        questionId: mention?.questionId,
+                        answerId: mention?.answerId,
+                      }));
+                    }}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {t('send_message', currentLanguage)}
+                  </Button>
+                )}
               </ListItem>
             ))}
           </List>
