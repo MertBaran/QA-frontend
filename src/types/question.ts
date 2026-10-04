@@ -58,6 +58,7 @@ export interface QuestionData {
   likes: string[];
   dislikes: string[];
   answers: string[];
+  commentCount?: number;
   parent?: ParentReference;
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
@@ -116,6 +117,7 @@ export interface Question {
   dislikesCount: number;
   dislikedByUsers: string[];
   answers: number;
+  commentCount?: number;
   timeAgo: string;
   isTrending: boolean;
   category: string;
@@ -140,7 +142,7 @@ export interface Question {
 }
 
 // Referans ve metadata tipleri
-export type QuestionReferenceType = 'link' | 'soru' | 'cevap' | 'dosya';
+export type QuestionReferenceType = 'link' | 'soru' | 'cevap' | 'yorum' | 'dosya';
 
 export interface QuestionReference {
   type: QuestionReferenceType;
@@ -191,6 +193,7 @@ export interface UpdateQuestionData {
   attachments?: QuestionAttachment[];
   featureTemplateId?: string;
   featureFieldValues?: Record<string, string | number | null | string[] | FeatureTableRow[]>;
+  focus?: number | null;
 }
 
 // API Response tipleri

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Box, useTheme } from '@mui/material';
+import DeferredImage from './DeferredImage';
 import { rehypeRefLinks } from '../../utils/rehypeRefLinks';
 import { remarkInlineStyles } from '../../utils/remarkInlineStyles';
 import { getMdHighlightStyle } from '../../utils/mdHighlightStyle';
@@ -141,22 +142,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className,
             </a>
           ),
           img: ({ src, alt }) => (
-            <img
-              src={src}
-              alt={alt || ''}
-              style={{
-                maxWidth: '100%',
-                maxHeight: 480,
-                width: 'auto',
-                height: 'auto',
-                objectFit: 'contain',
-                display: 'block',
-                borderRadius: 8,
-                marginTop: 8,
-                marginBottom: 8,
-              }}
-              loading="lazy"
-            />
+            <Box sx={{ maxWidth: 480, my: 1, borderRadius: 1, overflow: 'hidden' }}>
+              <DeferredImage src={typeof src === 'string' ? src : undefined} alt={alt || ''} objectFit="contain" />
+            </Box>
           ),
         }}
       >

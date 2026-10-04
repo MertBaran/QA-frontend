@@ -653,7 +653,6 @@ const CreateQuestionFlow: React.FC<CreateQuestionFlowProps> = (props) => {
                       : count === 2
                         ? { gridColumn: '1 / -1', gridRow: '2 / -1' }
                         : { gridColumn: '2 / -1', gridRow: '2 / -1' };
-                const showEditEmpty = props.mode === 'edit' && count === 0;
                 return (
                   <Box
                     sx={{
@@ -666,13 +665,7 @@ const CreateQuestionFlow: React.FC<CreateQuestionFlowProps> = (props) => {
                       overflow: 'visible',
                     }}
                   >
-                    {showEditEmpty ? (
-                      <Box sx={{ gridColumn: '1 / -1', gridRow: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: (theme) => theme.palette.text.secondary }}>
-                        <InsertDriveFile sx={{ fontSize: 36, opacity: 0.5 }} />
-                        <Typography variant="body2" sx={{ mt: 0.5 }}>—</Typography>
-                      </Box>
-                    ) : (
-                    pageFiles.map((entry, idx) => {
+                    {pageFiles.map((entry, idx) => {
                       const fileNum = filesPage * FILES_PER_PAGE + idx + 1;
                       return entry.type === 'existing' ? (
                         <Box
@@ -870,8 +863,7 @@ const CreateQuestionFlow: React.FC<CreateQuestionFlowProps> = (props) => {
                           </Box>
                         </Box>
                       );
-                    })
-                    )}
+                    })}
                     {uploadGridPlacement ? (
                       <Box
                         sx={(theme) => ({

@@ -158,14 +158,17 @@ const answerSlice = createSlice({
       // Delete answer
       .addCase(deleteAnswer.fulfilled, (state, action) => {
         state.loading = false;
-        // The answer ID is in action.meta.arg
         const answerId = (action as any).meta.arg.answerId as string;
-        state.answers = state.answers.filter((a) => a.id !== answerId);
-        state.totalAnswers -= 1;
-
-        // Clear current answer if it's the deleted one
-        if (state.currentAnswer && state.currentAnswer.id === answerId) {
-          state.currentAnswer = null;
+        const index = state.answers.findIndex((a) => a.id === answerId);
+        if (index !== -1) {
+          state.answers[index] = {
+            ...state.answers[index],
+            deleted: true,
+            content: '',
+            references: [],
+            metadata: [],
+            attachments: [],
+          };
         }
       })
       .addCase(deleteAnswer.pending, (state) => {

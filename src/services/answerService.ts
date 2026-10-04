@@ -1,4 +1,5 @@
 import api from './api';
+import { formatContentAge } from '../utils/contentAge';
 import {
   AnswerData,
   Answer,
@@ -10,23 +11,7 @@ import {
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
 export const transformAnswerData = (answerData: AnswerData): Answer => {
-  const createdAt = new Date(answerData.createdAt);
-  const now = new Date();
-  const timeDiff = now.getTime() - createdAt.getTime();
-
-  // Zaman hesaplama
-  let timeAgo = '';
-  const minutes = Math.floor(timeDiff / (1000 * 60));
-  const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-  const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    timeAgo = `${minutes} dakika önce`;
-  } else if (hours < 24) {
-    timeAgo = `${hours} saat önce`;
-  } else {
-    timeAgo = `${days} gün önce`;
-  }
+  const timeAgo = formatContentAge(answerData.createdAt);
 
   const userInfo =
     answerData.userInfo || (typeof answerData.user === 'object' ? answerData.user : null);
@@ -69,6 +54,10 @@ export const transformAnswerData = (answerData: AnswerData): Answer => {
     parentType: answerData.parent?.type,
     ancestors: answerData.ancestors,
     parentContentInfo: answerData.parentContentInfo,
+    references: answerData.references,
+    metadata: answerData.metadata,
+    attachments: answerData.attachments,
+    deleted: Boolean(answerData.deleted),
   };
 };
 

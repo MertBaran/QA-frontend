@@ -1,5 +1,12 @@
 import { ApiResponse } from './api';
-import { UserData, ParentContentInfo, AncestorReference } from './question';
+import {
+  UserData,
+  ParentContentInfo,
+  AncestorReference,
+  QuestionReference,
+  QuestionMetadataItem,
+  QuestionAttachment,
+} from './question';
 
 // Backend'den gelecek ham cevap tipi
 export interface AnswerData {
@@ -28,6 +35,10 @@ export interface AnswerData {
   };
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  deleted?: boolean;
   __v?: number;
 }
 
@@ -59,16 +70,26 @@ export interface Answer {
   parentType?: 'question' | 'answer';
   ancestors?: AncestorReference[];
   parentContentInfo?: ParentContentInfo;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
+  deleted?: boolean;
 }
 
 // Cevap oluşturma için tip
 export interface CreateAnswerData {
   content: string;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
 }
 
 // Cevap güncelleme için tip
 export interface UpdateAnswerData {
   content: string;
+  references?: QuestionReference[];
+  metadata?: QuestionMetadataItem[];
+  attachments?: QuestionAttachment[];
 }
 
 // API Response tipleri

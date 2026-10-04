@@ -20,10 +20,12 @@ import {
 import { getScrollbarSx } from '../../theme/scrollbarStyles';
 import { Add, Delete, OpenInNew, YouTube } from '@mui/icons-material';
 import { t } from '../../utils/translations';
+import { referenceNeedsDescription } from '../../utils/filledEntries';
 import { getNegativeActionColor } from '../../utils/themeNegativeColor';
 import { useAppSelector } from '../../store/hooks';
 import ReferenceContentSelector from './ReferenceContentSelector';
 import type { AttachedFileOption } from './ReferenceContentSelector';
+import ItemDetailPopup from '../ui/ItemDetailPopup';
 
 /** Parses YouTube URL and returns { videoId, startSeconds } or null */
 const parseYouTubeUrl = (url: string): { videoId: string; startSeconds: number } | null => {
@@ -57,7 +59,7 @@ const parseYouTubeUrl = (url: string): { videoId: string; startSeconds: number }
   return videoId ? { videoId, startSeconds } : null;
 };
 
-export type ReferenceType = 'link' | 'soru' | 'cevap' | 'dosya';
+export type ReferenceType = 'link' | 'soru' | 'cevap' | 'yorum' | 'dosya';
 
 export interface CreateQuestionRightState {
   references: { type: ReferenceType; content: string; description: string }[];
@@ -68,6 +70,7 @@ const REFERENCE_TYPES: { value: ReferenceType; i18nKey: string }[] = [
   { value: 'link', i18nKey: 'reference_type_link' },
   { value: 'soru', i18nKey: 'reference_type_question' },
   { value: 'cevap', i18nKey: 'reference_type_answer' },
+  { value: 'yorum', i18nKey: 'reference_type_comment' },
   { value: 'dosya', i18nKey: 'reference_type_file' },
 ];
 
@@ -84,6 +87,8 @@ interface CreateQuestionRightModalProps {
   onRefHover?: (refIndex: number | null) => void;
   /** Edit modunda referans ve metadata düzenlenemez */
   readOnly?: boolean;
+  /** Cevap yazımında metadata sekmesi yok */
+  hideMetadata?: boolean;
 }
 
 const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
@@ -95,6 +100,7 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
   hoveredRefIndex,
   onRefHover,
   readOnly = false,
+  hideMetadata = false,
 }) => {
   const theme = useTheme();
   const { name: themeName } = useAppSelector((s) => s.theme);
@@ -102,6 +108,7 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
   const { references, metadata } = state;
   const [tabIndex, setTabIndex] = useState(0);
   const [youtubeModal, setYoutubeModal] = useState<{ videoId: string; startSeconds: number } | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ url: string; youtube: { videoId: string; startSeconds: number } | null } | null>(null);
 
   if (!open) return null;
 
@@ -134,7 +141,9 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
         <Box sx={{ borderBottom: (theme) => `1px solid ${theme.palette.divider}` }}>
           <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} variant="fullWidth" sx={{ minHeight: 48 }}>
             <Tab label={t('references', currentLanguage)} sx={{ typography: 'body1' }} />
-            <Tab label={t('metadata', currentLanguage)} sx={{ typography: 'body1' }} />
+            {!hideMetadata && (
+              <Tab label={t('metadata', currentLanguage)} sx={{ typography: 'body1' }} />
+            )}
           </Tabs>
         </Box>
         <Box sx={(theme) => ({ flex: 1, overflow: 'auto', p: 3, pt: 4, ...getScrollbarSx(theme) })}>
@@ -225,29 +234,16 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
                     {ref.type === 'link' && (() => {
                       const yt = parseYouTubeUrl(ref.content);
                       const url = ref.content?.trim();
-                      const isUrl = url && (url.startsWith('http://') || url.startsWith('https://'));
-                      if (yt) {
+                      const isUrl = !!url && (url.startsWith('http://') || url.startsWith('https://'));
+                      if (url && (yt || isUrl)) {
                         return (
-                          <Tooltip title={t('reference_play_video', currentLanguage)}>
+                          <Tooltip title={t(yt ? 'reference_play_video' : 'reference_open_link', currentLanguage)}>
                             <IconButton
                               size="small"
-                              onClick={() => setYoutubeModal(yt)}
-                              sx={{ flexShrink: 0, color: '#FF0000' }}
+                              onClick={() => setLinkPreview({ url, youtube: yt })}
+                              sx={{ flexShrink: 0, color: yt ? '#FF0000' : undefined }}
                             >
-                              <YouTube sx={{ fontSize: 28 }} />
-                            </IconButton>
-                          </Tooltip>
-                        );
-                      }
-                      if (isUrl) {
-                        return (
-                          <Tooltip title={t('reference_open_link', currentLanguage)}>
-                            <IconButton
-                              size="small"
-                              onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-                              sx={{ flexShrink: 0 }}
-                            >
-                              <OpenInNew sx={{ fontSize: 24 }} />
+                              {yt ? <YouTube sx={{ fontSize: 28 }} /> : <OpenInNew sx={{ fontSize: 24 }} />}
                             </IconButton>
                           </Tooltip>
                         );
@@ -265,9 +261,9 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
                       setReferences(next);
                     }}
                     size="small"
-                    required={(ref.type === 'soru' || ref.type === 'cevap') && !!ref.content?.trim()}
-                    error={(ref.type === 'soru' || ref.type === 'cevap') && !!ref.content?.trim() && !ref.description?.trim()}
-                    helperText={(ref.type === 'soru' || ref.type === 'cevap') && !!ref.content?.trim() && !ref.description?.trim()
+                    required={referenceNeedsDescription(ref.type) && !!ref.content?.trim()}
+                    error={referenceNeedsDescription(ref.type) && !!ref.content?.trim() && !ref.description?.trim()}
+                    helperText={referenceNeedsDescription(ref.type) && !!ref.content?.trim() && !ref.description?.trim()
                       ? t('reference_description_required', currentLanguage)
                       : undefined}
                     InputProps={{ readOnly: readOnly }}
@@ -282,7 +278,7 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
               )}
             </Stack>
           )}
-          {tabIndex === 1 && (
+          {tabIndex === 1 && !hideMetadata && (
             <Stack spacing={1.5}>
               {metadata.map((m, idx) => (
                 <Box
@@ -343,6 +339,22 @@ const CreateQuestionRightModal: React.FC<CreateQuestionRightModalProps> = ({
           )}
         </Box>
       </Box>
+      <ItemDetailPopup
+        open={!!linkPreview}
+        onClose={() => setLinkPreview(null)}
+        title={t('reference_type_link', currentLanguage)}
+        details={[{ key: 'URL', value: linkPreview?.url ?? '' }]}
+        currentLanguage={currentLanguage}
+        descriptionLabel={t('reference_description', currentLanguage)}
+        linkUrl={linkPreview?.url}
+        youtubeData={linkPreview?.youtube ?? undefined}
+        linkOpenLabel={t('reference_open_link', currentLanguage)}
+        youtubePreviewLabel={t('reference_play_video', currentLanguage)}
+        onYoutubePreview={data => {
+          setYoutubeModal(data);
+          setLinkPreview(null);
+        }}
+      />
       <Dialog
         open={!!youtubeModal}
         onClose={() => setYoutubeModal(null)}

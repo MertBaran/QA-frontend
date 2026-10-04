@@ -37,6 +37,7 @@ interface QuestionDetailLeftPanelProps {
   currentLanguage: string;
   featureTemplateName?: string | null;
   featureFieldRows?: QuestionDetailFeatureFieldRow[];
+  showFocus?: boolean;
 }
 
 const QuestionDetailLeftPanel: React.FC<QuestionDetailLeftPanelProps> = ({
@@ -44,6 +45,7 @@ const QuestionDetailLeftPanel: React.FC<QuestionDetailLeftPanelProps> = ({
   currentLanguage,
   featureTemplateName,
   featureFieldRows = [],
+  showFocus = false,
 }) => {
   const visibility = question.visibility ?? true;
   const format = question.format ?? '';
@@ -123,7 +125,7 @@ const QuestionDetailLeftPanel: React.FC<QuestionDetailLeftPanelProps> = ({
             </Box>
           </Box>
         )}
-        {focus != null && focus >= 1 && focus <= 10 && (
+        {showFocus && focus != null && focus >= 1 && focus <= 10 && (
           <Box>
             <Typography variant="body2" sx={{ color: (theme) => theme.palette.text.secondary, display: 'block', mb: 0.5, fontSize: '0.95rem' }}>
               {t('focus', currentLanguage)}

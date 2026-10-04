@@ -18,10 +18,12 @@ import { t } from '../../utils/translations';
 import { searchService } from '../../services/searchService';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import { commentService } from '../../services/commentService';
 import ReferenceSelectedCard from './ReferenceSelectedCard';
 import ReferenceLookupModal from './ReferenceLookupModal';
 import type { Question } from '../../types/question';
 import type { Answer } from '../../types/answer';
+import type { CommentItem } from '../../types/comment';
 
 export interface AttachedFileOption {
   id: string;
@@ -30,7 +32,7 @@ export interface AttachedFileOption {
 }
 
 interface ReferenceContentSelectorProps {
-  type: 'link' | 'soru' | 'cevap' | 'dosya';
+  type: 'link' | 'soru' | 'cevap' | 'yorum' | 'dosya';
   value: string;
   onChange: (value: string) => void;
   attachedFiles: AttachedFileOption[];
@@ -52,13 +54,17 @@ const ReferenceContentSelector: React.FC<ReferenceContentSelectorProps> = ({
 }) => {
   const [questionSearch, setQuestionSearch] = useState('');
   const [answerSearch, setAnswerSearch] = useState('');
+  const [commentSearch, setCommentSearch] = useState('');
   const [questionOptions, setQuestionOptions] = useState<Question[]>([]);
   const [answerOptions, setAnswerOptions] = useState<Answer[]>([]);
+  const [commentOptions, setCommentOptions] = useState<CommentItem[]>([]);
   const [questionLoading, setQuestionLoading] = useState(false);
   const [answerLoading, setAnswerLoading] = useState(false);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<Answer | null>(null);
+  const [selectedComment, setSelectedComment] = useState<CommentItem | null>(null);
 
   const searchQuestions = useCallback(async (term: string) => {
     if (term.length < MIN_SEARCH_LENGTH) {
@@ -102,6 +108,26 @@ const ReferenceContentSelector: React.FC<ReferenceContentSelectorProps> = ({
     return () => clearTimeout(t);
   }, [answerSearch, searchAnswers]);
 
+  const searchComments = useCallback(async (term: string) => {
+    if (term.length < MIN_SEARCH_LENGTH) {
+      setCommentOptions([]);
+      return;
+    }
+    setCommentLoading(true);
+    try {
+      setCommentOptions(await commentService.search(term, 15));
+    } catch {
+      setCommentOptions([]);
+    } finally {
+      setCommentLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => searchComments(commentSearch), 300);
+    return () => clearTimeout(timer);
+  }, [commentSearch, searchComments]);
+
   useEffect(() => {
     if (type === 'soru' && !value) setSelectedQuestion(null);
     else if (type === 'soru' && value && !questionOptions.find((q) => q.id === value)) {
@@ -115,6 +141,13 @@ const ReferenceContentSelector: React.FC<ReferenceContentSelectorProps> = ({
       answerService.getAnswerById(value).then((a) => a && setSelectedAnswer(a));
     }
   }, [type, value, answerOptions]);
+
+  useEffect(() => {
+    if (type === 'yorum' && !value) setSelectedComment(null);
+    else if (type === 'yorum' && value && !commentOptions.find(comment => comment.id === value)) {
+      commentService.getById(value).then(comment => comment && setSelectedComment(comment));
+    }
+  }, [type, value, commentOptions]);
 
   if (type === 'link') {
     return (
@@ -318,6 +351,93 @@ const ReferenceContentSelector: React.FC<ReferenceContentSelectorProps> = ({
           type="cevap"
           onSelect={(id, item) => {
             setSelectedAnswer(item as Answer);
+            onChange(id);
+          }}
+          currentLanguage={currentLanguage}
+        />
+      </Box>
+    );
+  }
+
+  if (type === 'yorum') {
+    const acSelected = commentOptions.find(comment => comment.id === value) || selectedComment;
+    const labelOf = (comment: CommentItem) => {
+      const text = comment.body || '';
+      return text.length > 80 ? `${text.slice(0, 80)}...` : text || comment.id;
+    };
+    const optionsWithSelected = value && !acSelected
+      ? [{ id: value, body: value } as CommentItem, ...commentOptions]
+      : commentOptions;
+    return (
+      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5 }}>
+          <Autocomplete
+            size="small"
+            sx={{ flex: 1, minWidth: 0 }}
+            options={optionsWithSelected}
+            value={acSelected ?? (value ? { id: value, body: value } as CommentItem : null)}
+            inputValue={commentSearch}
+            onInputChange={(_, next) => !readOnly && setCommentSearch(next)}
+            onChange={(_, comment) => {
+              if (readOnly) return;
+              setSelectedComment(comment ?? null);
+              onChange(comment?.id ?? '');
+            }}
+            disabled={readOnly}
+            getOptionLabel={comment => (typeof comment === 'object' ? labelOf(comment) : '')}
+            isOptionEqualToValue={(option, selected) => option.id === selected?.id}
+            loading={commentLoading}
+            ListboxProps={{ sx: (theme: any) => ({ maxHeight: 280, ...getScrollbarSx(theme) }) }}
+            renderInput={params => (
+              <TextField
+                {...params}
+                label={t('reference_content', currentLanguage)}
+                placeholder={t('reference_search_comment', currentLanguage)}
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {commentLoading ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+                sx={{ '& .MuiInputBase-input': { color: theme => theme.palette.text.primary } }}
+              />
+            )}
+            renderOption={(props, comment) => (
+              <li {...props} key={comment.id}>
+                <Box>
+                  <Typography variant="body2">{labelOf(comment)}</Typography>
+                  {comment.authorName && (
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      {comment.authorName}
+                    </Typography>
+                  )}
+                </Box>
+              </li>
+            )}
+          />
+          {!readOnly && (
+            <Tooltip title={t('reference_lookup', currentLanguage)}>
+              <IconButton size="small" onClick={() => setLookupOpen(true)} sx={{ mt: 0.5 }}>
+                <ManageSearch fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
+        {value && (selectedComment || acSelected) && (
+          <ReferenceSelectedCard
+            comment={selectedComment || acSelected || undefined}
+            currentLanguage={currentLanguage}
+          />
+        )}
+        <ReferenceLookupModal
+          open={lookupOpen}
+          onClose={() => setLookupOpen(false)}
+          type="yorum"
+          onSelect={(id, item) => {
+            setSelectedComment(item as CommentItem);
             onChange(id);
           }}
           currentLanguage={currentLanguage}

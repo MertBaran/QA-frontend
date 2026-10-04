@@ -21,9 +21,11 @@ import { t } from '../../utils/translations';
 import { getScrollbarSx } from '../../theme/scrollbarStyles';
 import { questionService } from '../../services/questionService';
 import { searchService } from '../../services/searchService';
+import { commentService } from '../../services/commentService';
 import ReferenceSelectedCard from './ReferenceSelectedCard';
 import type { Question } from '../../types/question';
 import type { Answer } from '../../types/answer';
+import type { CommentItem } from '../../types/comment';
 
 const FORMAT_OPTIONS = ['format_ne', 'format_niye', 'format_nasil', 'format_hangisi', 'format_evet_hayir', 'format_kim', 'format_nicelik', 'format_yer', 'format_zaman', 'format_teyit', 'format_belirsiz'] as const;
 const INTEREST_OPTIONS = ['interest_gundelik', 'interest_akademik', 'interest_ahiretlik', 'interest_belirsiz'] as const;
@@ -71,8 +73,8 @@ function matchDate(ts: number, op: DateOp, val1: string, val2: string): boolean 
 interface ReferenceLookupModalProps {
   open: boolean;
   onClose: () => void;
-  type: 'soru' | 'cevap';
-  onSelect: (id: string, item: Question | Answer) => void;
+  type: 'soru' | 'cevap' | 'yorum';
+  onSelect: (id: string, item: Question | Answer | CommentItem) => void;
   currentLanguage: string;
 }
 
@@ -109,6 +111,7 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
   const [interest, setInterest] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -193,12 +196,36 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
     createdAtVal || createdAtVal2 || category || format || interest
   );
 
+  const loadComments = useCallback(async () => {
+    const term = searchDetail.trim() || searchUsername.trim();
+    if (!term) {
+      setComments([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const list = await commentService.search(term, 30);
+      setComments(
+        list.filter(comment => {
+          if (!matchText(comment.authorName || '', opUsername, searchUsername)) return false;
+          if (!matchText(comment.body || '', opDetail, searchDetail)) return false;
+          return matchDate(new Date(comment.createdAt).getTime(), createdAtOp, createdAtVal, createdAtVal2);
+        })
+      );
+    } catch {
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchUsername, opUsername, searchDetail, opDetail, createdAtOp, createdAtVal, createdAtVal2]);
+
   const handleSearch = useCallback(() => {
     if (!hasAnyFilter) return;
     setHasSearched(true);
     if (type === 'soru') loadQuestions();
+    else if (type === 'yorum') loadComments();
     else loadAnswers();
-  }, [type, hasAnyFilter, loadQuestions, loadAnswers]);
+  }, [type, hasAnyFilter, loadQuestions, loadAnswers, loadComments]);
 
   const resetAll = useCallback(() => {
     setSearchUsername('');
@@ -215,6 +242,7 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
     setInterest('');
     setQuestions([]);
     setAnswers([]);
+    setComments([]);
     setHasSearched(false);
   }, []);
 
@@ -228,6 +256,17 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
     onClose();
   };
 
+  const handleSelectComment = (comment: CommentItem) => {
+    onSelect(comment.id, comment);
+    onClose();
+  };
+
+  const lookupTitle = type === 'soru'
+    ? t('reference_type_question', currentLanguage)
+    : type === 'yorum'
+      ? t('reference_type_comment', currentLanguage)
+      : t('reference_type_answer', currentLanguage);
+
   const selectSx = { '& .MuiSelect-select': { color: (theme: { palette: { text: { primary: string } } }) => theme.palette.text.primary } };
 
   return (
@@ -240,7 +279,7 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
         <Typography variant="h6">
-          {type === 'soru' ? t('reference_type_question', currentLanguage) : t('reference_type_answer', currentLanguage)} {t('reference_lookup', currentLanguage)}
+          {lookupTitle} {t('reference_lookup', currentLanguage)}
         </Typography>
         <IconButton onClick={onClose} size="small">
           <Close />
@@ -270,7 +309,7 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
                 <Clear fontSize="small" />
               </IconButton>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+            {type !== 'yorum' && <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
               <TextField size="small" placeholder={t('search_by_title', currentLanguage)} value={searchTitle} onChange={(e) => setSearchTitle(e.target.value)} sx={{ flex: 1, '& .MuiInputBase-input': { color: 'inherit' } }} />
               <FormControl size="small" sx={{ minWidth: 110 }}>
                 <Select value={opTitle} onChange={(e) => setOpTitle(e.target.value as TextOp)} sx={selectSx}>
@@ -282,7 +321,7 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
               <IconButton size="small" onClick={() => { setSearchTitle(''); setOpTitle('contains'); }} title={t('filter_reset_single', currentLanguage)} sx={{ flexShrink: 0 }}>
                 <Clear fontSize="small" />
               </IconButton>
-            </Box>
+            </Box>}
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
               <TextField size="small" placeholder={t('search_by_detail', currentLanguage)} value={searchDetail} onChange={(e) => setSearchDetail(e.target.value)} multiline maxRows={2} sx={{ flex: 1, '& .MuiInputBase-input': { color: 'inherit' } }} />
               <FormControl size="small" sx={{ minWidth: 110 }}>
@@ -386,6 +425,23 @@ const ReferenceLookupModal: React.FC<ReferenceLookupModalProps> = ({
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
+            ) : type === 'yorum' ? (
+              <Stack spacing={1} sx={{ width: '100%' }}>
+                {comments.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>
+                    {!hasSearched ? t('reference_set_filters_hint', currentLanguage) : t('reference_no_results', currentLanguage)}
+                  </Typography>
+                ) : (
+                  comments.map(comment => (
+                    <ReferenceSelectedCard
+                      key={comment.id}
+                      comment={comment}
+                      currentLanguage={currentLanguage}
+                      onSelect={() => handleSelectComment(comment)}
+                    />
+                  ))
+                )}
+              </Stack>
             ) : type === 'soru' ? (
               <Stack spacing={1} sx={{ width: '100%' }}>
                 {questions.length === 0 ? (

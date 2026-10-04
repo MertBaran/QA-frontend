@@ -333,9 +333,7 @@ const CreateQuestionLeftModal: React.FC<CreateQuestionLeftModalProps> = ({
           label={t('focus', currentLanguage)}
           type="number"
           value={focus}
-          InputProps={{ readOnly: readOnly }}
           onChange={(e) => {
-            if (readOnly) return;
             const v = e.target.value;
             if (v === '') setFocus('');
             else {
@@ -344,7 +342,6 @@ const CreateQuestionLeftModal: React.FC<CreateQuestionLeftModalProps> = ({
             }
           }}
           onBlur={(e) => {
-            if (readOnly) return;
             const v = (e.target as HTMLInputElement).value;
             if (v !== '') {
               const n = parseInt(v, 10);

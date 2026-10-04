@@ -18,10 +18,13 @@ import { t } from '../../utils/translations';
 import { contentAssetService } from '../../services/contentAssetService';
 import { questionService } from '../../services/questionService';
 import { answerService, transformAnswerData } from '../../services/answerService';
+import { commentService } from '../../services/commentService';
 import { showErrorToast } from '../../utils/notificationUtils';
 import { stripRefLinksForDisplay } from '../../utils/refLinkDisplay';
+import { filledMetadata, filledReferences } from '../../utils/filledEntries';
 import type { Question } from '../../types/question';
 import type { Answer } from '../../types/answer';
+import type { CommentItem } from '../../types/comment';
 
 const PREVIEW_LENGTH = 80;
 
@@ -73,6 +76,7 @@ const REFERENCE_TYPES: { value: string; i18nKey: string }[] = [
   { value: 'link', i18nKey: 'reference_type_link' },
   { value: 'soru', i18nKey: 'reference_type_question' },
   { value: 'cevap', i18nKey: 'reference_type_answer' },
+  { value: 'yorum', i18nKey: 'reference_type_comment' },
   { value: 'dosya', i18nKey: 'reference_type_file' },
 ];
 
@@ -108,7 +112,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
   const [youtubeModal, setYoutubeModal] = useState<{ videoId: string; startSeconds: number } | null>(null);
   const [attachmentPreviewUrls, setAttachmentPreviewUrls] = useState<Record<string, string>>({});
   const [filesPage, setFilesPage] = useState(0);
-  const [resolvedRefs, setResolvedRefs] = useState<Record<number, { question?: Question; answer?: Answer }>>({});
+  const [resolvedRefs, setResolvedRefs] = useState<Record<number, { question?: Question; answer?: Answer; comment?: CommentItem }>>({});
   const [detailPopup, setDetailPopup] = useState<{
     title: string;
     details: { key: string; value: string }[];
@@ -117,6 +121,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
     showFileIcon?: boolean;
     officeAsset?: { key: string; type?: 'question-attachment'; entityId?: string; ownerId?: string };
     linkUrl?: string;
+    wide?: boolean;
     /** Soru/cevap için yeni sekmede açılacak URL */
     targetUrl?: string;
     youtubeData?: { videoId: string; startSeconds: number };
@@ -128,8 +133,10 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
     contentBodyLabel?: string;
   } | null>(null);
 
-  const references = useMemo(() => question.references ?? [], [question.references]);
-  const metadata = question.metadata ?? [];
+  const references = useMemo(() => filledReferences(question.references), [question.references]);
+  const metadata = useMemo(() => filledMetadata(question.metadata), [question.metadata]);
+  const notAvailable = (labelKey: string) =>
+    t('item_not_available', currentLanguage).replace('{item}', t(labelKey, currentLanguage));
   const attachments = useMemo(() => question.attachments ?? [], [question.attachments]);
   const highlightedFileKey = highlightedRefIndex != null && references[highlightedRefIndex]?.type === 'dosya'
     ? references[highlightedRefIndex].content
@@ -163,11 +170,11 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
   useEffect(() => {
     const soruCevapRefs = references
       .map((ref, idx) => ({ ref, idx }))
-      .filter(({ ref }) => ref.type === 'soru' || ref.type === 'cevap');
+      .filter(({ ref }) => ref.type === 'soru' || ref.type === 'cevap' || ref.type === 'yorum');
     if (soruCevapRefs.length === 0) return;
     let cancelled = false;
     const load = async () => {
-      const next: Record<number, { question?: Question; answer?: Answer }> = {};
+      const next: Record<number, { question?: Question; answer?: Answer; comment?: CommentItem }> = {};
       for (const { ref, idx } of soruCevapRefs) {
         if (!ref.content?.trim()) continue;
         try {
@@ -185,6 +192,9 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
               a = await answerService.getAnswerByQuestionAndId(question.id, answerId);
             }
             if (!cancelled && a) next[idx] = { answer: a };
+          } else if (ref.type === 'yorum') {
+            const comment = await commentService.getById(ref.content.trim());
+            if (!cancelled && comment) next[idx] = { comment };
           }
         } catch {
           // ignore
@@ -277,19 +287,21 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
             <Tab label={t('metadata', currentLanguage)} sx={{ typography: 'body1' }} />
           </Tabs>
         </Box>
-        <Box sx={(theme) => ({ flex: 1, overflow: 'auto', p: 3, pt: 4, ...getScrollbarSx(theme) })}>
+        <Box sx={(theme) => ({ flex: 1, minHeight: 0, overflow: 'auto', p: 3, pt: 4, ...getScrollbarSx(theme) })}>
           {tabIndex === 0 && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, overflow: 'visible' }}>
               {references.length === 0 ? (
                 <Typography variant="body2" sx={{ color: (t) => t.palette.text.secondary }}>
-                  —
+                  {notAvailable('references')}
                 </Typography>
               ) : (
                 references.map((ref, idx) => {
                   const resolved = resolvedRefs[idx];
                   const isSoruWithData = ref.type === 'soru' && resolved?.question;
                   const isCevapWithData = ref.type === 'cevap' && resolved?.answer;
+                  const isYorumWithData = ref.type === 'yorum' && resolved?.comment;
                   const isCevapClickable = ref.type === 'cevap' && !!ref.content?.trim();
+                  const isYorumClickable = ref.type === 'yorum' && !!ref.content?.trim();
                   const isHighlighted = highlightedRefIndex === idx;
 
                   const getSoruCevapTargetUrl = (): string | undefined => {
@@ -300,21 +312,29 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                       const qId = resolved.answer.questionId ?? (pageAnswers.some((pa) => pa.id === resolved?.answer?.id) ? question.id : null);
                       return qId ? `${window.location.origin}/questions/${qId}#answer-${resolved.answer!.id}` : undefined;
                     }
+                    if (isYorumWithData && resolved?.comment?.questionId) {
+                      return `${window.location.origin}/questions/${resolved.comment.questionId}#comment-${resolved.comment.id}`;
+                    }
                     return undefined;
                   };
 
                   const handleRefClick = async (e?: React.MouseEvent) => {
-                    const hasPopupContent = ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya' || isSoruWithData || isCevapWithData;
+                    const hasPopupContent = ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya' || isSoruWithData || isCevapWithData || isYorumWithData;
                     if (hasPopupContent) {
-                      if (isSoruWithData || isCevapWithData) {
+                      if (isSoruWithData || isCevapWithData || isYorumWithData) {
                         const q = resolved?.question;
                         const a = resolved?.answer;
-                        const authorName = q?.author?.name ?? a?.author?.name ?? q?.userInfo?.name ?? a?.userInfo?.name ?? '—';
-                        const avatarSrc = q?.userInfo?.profile_image || q?.author?.avatar || a?.userInfo?.profile_image || a?.author?.avatar || undefined;
-                        const ownerId = q?.userInfo?._id ?? q?.author?.id ?? a?.userInfo?._id ?? a?.author?.id ?? undefined;
-                        const contentTitle = q?.summary ?? a?.questionSummary ?? '—';
-                        const contentBody = q?.detail ?? a?.content ?? '';
-                        const contentBodyLabel = ref.type === 'soru' ? (t('question_detail', currentLanguage) || 'Soru detayı') : (t('answer', currentLanguage) || 'Cevap');
+                        const comment = resolved?.comment;
+                        const authorName = q?.author?.name ?? a?.author?.name ?? comment?.authorName ?? q?.userInfo?.name ?? a?.userInfo?.name ?? '—';
+                        const avatarSrc = q?.userInfo?.profile_image || q?.author?.avatar || a?.userInfo?.profile_image || a?.author?.avatar || comment?.authorAvatar || undefined;
+                        const ownerId = q?.userInfo?._id ?? q?.author?.id ?? a?.userInfo?._id ?? a?.author?.id ?? comment?.userId ?? undefined;
+                        const contentTitle = q?.summary ?? a?.questionSummary ?? (comment?.body ? comment.body.slice(0, 80) : '—');
+                        const contentBody = q?.detail ?? a?.content ?? comment?.body ?? '';
+                        const contentBodyLabel = ref.type === 'soru'
+                          ? (t('question_detail', currentLanguage) || 'Soru detayı')
+                          : ref.type === 'yorum'
+                            ? t('reference_type_comment', currentLanguage)
+                            : (t('answer', currentLanguage) || 'Cevap');
                         setDetailPopup({
                           title: `${t(REFERENCE_TYPES.find((r) => r.value === ref.type)?.i18nKey ?? 'ref', currentLanguage)} #${idx + 1}`,
                           details: [],
@@ -332,7 +352,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                         const url = ref.content?.trim();
                         const yt = url ? parseYouTubeUrl(url) : null;
                         const isUrl = url && (url.startsWith('http://') || url.startsWith('https://'));
-                        setDetailPopup({ title: `${t('reference_type_link', currentLanguage)} #${idx + 1}`, details: [{ key: t('reference_content', currentLanguage) || 'URL', value: ref.content || '' }], description: ref.description || '', linkUrl: isUrl ? url : undefined, youtubeData: yt ?? undefined });
+                        setDetailPopup({ title: `${t('reference_type_link', currentLanguage)} #${idx + 1}`, details: [{ key: t('reference_content', currentLanguage) || 'URL', value: ref.content || '' }], description: ref.description || '', linkUrl: isUrl ? url : undefined, youtubeData: yt ?? undefined, wide: true });
                       } else if (ref.type === 'dosya') {
                         const fn = extractFilenameFromKey(ref.content) || ref.content;
                         const fileKey = ref.content;
@@ -353,7 +373,12 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                             : undefined,
                         });
                       } else {
-                        setDetailPopup({ title: `${t(ref.type === 'soru' ? 'reference_type_question' : 'reference_type_answer', currentLanguage)} #${idx + 1}`, details: [{ key: t('reference_content', currentLanguage) || 'İçerik', value: ref.content || '—' }], description: ref.description || '', showFileIcon: false });
+                        const missingKey = ref.type === 'soru'
+                          ? 'reference_type_question'
+                          : ref.type === 'yorum'
+                            ? 'reference_type_comment'
+                            : 'reference_type_answer';
+                        setDetailPopup({ title: `${t(missingKey, currentLanguage)} #${idx + 1}`, details: [{ key: t('reference_content', currentLanguage) || 'İçerik', value: ref.content || '—' }], description: ref.description || '', showFileIcon: false });
                       }
                       return;
                     }
@@ -391,6 +416,30 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                       } catch {
                         showErrorToast(t('reference_load_failed', currentLanguage));
                       }
+                    } else if (ref.type === 'yorum' && ref.content?.trim()) {
+                      try {
+                        const comment = await commentService.getById(ref.content.trim());
+                        if (comment?.questionId) {
+                          setResolvedRefs((prev) => ({ ...prev, [idx]: { comment } }));
+                          setDetailPopup({
+                            title: `${t('reference_type_comment', currentLanguage)} #${idx + 1}`,
+                            details: [],
+                            description: ref.description || '',
+                            showFileIcon: false,
+                            targetUrl: `${window.location.origin}/questions/${comment.questionId}#comment-${comment.id}`,
+                            avatarSrc: comment.authorAvatar,
+                            authorName: comment.authorName || '—',
+                            ownerId: comment.userId,
+                            contentTitle: comment.body?.slice(0, 80) || '—',
+                            contentBody: comment.body || '',
+                            contentBodyLabel: t('reference_type_comment', currentLanguage),
+                          });
+                        } else {
+                          showErrorToast(t('reference_comment_not_found', currentLanguage));
+                        }
+                      } catch {
+                        showErrorToast(t('reference_load_failed', currentLanguage));
+                      }
                     } else if (isHighlighted) {
                       onRefHighlightClear?.();
                     }
@@ -417,9 +466,9 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                             ? `${theme.palette.primary.main}22`
                             : `${theme.palette.primary.main}15`)
                         : 'transparent',
-                      cursor: (isSoruWithData || isCevapWithData || isCevapClickable || isHighlighted || ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya') ? 'pointer' : 'default',
+                      cursor: (isSoruWithData || isCevapWithData || isYorumWithData || isCevapClickable || isYorumClickable || isHighlighted || ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya') ? 'pointer' : 'default',
                       transition: 'border-color 0.2s, background-color 0.2s',
-                      '&:hover': (isSoruWithData || isCevapWithData || isCevapClickable || ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya')
+                      '&:hover': (isSoruWithData || isCevapWithData || isYorumWithData || isCevapClickable || isYorumClickable || ref.description?.trim() || ref.type === 'link' || ref.type === 'dosya')
                         ? {
                             borderColor: theme.palette.primary.main,
                             backgroundColor: theme.palette.mode === 'dark'
@@ -455,14 +504,15 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                         ? t(REFERENCE_TYPES.find((r) => r.value === ref.type)!.i18nKey, currentLanguage)
                         : ref.type}
                     </Typography>
-                    {(isSoruWithData || isCevapWithData) ? (() => {
+                    {(isSoruWithData || isCevapWithData || isYorumWithData) ? (() => {
                       const q = resolved?.question;
                       const a = resolved?.answer;
-                      const authorName = q?.author?.name ?? a?.author?.name ?? q?.userInfo?.name ?? a?.userInfo?.name ?? '—';
-                      const avatarSrc = q?.userInfo?.profile_image || q?.author?.avatar || a?.userInfo?.profile_image || a?.author?.avatar || undefined;
-                      const ownerId = q?.userInfo?._id ?? q?.author?.id ?? a?.userInfo?._id ?? a?.author?.id ?? undefined;
-                      const title = q?.summary ?? a?.questionSummary ?? '—';
-                      const rawContent = q?.detail ?? a?.content ?? '';
+                      const comment = resolved?.comment;
+                      const authorName = q?.author?.name ?? a?.author?.name ?? comment?.authorName ?? q?.userInfo?.name ?? a?.userInfo?.name ?? '—';
+                      const avatarSrc = q?.userInfo?.profile_image || q?.author?.avatar || a?.userInfo?.profile_image || a?.author?.avatar || comment?.authorAvatar || undefined;
+                      const ownerId = q?.userInfo?._id ?? q?.author?.id ?? a?.userInfo?._id ?? a?.author?.id ?? comment?.userId ?? undefined;
+                      const title = q?.summary ?? a?.questionSummary ?? (comment?.body ? comment.body.slice(0, 80) : '—');
+                      const rawContent = comment ? '' : (q?.detail ?? a?.content ?? '');
                       const contentDisplay = stripRefLinksForDisplay(rawContent);
                       const contentPreview = contentDisplay?.slice(0, PREVIEW_LENGTH);
                       const contentSuffix = contentDisplay?.length > PREVIEW_LENGTH ? '...' : '';
@@ -589,7 +639,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                           </Box>
                         )}
                       </Box>
-                    ) : ref.type === 'cevap' ? (
+                    ) : ref.type === 'cevap' || ref.type === 'yorum' ? (
                       <Box>
                         {ref.description?.trim() ? (
                           <Box>
@@ -624,7 +674,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                         {ref.content}
                       </Typography>
                     )}
-                    {ref.description?.trim() && ref.type !== 'cevap' && ref.type !== 'soru' && ref.type !== 'dosya' && (
+                    {ref.description?.trim() && ref.type !== 'cevap' && ref.type !== 'soru' && ref.type !== 'yorum' && ref.type !== 'dosya' && (
                       <Box>
                         <Typography variant="body2" sx={{ color: (t) => t.palette.text.secondary }}>
                           <Box component="span" sx={{ fontWeight: 700 }}>{t('reference_description', currentLanguage)}: </Box>
@@ -642,7 +692,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {metadata.length === 0 ? (
                 <Typography variant="body2" sx={{ color: (t) => t.palette.text.secondary }}>
-                  —
+                  {notAvailable('metadata')}
                 </Typography>
               ) : (
                 metadata.map((m, idx) => (
@@ -675,9 +725,10 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
       {/* Dosyalar adacığı - oluşturmadaki ile birebir aynı görünüm */}
       <Box
         sx={(theme) => ({
-          flexShrink: 0,
+          flex: '0 1 320px',
           minWidth: 280,
-          minHeight: 320,
+          minHeight: 160,
+          maxHeight: 320,
           p: 2,
           borderRadius: 2,
           border: `2px dashed ${theme.palette.divider}`,
@@ -731,7 +782,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
                 >
                   <InsertDriveFile sx={{ fontSize: 36, opacity: 0.5 }} />
                   <Typography variant="body2" sx={{ mt: 0.5 }}>
-                    —
+                    {notAvailable('file_upload_title')}
                   </Typography>
                 </Box>
               );
@@ -920,6 +971,7 @@ const QuestionDetailRightPanel: React.FC<QuestionDetailRightPanelProps> = ({
         showFileIcon={detailPopup?.showFileIcon}
         officeAsset={detailPopup?.officeAsset}
         linkUrl={detailPopup?.linkUrl}
+        wide={detailPopup?.wide}
         targetUrl={detailPopup?.targetUrl}
         youtubeData={detailPopup?.youtubeData}
         linkOpenLabel={t('reference_open_link', currentLanguage)}

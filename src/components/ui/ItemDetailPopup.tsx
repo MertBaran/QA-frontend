@@ -64,6 +64,8 @@ interface ItemDetailPopupProps {
   officeAsset?: OfficeAssetRef | null;
   /** Link referansı - Linke git butonu */
   linkUrl?: string;
+  /** Dosya ve link detayı aynı genişlikte açılır */
+  wide?: boolean;
   /** Soru/cevap referansı - Yeni sekmede soru/cevaba git */
   targetUrl?: string;
   /** YouTube - Önizle butonu */
@@ -94,6 +96,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({
   showFileIcon,
   officeAsset,
   linkUrl,
+  wide = false,
   targetUrl,
   youtubeData,
   onYoutubePreview,
@@ -200,6 +203,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({
 
   const isDocumentPreviewDialog =
     isPdfPreview || isTxtPreview || isOfficePreview;
+  const roomy = !isSoruCevapView && (wide || !!showFileIcon);
 
   return (
     <>
@@ -210,7 +214,7 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          maxWidth: 420,
+          maxWidth: roomy ? 640 : 420,
           borderRadius: 2,
           mx: 2,
         },
@@ -377,8 +381,8 @@ const ItemDetailPopup: React.FC<ItemDetailPopupProps> = ({
               sx={(theme) => ({
                 display: 'block',
                 width: '100%',
-                minHeight: 80,
-                maxHeight: 200,
+                minHeight: roomy ? 140 : 80,
+                maxHeight: roomy ? 320 : 200,
                 mt: 0.5,
                 p: 1.5,
                 borderRadius: 1,

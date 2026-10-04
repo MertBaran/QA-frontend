@@ -3,7 +3,7 @@ import MdEditor from 'react-markdown-editor-lite';
 import 'react-markdown-editor-lite/lib/index.css';
 import { Box, Typography, TextField, useTheme, Theme, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { styled, SxProps } from '@mui/material/styles';
-import { InsertLink, Quiz, Chat, InsertDriveFile } from '@mui/icons-material';
+import { InsertLink, Quiz, Chat, ChatBubbleOutline, InsertDriveFile } from '@mui/icons-material';
 import type MarkdownIt from 'markdown-it';
 import { getScrollbarSx } from '../../theme/scrollbarStyles';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -73,6 +73,7 @@ function getRefDisplayLabel(
   const typeLabels: Record<string, { tr: string; en: string; de: string }> = {
     soru: { tr: 'soru', en: 'question', de: 'Frage' },
     cevap: { tr: 'cevap', en: 'answer', de: 'Antwort' },
+    yorum: { tr: 'yorum', en: 'comment', de: 'Kommentar' },
     link: { tr: 'link', en: 'link', de: 'Link' },
     dosya: { tr: 'dosya', en: 'file', de: 'Datei' },
   };
@@ -91,6 +92,7 @@ function getRefDisplayLabel(
         break;
       case 'soru':
       case 'cevap':
+      case 'yorum':
       default:
         desc = `ref-${n} ${typeLabel}`;
     }
@@ -103,6 +105,7 @@ function RefTypeIcon({ type }: { type: string }) {
     case 'link': return <InsertLink fontSize="small" />;
     case 'soru': return <Quiz fontSize="small" />;
     case 'cevap': return <Chat fontSize="small" />;
+    case 'yorum': return <ChatBubbleOutline fontSize="small" />;
     case 'dosya': return <InsertDriveFile fontSize="small" />;
     default: return <InsertLink fontSize="small" />;
   }
@@ -146,6 +149,8 @@ export interface RichTextEditorProps {
   onRefHover?: (refIndex: number | null) => void;
   /** Dil kodu - referans etiketleri için (ref-1 soru vb.) */
   currentLanguage?: string;
+  /** Yazma alanına tıklanınca, örneğin referans çentiğini açmak için */
+  onActivate?: () => void;
 }
 
 // ============================================================================
@@ -177,11 +182,32 @@ const EditorContainer = styled(Box, {
     return `${theme.palette.primary.main}${Math.round(OPACITY_FOCUS_SHADOW * 255).toString(16).padStart(2, '0')}`;
   };
 
-  const getToolbarBackground = () => {
-    return theme.palette.mode === 'dark'
-      ? theme.palette.background.default
-      : theme.palette.grey[100];
+  const getEditorChrome = () => '#F7F7F8';
+
+  const getEditorScrollbarSx = () => {
+    const track = getEditorChrome();
+    const thumb = '#E4E5E7';
+    return {
+      '&::-webkit-scrollbar': {
+        width: 10,
+        height: 10,
+      },
+      '&::-webkit-scrollbar-track': {
+        background: track,
+      },
+      '&::-webkit-scrollbar-thumb': {
+        background: thumb,
+        borderRadius: 5,
+        '&:hover': {
+          background: '#D4D6D8',
+        },
+      },
+      scrollbarWidth: 'thin' as const,
+      scrollbarColor: `${thumb} ${track}`,
+    };
   };
+
+  const getToolbarBackground = () => getEditorChrome();
 
   const getToolbarHoverBackground = () => {
     const baseColor = theme.palette.primary.main;
@@ -222,17 +248,19 @@ const EditorContainer = styled(Box, {
       backgroundColor: `${theme.palette.background.paper} !important`,
       color: `${theme.palette.text.primary} !important`,
       borderRight: `1px solid ${theme.palette.divider} !important`,
+      ...getEditorScrollbarSx(),
       '&:last-child': {
         borderRight: 'none !important',
       },
     },
-    '& .rc-md-editor .editor-container .section-container .section .input, & .rc-md-editor .editor-container .sec-md .input': {
+    '& .rc-md-editor .editor-container .section-container .section .input, & .rc-md-editor .editor-container .sec-md .input, & .rc-md-editor textarea': {
       backgroundColor: `${theme.palette.background.paper} !important`,
       color: `${theme.palette.text.primary} !important`,
       fontSize: '16px !important',
       lineHeight: '1.6 !important',
       fontFamily: 'inherit !important',
       padding: '10px 15px !important',
+      ...getEditorScrollbarSx(),
       '&::placeholder': {
         color: `${theme.palette.text.secondary} !important`,
         opacity: OPACITY_PLACEHOLDER,
@@ -246,7 +274,8 @@ const EditorContainer = styled(Box, {
       fontFamily: 'inherit !important',
       padding: '10px 15px !important',
     },
-    '& .rc-md-editor .toolbar': {
+    '& .rc-md-editor .rc-md-navigation, & .rc-md-editor .toolbar': {
+      background: `${getToolbarBackground()} !important`,
       backgroundColor: `${getToolbarBackground()} !important`,
       borderBottom: `1px solid ${theme.palette.divider} !important`,
       padding: '8px 4px !important',
@@ -307,6 +336,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   hoveredRefIndex,
   onRefHover,
   currentLanguage = 'tr',
+  onActivate,
 }) => {
   const theme = useTheme();
   const editorRef = useRef<MdEditorRef>(null);
@@ -488,7 +518,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           const fullMatch = matchWithBrackets[0];
           openRefDropdown(start - fullMatch.length, fullMatch.length, matchWithBrackets[1]);
         }
-      } else if (e.key === 'f' && beforeCursor === '/re') {
+      } else if (e.key === 'f' && beforeCursor.endsWith('/re')) {
+        const linkBefore = beforeCursor.match(/\[([^\]]*)\]\s*\/re$/);
         setTimeout(() => {
           const v = (textarea as HTMLTextAreaElement).value;
           const s = (textarea as HTMLTextAreaElement).selectionStart;
@@ -498,6 +529,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             openRefDropdown(s - m[0].length, m[0].length, m[1]);
           } else if (b.endsWith(REF_TRIGGER)) {
             openRefDropdown(s - REF_LEN, REF_LEN, null);
+          } else if (linkBefore) {
+            openRefDropdown(start - linkBefore[0].length, linkBefore[0].length + 1, linkBefore[1]);
+          } else {
+            openRefDropdown(start - 3, REF_LEN, null);
           }
         }, 0);
       } else if (beforeCursor.endsWith(REF_TRIGGER)) {
@@ -589,6 +624,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   return (
     <Box
       ref={containerRef}
+      onMouseDownCapture={() => onActivate?.()}
       onBlur={(e) => {
         // Focus container dışına çıkınca parent'a hemen yaz
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {

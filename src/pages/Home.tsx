@@ -20,6 +20,7 @@ import {
   TAG_MAX_COUNT,
 } from '../constants/questionValidation';
 import { t } from '../utils/translations';
+import { referenceNeedsDescription } from '../utils/filledEntries';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import papyrusGenis2Dark from '../asset/textures/papyrus_genis_2_dark.png';
 import papyrusVertical1 from '../asset/textures/papyrus_vertical_1.png';
@@ -192,7 +193,7 @@ const Home = () => {
     }
 
     const soruCevapRefWithoutDesc = rightState?.references?.find(
-      (r) => (r.type === 'soru' || r.type === 'cevap') && r.content?.trim() && !r.description?.trim()
+      (r) => referenceNeedsDescription(r.type) && r.content?.trim() && !r.description?.trim()
     );
     if (soruCevapRefWithoutDesc) {
       showErrorToast(t('reference_description_required', currentLanguage));
