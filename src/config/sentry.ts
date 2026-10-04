@@ -12,7 +12,7 @@ export const initSentry = (): void => {
       integrations: [new BrowserTracing()],
       tracesSampleRate: 1.0,
       environment: 'development',
-      release: '1.0.0',
+      release: '1.8.0',
       sampleRate: 1.0,
       beforeSend(event) {
         console.log('Sentry Error (development):', event);
@@ -26,7 +26,7 @@ export const initSentry = (): void => {
     integrations: [new BrowserTracing()],
     tracesSampleRate: 1.0,
     environment: process.env.NODE_ENV || 'development',
-    release: process.env.REACT_APP_VERSION || '1.0.0',
+    release: process.env.REACT_APP_VERSION || '1.8.0',
     sampleRate: 1.0,
     beforeSend(event) {
       console.log('Sentry Error:', event);
