@@ -19,6 +19,7 @@ import { useAppSelector } from '../../store/hooks';
 import { Question, AncestorReference } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { questionService } from '../../services/questionService';
+import QuestionHoverPreview, { ANCESTOR_PREVIEW_DELAY_MS, setHomePreviewSuppressed, useDelayedQuestionPreview } from './QuestionHoverPreview';
 import { answerService } from '../../services/answerService';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
 
@@ -215,6 +216,13 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
   const [loadedCount, setLoadedCount] = useState(0);
   const [lastQuestionId, setLastQuestionId] = useState<string>('');
   const ITEMS_PER_LOAD = 5;
+  const hoverPreview = useDelayedQuestionPreview({ delayMs: ANCESTOR_PREVIEW_DELAY_MS });
+
+  useEffect(() => {
+    if (!open) return;
+    setHomePreviewSuppressed(true);
+    return () => setHomePreviewSuppressed(false);
+  }, [open]);
 
   // Find parent (depth 0) and filter ancestors with depth > 0
   const parentAncestor = ancestors.find(a => a.depth === 0);
@@ -518,6 +526,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
   };
 
   return (
+    <>
     <StyledDrawer
       anchor="left"
       open={open}
@@ -603,6 +612,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                         borderLeft: `3px solid ${getThemeColor(themeName, theme, 'primary')}`,
                       }
                     }}
+                    {...hoverPreview.bind(parentItem.data as Question)}
                     onClick={(e) => handleQuestionClick(e, parentItem.id)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -736,6 +746,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                         borderLeft: `3px solid ${getThemeColor(themeName, theme, 'primary')}`,
                       }
                     }}
+                    {...hoverPreview.bindAnswer(parentItem.data as Answer)}
                     onClick={(e) => handleAnswerClick(e, parentItem.data as Answer)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -871,6 +882,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                 <DepthIndicator depth={item.depth} isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'} />
                 {item.type === 'question' && item.data ? (
                     <QuestionItem isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'}
+                    {...hoverPreview.bind(item.data as Question)}
                     onClick={(e) => handleQuestionClick(e, item.id)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -999,6 +1011,7 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
                   </QuestionItem>
                 ) : item.type === 'answer' && item.data ? (
                     <AnswerItem isMolume={themeName === 'molume'} isMagnefite={themeName === 'magnefite'}
+                    {...hoverPreview.bindAnswer(item.data as Answer)}
                     onClick={(e) => handleAnswerClick(e, item.data as Answer)}
                     onMouseDown={(e) => {
                       if (e.button === 1) {
@@ -1142,6 +1155,15 @@ const AncestorsDrawer: React.FC<AncestorsDrawerProps> = ({
         )}
       </Box>
     </StyledDrawer>
+    <QuestionHoverPreview
+      placement="page"
+      question={hoverPreview.question}
+      featuredAnswer={hoverPreview.featuredAnswer}
+      anchorEl={hoverPreview.anchorEl}
+      onMouseEnter={hoverPreview.previewHandlers.onMouseEnter}
+      onMouseLeave={hoverPreview.previewHandlers.onMouseLeave}
+    />
+    </>
   );
 };
 
