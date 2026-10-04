@@ -119,6 +119,11 @@ export const questions = {
     en: 'Image Preview',
     de: 'Bildvorschau',
   },
+  content_preview: {
+    tr: 'Önizleme',
+    en: 'Preview',
+    de: 'Vorschau',
+  },
   no_questions: {
     tr: 'Henüz soru yok.',
     en: 'No questions yet.',
@@ -335,7 +340,7 @@ export const questions = {
     de: 'Zu dieser Antwort',
   },
   related_questions: {
-    tr: 'Bunun hakkında sorulan sorular',
+    tr: 'Hakkında sorulan sorular',
     en: 'Questions about this',
     de: 'Fragen dazu',
   },
@@ -380,6 +385,11 @@ export const questions = {
     en: 'Metadata',
     de: 'Metadaten',
   },
+  item_not_available: {
+    tr: '{item} mevcut değil',
+    en: 'No {item}',
+    de: 'Keine {item}',
+  },
   add_reference: {
     tr: 'Referans Ekle',
     en: 'Add Reference',
@@ -409,6 +419,11 @@ export const questions = {
     tr: 'Cevap',
     en: 'Answer',
     de: 'Antwort',
+  },
+  reference_type_comment: {
+    tr: 'Yorum',
+    en: 'Comment',
+    de: 'Kommentar',
   },
   reference_type_file: {
     tr: 'Dosya',
@@ -464,6 +479,11 @@ export const questions = {
     tr: 'Cevap ara... (min 3 karakter)',
     en: 'Search answer... (min 3 chars)',
     de: 'Antwort suchen... (min 3 Zeichen)',
+  },
+  reference_search_comment: {
+    tr: 'Yorum ara... (min 3 karakter)',
+    en: 'Search comment... (min 3 chars)',
+    de: 'Kommentar suchen... (min 3 Zeichen)',
   },
   reference_lookup: {
     tr: 'Gözat',
@@ -576,9 +596,9 @@ export const questions = {
     de: 'Beschreibung',
   },
   reference_description_required: {
-    tr: 'Soru ve cevap referansları için açıklama zorunludur',
-    en: 'Description is required for question and answer references',
-    de: 'Beschreibung ist für Fragen- und Antwortreferenzen erforderlich',
+    tr: 'Soru, cevap ve yorum referansları için açıklama zorunludur',
+    en: 'Description is required for question, answer, and comment references',
+    de: 'Beschreibung ist für Fragen-, Antwort- und Kommentareferenzen erforderlich',
   },
   metadata_key: {
     tr: 'Anahtar',
@@ -609,6 +629,11 @@ export const questions = {
     tr: 'Cevap bulunamadı',
     en: 'Answer not found',
     de: 'Antwort nicht gefunden',
+  },
+  reference_comment_not_found: {
+    tr: 'Yorum bulunamadı',
+    en: 'Comment not found',
+    de: 'Kommentar nicht gefunden',
   },
   reference_load_failed: {
     tr: 'Referans yüklenemedi',

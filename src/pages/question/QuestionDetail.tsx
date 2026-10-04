@@ -14,8 +14,12 @@ import {
   Alert,
   useTheme,
   Dialog,
+  alpha,
   Pagination,
   Tooltip,
+  Tabs,
+  Tab,
+  Collapse,
 } from '@mui/material';
 import papyrusGenis2Dark from '../../asset/textures/papyrus_genis_2_dark.png';
 import papyrusHorizontal1 from '../../asset/textures/papyrus_horizontal_1.png';
@@ -33,18 +37,27 @@ import {
   ChevronLeft,
   ChevronRight,
   Close,
+  ExpandMore,
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import Layout from '../../components/layout/Layout';
 import { getScrollbarSx } from '../../theme/scrollbarStyles';
-import { Question, UpdateQuestionData, CreateQuestionData, QuestionReference } from '../../types/question';
+import { Question, UpdateQuestionData, CreateQuestionData, QuestionReference, QuestionMetadataItem } from '../../types/question';
 import type { FeatureTableRow } from '../../types/questionFeatureTemplate';
 import { Answer } from '../../types/answer';
+import { filledMetadata, filledReferences, referenceNeedsDescription } from '../../utils/filledEntries';
+import { referenceNotchColor } from '../../theme/referenceNotchColor';
+import ReportContentButton from '../../components/ui/ReportContentButton';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import { commentService } from '../../services/commentService';
+import type { CommentItem } from '../../types/comment';
+import CommentThread from '../../components/comment/CommentThread';
+import DeferredImage from '../../components/ui/DeferredImage';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import logger from '../../utils/logger';
 import { t } from '../../utils/translations';
+import ContentTime from '../../components/ui/ContentTime';
 import ActionButtons from '../../components/ui/ActionButtons';
 import LikesModal from '../../components/ui/LikesModal';
 import ParentInfoChip from '../../components/ui/ParentInfoChip';
@@ -62,11 +75,13 @@ import {
 import ExpandableMarkdown from '../../components/ui/ExpandableMarkdown';
 import AncestorsDrawer from '../../components/question/AncestorsDrawer';
 import AnswerCard from '../../components/answer/AnswerCard';
+import AnswerComposeExtras, { type AnswerFileDraft } from '../../components/answer/AnswerComposeExtras';
+import InlineSidePanel from '../../components/ui/InlineSidePanel';
 import ItemsPerPageSelector, { DateSortOrder, dateSortToApiOrder } from '../../components/home/ItemsPerPageSelector';
 import { openModal, closeModal, openDislikesModal, closeDislikesModal } from '../../store/likes/likesSlice';
 import { fetchLikedUsers, fetchDislikedUsers } from '../../store/likes/likesThunks';
 import { getAnswersByQuestion, createAnswer, likeAnswer, unlikeAnswer, deleteAnswer } from '../../store/answers/answerThunks';
-import { updateAnswerInList, removeAnswerFromList } from '../../store/answers/answerSlice';
+import { updateAnswerInList } from '../../store/answers/answerSlice';
 import CreateQuestionFlow from '../../components/question/CreateQuestionFlow';
 import type { CreateQuestionLeftState } from '../../components/question/CreateQuestionLeftModal';
 import QuestionDetailLeftPanel, {
@@ -233,6 +248,10 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [loadingQuestion, setLoadingQuestion] = useState(true);
   const [newAnswer, setNewAnswer] = useState('');
+  const [answerReferences, setAnswerReferences] = useState<QuestionReference[]>([]);
+  const [answerMetadata, setAnswerMetadata] = useState<QuestionMetadataItem[]>([]);
+  const [answerFiles, setAnswerFiles] = useState<AnswerFileDraft[]>([]);
+  const [comments, setComments] = useState<CommentItem[]>([]);
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
   const [answerValidationError, setAnswerValidationError] = useState<string>('');
   const [highlightedAnswerId, setHighlightedAnswerId] = useState<string | null>(null);
@@ -313,6 +332,10 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
   const [hoveredRefIndex, setHoveredRefIndex] = useState<number | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<'answers' | 'comments'>('answers');
+  const [answerComposerOpen, setAnswerComposerOpen] = useState(false);
+  const [answerRefsOpen, setAnswerRefsOpen] = useState(false);
+  const [reactionMention, setReactionMention] = useState<{ questionId: string; answerId?: string } | null>(null);
   const [questionProfileImageUrl, setQuestionProfileImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -490,6 +513,135 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
     loadQuestionData();
   }, [id, dispatch, answersPage, answersLimit, dateSort]);
 
+  useEffect(() => {
+    if (!question || !user) return;
+    const ownerId = question.userInfo?._id || question.author.id;
+    if (ownerId !== user.id) return;
+    const references = filledReferences(question.references);
+    const metadata = filledMetadata(question.metadata);
+    const dirty =
+      references.length !== (question.references?.length ?? 0) ||
+      metadata.length !== (question.metadata?.length ?? 0);
+    if (!dirty) return;
+    let cancelled = false;
+    questionService
+      .updateQuestion(question.id, { references, metadata })
+      .then(updated => {
+        if (!cancelled && updated) setQuestion(updated);
+      })
+      .catch(err => {
+        console.error('Boş referans veya metadata silinemedi:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [question, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const dirty = answers.filter(answer => {
+      const ownerId = answer.userInfo?._id || answer.author.id;
+      if (ownerId !== user.id) return false;
+      return (
+        filledReferences(answer.references).length !== (answer.references?.length ?? 0) ||
+        filledMetadata(answer.metadata).length !== (answer.metadata?.length ?? 0)
+      );
+    });
+    if (dirty.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (const answer of dirty) {
+        try {
+          const updated = await answerService.updateAnswer(answer.id, {
+            content: answer.content,
+            references: filledReferences(answer.references),
+            metadata: filledMetadata(answer.metadata),
+          });
+          if (!cancelled && updated) {
+            dispatch(updateAnswerInList({ answerId: answer.id, updates: updated }));
+          }
+        } catch (err) {
+          console.error('Boş cevap referansı silinemedi:', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [answers, user, dispatch]);
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    commentService
+      .listForQuestion(id)
+      .then(list => {
+        if (!cancelled) setComments(list);
+      })
+      .catch(err => {
+        console.error('Yorumlar yüklenirken hata:', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  const refreshComments = async () => {
+    if (!id) return;
+    const list = await commentService.listForQuestion(id);
+    setComments(list);
+  };
+
+  const handleCreateComment = async (
+    targetType: 'question' | 'answer',
+    targetId: string,
+    body: string,
+    parentId?: string,
+  ) => {
+    try {
+      await commentService.create({ body, targetType, targetId, parentId });
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum gönderilemedi:', err);
+      showErrorToast(t('write_comment', currentLanguage));
+      throw err;
+    }
+  };
+
+  const handleUpdateComment = async (commentId: string, body: string) => {
+    try {
+      await commentService.update(commentId, body);
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum güncellenemedi:', err);
+      showErrorToast(t('edit_comment', currentLanguage));
+      throw err;
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const { confirmService } = await import('../../services/confirmService');
+    const confirmed = await confirmService.confirmDelete(undefined, currentLanguage);
+    if (!confirmed) return;
+
+    try {
+      await commentService.remove(commentId);
+      await refreshComments();
+    } catch (err) {
+      console.error('Yorum silinemedi:', err);
+      showErrorToast(t('delete_comment', currentLanguage));
+    }
+  };
+
+  const handleReactComment = async (commentId: string, type: 'like' | 'dislike') => {
+    try {
+      const updated = await commentService.react(commentId, type);
+      setComments(current => current.map(item => (item.id === commentId ? updated : item)));
+    } catch (err) {
+      console.error('Yorum tepkisi kaydedilemedi:', err);
+    }
+  };
+
   // Fetch bookmarks once on mount if authenticated (so QuestionDetail can show bookmark state)
   useEffect(() => {
     if (user && bookmarks.length === 0) {
@@ -554,6 +706,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
       const hash = window.location.hash;
       if (hash && hash.startsWith('#answer-')) {
         const answerId = hash.substring('#answer-'.length);
+        setDetailTab('answers');
         await resolveAnswerHighlight(answerId, true);
       } else if (!highlightAnswerIdProp) {
         setHighlightedAnswerId(null);
@@ -585,7 +738,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
       const answerExists = answers.some(a => a.id === answerId);
 
       if (answerExists) {
-        // Cevap mevcut sayfada, highlight et
+        setDetailTab('answers');
         setHighlightedAnswerId(answerId);
         setTimeout(() => {
           const element = document.getElementById(`answer-${answerId}`);
@@ -603,6 +756,29 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
     }
   }, [answers, answersPage]);
 
+  useEffect(() => {
+    const openCommentFromHash = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#comment-') || comments.length === 0 || !id) return;
+      const commentId = hash.slice('#comment-'.length);
+      const comment = comments.find(item => item.id === commentId);
+      if (!comment) return;
+      if (comment.targetType === 'question') {
+        setDetailTab('comments');
+        return;
+      }
+      setDetailTab('answers');
+      void answerService.getAnswerPageNumber(id, comment.targetId, answersLimit).then(pageNumber => {
+        if (!pageNumber) return;
+        setAnswersPage(current => (current === pageNumber ? current : pageNumber));
+      });
+    };
+
+    openCommentFromHash();
+    window.addEventListener('hashchange', openCommentFromHash);
+    return () => window.removeEventListener('hashchange', openCommentFromHash);
+  }, [comments, id, answersLimit]);
+
   // Cevap gönder
   const handleSubmitAnswer = async () => {
     if (!id || !newAnswer.trim() || !user) return;
@@ -615,9 +791,60 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
       setSubmittingAnswer(true);
       setAnswerValidationError('');
 
-      await dispatch(createAnswer({ questionId: id, answerData: { content: newAnswer.slice(0, CONTENT_MAX_LENGTH) } }));
+      const soruCevapRefWithoutDesc = answerReferences.find(
+        (ref) => referenceNeedsDescription(ref.type) && ref.content?.trim() && !ref.description?.trim()
+      );
+      if (soruCevapRefWithoutDesc) {
+        showErrorToast(t('reference_description_required', currentLanguage));
+        setSubmittingAnswer(false);
+        return;
+      }
+
+      let attachmentKeys: { key: string; description?: string; size?: number }[] = [];
+      if (answerFiles.length > 0) {
+        for (const file of answerFiles) {
+          const presigned = await contentAssetService.createPresignedUpload({
+            type: 'answer-attachment',
+            filename: file.file.name,
+            mimeType: file.file.type,
+            contentLength: file.file.size,
+            ownerId: user.id,
+            visibility: 'public',
+          });
+          await uploadFileToPresignedUrl(presigned, file.file);
+          attachmentKeys.push({
+            key: presigned.key,
+            description: file.description || undefined,
+            size: file.file.size,
+          });
+        }
+      }
+
+      const cleanedMetadata = filledMetadata(answerMetadata);
+      const mappedReferences = filledReferences(answerReferences.map((ref) => {
+        if (ref.type === 'dosya' && ref.content) {
+          const index = answerFiles.findIndex((file) => file.id === ref.content);
+          if (index >= 0 && attachmentKeys[index]) {
+            return { ...ref, content: attachmentKeys[index].key };
+          }
+        }
+        return ref;
+      }));
+
+      await dispatch(createAnswer({
+        questionId: id,
+        answerData: {
+          content: newAnswer.slice(0, CONTENT_MAX_LENGTH),
+          references: mappedReferences.length > 0 ? mappedReferences : undefined,
+          metadata: cleanedMetadata.length > 0 ? cleanedMetadata : undefined,
+          attachments: attachmentKeys.length > 0 ? attachmentKeys : undefined,
+        },
+      }));
 
       setNewAnswer('');
+      setAnswerReferences([]);
+      setAnswerMetadata([]);
+      setAnswerFiles([]);
       setAnswerValidationError('');
       // Yeni cevap eklendiğinde ilk sayfaya dön ve cevapları yeniden yükle
       setAnswersPage(1);
@@ -943,8 +1170,10 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
       return;
     }
 
-    // Optimistic update: UI'dan hemen sil
-    dispatch(removeAnswerFromList(answerId));
+    dispatch(updateAnswerInList({
+      answerId,
+      updates: { deleted: true, content: '', references: [], metadata: [], attachments: [] },
+    }));
 
     try {
       await dispatch(deleteAnswer({ answerId, questionId: id! }));
@@ -1027,7 +1256,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
     }
 
     const soruCevapRefWithoutDesc = opt.rightState?.references?.find(
-      (r) => (r.type === 'soru' || r.type === 'cevap') && r.content?.trim() && !r.description?.trim()
+      (r) => referenceNeedsDescription(r.type) && r.content?.trim() && !r.description?.trim()
     );
     if (soruCevapRefWithoutDesc) {
       showErrorToast(t('reference_description_required', currentLanguage));
@@ -1156,9 +1385,57 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
     setRelatedQuestionsAnchor(null);
   };
 
+  const cardOpen = (location.state as { open?: string } | null)?.open;
+  const appliedCardOpen = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (embedded || !question || !cardOpen) return;
+    const key = `${question.id}:${cardOpen}`;
+    if (appliedCardOpen.current === key) return;
+    appliedCardOpen.current = key;
+
+    if (cardOpen === 'likes') {
+      setReactionMention({ questionId: question.id });
+      dispatch(closeModal());
+      dispatch(openModal());
+      if (question.likedByUsers.length > 0) dispatch(fetchLikedUsers(question.likedByUsers));
+      return;
+    }
+    if (cardOpen === 'dislikes') {
+      setReactionMention({ questionId: question.id });
+      dispatch(closeDislikesModal());
+      dispatch(openDislikesModal());
+      if (question.dislikedByUsers.length > 0) dispatch(fetchDislikedUsers(question.dislikedByUsers));
+      return;
+    }
+    if (cardOpen === 'comments' || cardOpen === 'answers') {
+      setDetailTab(cardOpen);
+      window.setTimeout(() => {
+        if (appliedCardOpen.current !== key) return;
+        const section = document.getElementById('answers-section');
+        if (section) scrollElementInView(section, 'start');
+      }, 350);
+      return;
+    }
+    if (cardOpen === 'related') {
+      const questionId = question.id;
+      window.setTimeout(() => {
+        if (appliedCardOpen.current !== key) return;
+        const trigger = document.getElementById('question-related-questions');
+        if (!trigger) return;
+        void handleShowRelatedQuestions(
+          { currentTarget: trigger } as React.MouseEvent<HTMLElement>,
+          questionId,
+          'question'
+        );
+      }, 350);
+    }
+  }, [question, cardOpen, embedded]);
+
   // Show liked users for question
   const handleShowLikedUsersForQuestion = async () => {
     if (!question || question.likedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id });
     dispatch(openModal());
     dispatch(fetchLikedUsers(question.likedByUsers));
   };
@@ -1166,6 +1443,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
   // Show disliked users for question
   const handleShowDislikedUsersForQuestion = async () => {
     if (!question || question.dislikedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id });
     dispatch(openDislikesModal());
     dispatch(fetchDislikedUsers(question.dislikedByUsers));
   };
@@ -1173,7 +1451,8 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
   // Show liked users for answer
   const handleShowLikedUsersForAnswer = async (answerId: string) => {
     const answer = answers.find(a => a.id === answerId);
-    if (!answer || answer.likedByUsers.length === 0) return;
+    if (!question || !answer || answer.likedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id, answerId });
     dispatch(openModal());
     dispatch(fetchLikedUsers(answer.likedByUsers));
   };
@@ -1181,7 +1460,8 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
   // Show disliked users for answer
   const handleShowDislikedUsersForAnswer = async (answerId: string) => {
     const answer = answers.find(a => a.id === answerId);
-    if (!answer || answer.dislikedByUsers.length === 0) return;
+    if (!question || !answer || answer.dislikedByUsers.length === 0) return;
+    setReactionMention({ questionId: question.id, answerId });
     dispatch(openDislikesModal());
     dispatch(fetchDislikedUsers(answer.dislikedByUsers));
   };
@@ -1290,7 +1570,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
     }
 
     const soruCevapRefWithoutDesc = rightState?.references?.find(
-      (r) => (r.type === 'soru' || r.type === 'cevap') && r.content?.trim() && !r.description?.trim()
+      (r) => referenceNeedsDescription(r.type) && r.content?.trim() && !r.description?.trim()
     );
     if (soruCevapRefWithoutDesc) {
       showErrorToast(t('reference_description_required', currentLanguage));
@@ -1370,7 +1650,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
           }
           return ref;
         }) as QuestionReference[];
-        updatePayload.references = mappedReferences;
+        updatePayload.references = filledReferences(mappedReferences);
 
         const refKeys = mappedReferences.filter((r) => r.type === 'dosya' && r.content).map((r) => r.content);
         const keptExisting = (question.attachments ?? []).filter((a) => refKeys.includes(a.key));
@@ -1378,7 +1658,13 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
       }
 
       if (rightState?.metadata != null) {
-        updatePayload.metadata = rightState.metadata;
+        updatePayload.metadata = filledMetadata(rightState.metadata);
+      }
+
+      if (leftState) {
+        const parsedFocus = leftState.focus ? parseInt(leftState.focus, 10) : NaN;
+        updatePayload.focus =
+          !Number.isNaN(parsedFocus) && parsedFocus >= 1 && parsedFocus <= 10 ? parsedFocus : null;
       }
 
       if (leftState?.featureTemplateId) {
@@ -1573,10 +1859,11 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
-          minWidth: embedded ? 0 : 2100,
+          maxWidth: '100%',
+          minWidth: 0,
         }}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'row', width: '100%', overflowX: embedded ? 'hidden' : 'auto', alignItems: 'flex-start', position: 'relative' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'row', width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'clip', alignItems: 'flex-start', position: 'relative' }}>
           {/* Sol tab - her zaman 40px, panel açıkken overlay */}
           {!embedded && (
           <Box sx={{ width: 40, flexShrink: 0, pt: 4, pb: 4, display: 'flex', alignItems: 'flex-start' }}>
@@ -1605,7 +1892,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
           )}
 
           {/* Orta - sabit konumda, paneller overlay ile üzerine biner */}
-          <Box sx={{ flex: 1, minWidth: embedded ? 0 : 1280, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
             <Container maxWidth="lg" sx={{ pt: embedded ? 0 : 4, pb: 0, position: 'relative', zIndex: 1, width: '100%' }}>
               <Box sx={{ display: 'flex', flexDirection: 'column', pb: 4 }}>
               {!embedded && (
@@ -1663,6 +1950,12 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                 canDelete={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id || question.author.id === user.id?.toString()))}
                 isBookmarked={!!bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)}
                 bookmarkId={bookmarks.find(b => b.target_type === 'question' && b.target_id === question.id)?._id || null}
+                messageRecipient={{
+                  id: question.userInfo?._id || question.author.id,
+                  name: question.author.name,
+                  profile_image: question.userInfo?.profile_image || question.author.avatar,
+                }}
+                mention={{ questionId: question.id }}
                 onLike={handleLikeQuestion}
                 onUnlike={handleUnlikeQuestion}
                 onDislike={handleDislikeQuestion}
@@ -1763,9 +2056,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                     >
                       {question.userInfo?.name || question.author.name}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                      {question.timeAgo}
-                    </Typography>
+                    <ContentTime value={question.createdAt} currentLanguage={currentLanguage} />
                   </Box>
                 </Box>
 
@@ -1841,7 +2132,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                   </Box>
 
                   {/* Thumbnail Container - Dikey olarak ortalanmış */}
-                  {(questionThumbnailUrl || question?.thumbnail?.url) && (
+                  {(questionThumbnailUrl || question?.thumbnail?.url || question?.thumbnail?.key) && (
                     <Box
                       sx={{
                         display: 'flex',
@@ -1869,34 +2160,22 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                         })}
                         onClick={() => setQuestionThumbnailPreviewOpen(true)}
                       >
-                        <img
-                          src={questionThumbnailUrl || question?.thumbnail?.url || ''}
+                        <DeferredImage
+                          src={questionThumbnailUrl || question?.thumbnail?.url || undefined}
                           alt={question.summary}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={async (e) => {
-                            const img = e.currentTarget;
-                            const currentSrc = img.src;
-
-                            // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene (URL expire olmuş olabilir)
-                            if (question?.thumbnail?.key) {
-                              try {
-                                const newUrl = await contentAssetService.resolveAssetUrl({
-                                  key: question.thumbnail.key,
-                                  type: 'question-thumbnail',
-                                  entityId: question.id,
-                                });
-                                if (newUrl && newUrl !== currentSrc) {
-                                  setQuestionThumbnailUrl(newUrl);
-                                  img.src = newUrl;
-                                  return; // Yeniden yükleme başarılı
-                                }
-                              } catch (error) {
-                                logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
-                              }
+                          onError={async () => {
+                            if (!question?.thumbnail?.key) return;
+                            try {
+                              const newUrl = await contentAssetService.resolveAssetUrl({
+                                key: question.thumbnail.key,
+                                type: 'question-thumbnail',
+                                entityId: question.id,
+                              });
+                              const current = questionThumbnailUrl || question?.thumbnail?.url;
+                              if (newUrl && newUrl !== current) setQuestionThumbnailUrl(newUrl);
+                            } catch (error) {
+                              logger.error('Thumbnail URL yeniden oluşturulamadı:', error);
                             }
-
-                            // Başarısız olursa gizle
-                            img.style.display = 'none';
                           }}
                         />
                       </Box>
@@ -1976,7 +2255,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                       {question.dislikesCount}
                     </Typography>
                   </Box>
-                  {user && questionRelatedQuestionsCount > 0 && (
+                  <Tooltip title={t('related_questions', currentLanguage)}>
                     <Box
                       sx={{
                         display: 'flex',
@@ -1984,50 +2263,22 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                         gap: 0.5,
                         cursor: 'pointer',
                       }}
+                      id="question-related-questions"
                       onClick={(e) => handleShowRelatedQuestions(e as React.MouseEvent<HTMLElement>, question.id, 'question')}
-                      title={t('related_questions', currentLanguage)}
                     >
                       <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
                       <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                         {questionRelatedQuestionsCount}
                       </Typography>
                     </Box>
-                  )}
+                  </Tooltip>
                 </Box>
               </Box>
             </Box>
+            <ReportContentButton />
           </QuestionCard>
               </Box>
 
-        {/* Cevap Yazma Bölümü */}
-        {user && (
-          <QuestionCard isPapirus={isPapirus} isAnswerWriting={true} isMagnefite={isMagnefite}>
-            <Typography variant="h6" sx={{ mb: 2, color: theme.palette.text.primary }}>
-              {t('write_answer', currentLanguage)}
-            </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
-              * {t('validation_answer_min', currentLanguage)}
-            </Typography>
-            <Box sx={{ mb: 2 }}>
-              <RichTextEditor
-                value={newAnswer}
-                onChange={(value) => setNewAnswer((value || '').slice(0, CONTENT_MAX_LENGTH))}
-                minHeight={300}
-                maxLength={CONTENT_MAX_LENGTH}
-                error={!!answerValidationError}
-                helperText={answerValidationError}
-              />
-            </Box>
-            <ActionButton
-              onClick={handleSubmitAnswer}
-              disabled={!newAnswer.trim() || newAnswer.trim().length < 5 || submittingAnswer || newAnswer.length > CONTENT_MAX_LENGTH}
-              endIcon={<Send />}
-              isMagnefite={isMagnefite}
-            >
-              {submittingAnswer ? t('sending', currentLanguage) : t('send_answer', currentLanguage)}
-            </ActionButton>
-          </QuestionCard>
-        )}
               </Box>
             </Container>
           </Box>
@@ -2053,6 +2304,25 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                   }}
                 >
                   <ChevronLeft />
+                  <Box
+                    aria-hidden
+                    sx={{
+                      position: 'absolute',
+                      bottom: 10,
+                      left: '50%',
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      transform: 'translateX(-50%)',
+                      bgcolor: referenceNotchColor(
+                        themeName,
+                        theme.palette.mode,
+                        filledReferences(question?.references).length > 0 ||
+                        filledMetadata(question?.metadata).length > 0 ||
+                        (question?.attachments?.length ?? 0) > 0
+                      ),
+                    }}
+                  />
                 </IconButton>
               </Tooltip>
             )}
@@ -2066,7 +2336,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                 position: 'absolute',
                 left: 0,
                 top: 0,
-                width: 320,
+                width: 'min(320px, 100%)',
                 maxHeight: 'calc(100vh - 180px)',
                 pt: 4,
                 pb: 4,
@@ -2084,6 +2354,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                   currentLanguage={currentLanguage}
                   featureTemplateName={featureTemplateDisplayName}
                   featureFieldRows={featureFieldDisplayRows}
+                  showFocus={!!(user && (question.author.id === user.id || question.userInfo?._id === user.id))}
                 />
                 <Tooltip title={t('close_panel', currentLanguage)} placement="right">
                   <IconButton
@@ -2113,7 +2384,8 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                 position: 'absolute',
                 right: 0,
                 top: 0,
-                width: 500,
+                width: 'min(500px, 100%)',
+                height: 'calc(100vh - 180px)',
                 maxHeight: 'calc(100vh - 180px)',
                 pt: 4,
                 pb: 4,
@@ -2123,6 +2395,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                 zIndex: 20,
                 display: 'flex',
                 flexDirection: 'column',
+                overflow: 'hidden',
               }}
             >
               <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}>
@@ -2145,10 +2418,30 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                       color: theme.palette.text.secondary,
                       bgcolor: theme.palette.background.paper,
                       boxShadow: 1,
+                      zIndex: 2,
                       '&:hover': { color: theme.palette.primary.main, bgcolor: `${theme.palette.primary.main}22` },
                     }}
                   >
                     <ChevronRight />
+                    <Box
+                      aria-hidden
+                      sx={{
+                        position: 'absolute',
+                        bottom: 4,
+                        left: '50%',
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        transform: 'translateX(-50%)',
+                        bgcolor: referenceNotchColor(
+                          themeName,
+                          theme.palette.mode,
+                          filledReferences(question?.references).length > 0 ||
+                          filledMetadata(question?.metadata).length > 0 ||
+                          (question?.attachments?.length ?? 0) > 0
+                        ),
+                      }}
+                    />
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -2157,15 +2450,147 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
         </Box>
 
         {/* Cevaplar - tam genişlik, sabit hizalama (paneller overlay) */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', minWidth: embedded ? 0 : 2100 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', maxWidth: '100%', minWidth: 0 }}>
           {!embedded && <Box sx={{ width: 40, flexShrink: 0 }} />}
-          <Box sx={{ flex: 1, minWidth: embedded ? 0 : 1280, display: 'flex', justifyContent: 'center' }}>
-            <Container maxWidth="lg" sx={{ pt: 0, pb: 8, position: 'relative', zIndex: 1, width: '100%' }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center' }}>
+            <Container maxWidth="lg" sx={{ pt: 0, pb: 8, position: 'relative', zIndex: 1, width: '100%', overflow: 'visible' }}>
               <Box id="answers-section" sx={{ mt: 4 }}>
-                <Typography variant="h5" sx={(theme) => ({ mb: 3, color: theme.palette.text.primary, fontWeight: 600 })}>
-                  {t('answers', currentLanguage)} ({totalAnswers})
-                </Typography>
+                <Tabs
+                  value={detailTab}
+                  onChange={(_, value: 'answers' | 'comments') => setDetailTab(value)}
+                  sx={{ mb: 2 }}
+                >
+                  <Tab value="answers" label={`${t('answers', currentLanguage)} (${totalAnswers})`} />
+                  <Tab
+                    value="comments"
+                    label={`${t('comments', currentLanguage)} (${comments.filter(item => item.targetType === 'question' && item.targetId === question.id && !item.deleted).length})`}
+                  />
+                </Tabs>
 
+                {detailTab === 'comments' ? (
+                  <QuestionCard isPapirus={isPapirus} isMagnefite={isMagnefite}>
+                    <CommentThread
+                      comments={comments.filter(item => item.targetType === 'question' && item.targetId === question.id)}
+                      currentUserId={user?.id}
+                      currentLanguage={currentLanguage}
+                      onCreate={(body, parentId) => handleCreateComment('question', question.id, body, parentId)}
+                      onUpdate={handleUpdateComment}
+                      onDelete={handleDeleteComment}
+                      onReact={handleReactComment}
+                      questionOwnerId={question.userInfo?._id || question.author.id}
+                      questionId={question.id}
+                      showHeading={false}
+                      composeMode="line"
+                      showReport
+                      onReveal={element => scrollElementInView(element, 'center')}
+                    />
+                  </QuestionCard>
+                ) : (
+                <>
+                {user && (
+                  <Box sx={{ mb: 2 }}>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      endIcon={
+                        <ExpandMore
+                          sx={{
+                            transform: answerComposerOpen ? 'rotate(180deg)' : 'none',
+                            transition: 'transform 200ms ease',
+                            position: 'relative',
+                            zIndex: 1,
+                          }}
+                        />
+                      }
+                      onClick={() => setAnswerComposerOpen(open => !open)}
+                      sx={theme => ({
+                        py: 1.35,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        animation: 'answerButtonPulse 9s ease-in-out infinite',
+                        '@keyframes answerButtonPulse': {
+                          '0%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0.28)}` },
+                          '45%': { boxShadow: `0 0 0 8px ${alpha(theme.palette.primary.main, 0)}` },
+                          '100%': { boxShadow: `0 0 0 0 ${alpha(theme.palette.primary.main, 0)}` },
+                        },
+                        '@keyframes answerButtonSheen': {
+                          '0%': { transform: 'translateX(-140%)' },
+                          '22%': { transform: 'translateX(140%)' },
+                          '100%': { transform: 'translateX(140%)' },
+                        },
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          left: 0,
+                          width: '45%',
+                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',
+                          animation: 'answerButtonSheen 14s ease-in-out infinite',
+                          pointerEvents: 'none',
+                        },
+                        '@media (prefers-reduced-motion: reduce)': {
+                          animation: 'none',
+                          '&::before': { animation: 'none', display: 'none' },
+                        },
+                      })}
+                    >
+                      {t('give_answer', currentLanguage)}
+                    </Button>
+                    <Box sx={{ position: 'relative', mt: answerComposerOpen ? 2 : 0 }}>
+                    <Collapse in={answerComposerOpen}>
+                        <QuestionCard isPapirus={isPapirus} isAnswerWriting isMagnefite={isMagnefite} sx={{ mt: 0, mb: 0 }}>
+                          <Typography variant="body2" sx={{ color: theme.palette.text.secondary, mb: 2 }}>
+                            * {t('validation_answer_min', currentLanguage)}
+                          </Typography>
+                          <Box sx={{ mb: 2 }}>
+                            <RichTextEditor
+                              value={newAnswer}
+                              onChange={(value) => setNewAnswer((value || '').slice(0, CONTENT_MAX_LENGTH))}
+                              onActivate={() => setAnswerRefsOpen(true)}
+                              minHeight={300}
+                              maxLength={CONTENT_MAX_LENGTH}
+                              error={!!answerValidationError}
+                              helperText={answerValidationError}
+                              references={answerReferences}
+                            />
+                          </Box>
+                          <ActionButton
+                            onClick={handleSubmitAnswer}
+                            disabled={!newAnswer.trim() || newAnswer.trim().length < 5 || submittingAnswer || newAnswer.length > CONTENT_MAX_LENGTH}
+                            endIcon={<Send />}
+                            isMagnefite={isMagnefite}
+                          >
+                            {submittingAnswer ? t('sending', currentLanguage) : t('send_answer', currentLanguage)}
+                          </ActionButton>
+                        </QuestionCard>
+                    </Collapse>
+                    {answerComposerOpen && (
+                      <InlineSidePanel
+                        open={answerRefsOpen}
+                        onToggle={() => setAnswerRefsOpen(open => !open)}
+                        label={t('references', currentLanguage)}
+                        buttonPosition="corner"
+                        hasContent={
+                          filledReferences(answerReferences).length > 0 ||
+                          filledMetadata(answerMetadata).length > 0 ||
+                          answerFiles.length > 0
+                        }
+                      >
+                        <AnswerComposeExtras
+                          currentLanguage={currentLanguage}
+                          references={answerReferences}
+                          onReferencesChange={setAnswerReferences}
+                          metadata={answerMetadata}
+                          onMetadataChange={setAnswerMetadata}
+                          files={answerFiles}
+                          onFilesChange={setAnswerFiles}
+                        />
+                      </InlineSidePanel>
+                    )}
+                    </Box>
+                  </Box>
+                )}
                 <ItemsPerPageSelector
                   variant="compact"
                   itemsPerPage={answersLimit}
@@ -2211,9 +2636,17 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                           onHelp={handleAskQuestionAboutAnswer}
                           onShowLikedUsers={handleShowLikedUsersForAnswer}
                           onShowDislikedUsers={handleShowDislikedUsersForAnswer}
+                          questionOwnerId={question.userInfo?._id || question.author.id}
                           questionId={question.id}
                           questionSummary={question.summary}
+                          showReport
                           showParentInfo={false}
+                          comments={comments.filter(item => item.targetType === 'answer' && item.targetId === answer.id)}
+                          onCreateComment={(body, parentId) => handleCreateComment('answer', answer.id, body, parentId)}
+                          onUpdateComment={handleUpdateComment}
+                          onDeleteComment={handleDeleteComment}
+                          onReactComment={handleReactComment}
+                          onRevealComment={element => scrollElementInView(element, 'center')}
                         />
                       </Box>
                     ))}
@@ -2236,6 +2669,8 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
                     )}
                   </>
                 )}
+                </>
+                )}
               </Box>
             </Container>
           </Box>
@@ -2249,34 +2684,24 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
         maxWidth="md"
       >
         {(questionThumbnailUrl || question?.thumbnail?.url || question?.thumbnail?.key) && (
-          <Box sx={{ p: 0, m: 0 }}>
-            <img
-              src={questionThumbnailUrl || question?.thumbnail?.url || ''}
+          <Box sx={{ p: 0, m: 0, minHeight: 240 }}>
+            <DeferredImage
+              src={questionThumbnailUrl || question?.thumbnail?.url || undefined}
               alt={question?.summary || 'Question thumbnail'}
-              style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
-              onError={async (e) => {
-                const img = e.currentTarget;
-                const currentSrc = img.src;
-
-                // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
-                if (question?.thumbnail?.key) {
-                  try {
-                    const newUrl = await contentAssetService.resolveAssetUrl({
-                      key: question.thumbnail.key,
-                      type: 'question-thumbnail',
-                      entityId: question.id,
-                    });
-                    if (newUrl && newUrl !== currentSrc) {
-                      setQuestionThumbnailUrl(newUrl);
-                      img.src = newUrl;
-                      return;
-                    }
-                  } catch (error) {
-                    logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
-                  }
+              objectFit="contain"
+              onError={async () => {
+                if (!question?.thumbnail?.key) return;
+                try {
+                  const newUrl = await contentAssetService.resolveAssetUrl({
+                    key: question.thumbnail.key,
+                    type: 'question-thumbnail',
+                    entityId: question.id,
+                  });
+                  const current = questionThumbnailUrl || question?.thumbnail?.url;
+                  if (newUrl && newUrl !== current) setQuestionThumbnailUrl(newUrl);
+                } catch (error) {
+                  logger.error('Thumbnail preview URL yeniden oluşturulamadı:', error);
                 }
-
-                img.style.display = 'none';
               }}
             />
           </Box>
@@ -2320,7 +2745,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
         initialLeftState={editInitialLeftState}
         initialRightState={question ? {
           references: (question.references ?? []).map((r) => ({
-            type: r.type as 'link' | 'soru' | 'cevap' | 'dosya',
+            type: r.type as 'link' | 'soru' | 'cevap' | 'yorum' | 'dosya',
             content: r.content,
             description: r.description ?? '',
           })),
@@ -2337,6 +2762,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
         onClose={() => dispatch(closeModal())}
         users={likesModalUsers}
         title={t('users_who_liked', currentLanguage)}
+        mention={reactionMention ?? undefined}
       />
 
       {/* Dislikes Modal */}
@@ -2345,6 +2771,7 @@ const QuestionDetail: React.FC<QuestionDetailProps> = ({
         onClose={() => dispatch(closeDislikesModal())}
         users={dislikedUsers}
         title={t('users_who_disliked', currentLanguage)}
+        mention={reactionMention ?? undefined}
       />
 
       {/* Ask Question Modal - CreateQuestionFlow (merkezi modal, soru oluşturma ile aynı) */}

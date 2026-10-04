@@ -1318,6 +1318,7 @@ const Search = () => {
                     <Fade in timeout={800 + index * 200} key={answer.id}>
                       <AnswerCard
                         answer={answer}
+                        showHoverPreview
                         isAlternateTexture={index % 2 === 1}
                         relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
                         onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
