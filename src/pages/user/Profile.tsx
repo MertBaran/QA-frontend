@@ -56,6 +56,7 @@ import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
 import ItemsPerPageSelector from '../../components/home/ItemsPerPageSelector';
 import { t } from '../../utils/translations';
+import ContentTime from '../../components/ui/ContentTime';
 import { stripRefLinksForDisplay } from '../../utils/refLinkDisplay';
 import { ProfilePageSkeleton, ProfileQuestionsListSkeleton, ProfileAnswersListSkeleton } from '../../components/ui/skeleton';
 import { User } from '../../types/user';
@@ -1544,12 +1545,16 @@ const Profile = () => {
                                   }
                                 />
                                 <Box sx={{ textAlign: 'right', ml: 2 }}>
-                                  <Typography variant="caption" sx={{ 
-                                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
-                                    display: 'block',
-                                  }}>
-                                    {new Date(question.createdAt || '').toLocaleDateString()}
-                                  </Typography>
+                                  <ContentTime
+                                    value={question.createdAt}
+                                    currentLanguage={currentLanguage}
+                                    variant="caption"
+                                    sx={{
+                                      display: 'block',
+                                      ml: 'auto',
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
+                                    }}
+                                  />
                                   <Box sx={{ display: 'flex', gap: 1, mt: 0.5, justifyContent: 'flex-end' }}>
                                     <Typography variant="caption" sx={{ 
                                       color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
@@ -1674,12 +1679,16 @@ const Profile = () => {
                                   }
                                 />
                                 <Box sx={{ textAlign: 'right', ml: 2 }}>
-                                  <Typography variant="caption" sx={{ 
-                                    color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
-                                    display: 'block',
-                                  }}>
-                                    {new Date(answer.createdAt || '').toLocaleDateString()}
-                                  </Typography>
+                                  <ContentTime
+                                    value={answer.createdAt}
+                                    currentLanguage={currentLanguage}
+                                    variant="caption"
+                                    sx={{
+                                      display: 'block',
+                                      ml: 'auto',
+                                      color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096',
+                                    }}
+                                  />
                                   <Typography variant="caption" sx={{ 
                                     color: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.5)' : '#718096' 
                                   }}>
