@@ -9,6 +9,8 @@ import { getTheme } from './theme/theme';
 import ErrorBoundary from './components/error/ErrorBoundary';
 import Loading from './components/ui/Loading';
 import ConfirmDialog from './components/ui/ConfirmDialog';
+import { BookmarkAddProvider } from './contexts/BookmarkAddContext';
+import { SettingsModalProvider } from './contexts/SettingsModalContext';
 import { initSentry } from './config/sentry';
 import { useAppSelector, useAppDispatch } from './store/hooks';
 import { useLanguageDetection } from './hooks/useLanguageDetection';
@@ -125,6 +127,10 @@ function AppContent() {
               color: `${theme.palette.text.primary} !important`,
               backgroundColor: `${theme.palette.background.paper} !important`,
             },
+            '#root .rc-md-editor .rc-md-navigation': {
+              background: '#F7F7F8 !important',
+              backgroundColor: '#F7F7F8 !important',
+            },
             '#root .rc-md-editor .editor-container .sec-html .html-wrap': {
               color: `${theme.palette.text.primary} !important`,
             },
@@ -138,7 +144,11 @@ function AppContent() {
           v7_startTransition: true,
         }}
       >
-        <AppRoutes />
+        <BookmarkAddProvider>
+          <SettingsModalProvider>
+            <AppRoutes />
+          </SettingsModalProvider>
+        </BookmarkAddProvider>
       </Router>
         </>
       )}

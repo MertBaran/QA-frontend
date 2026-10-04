@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Chip, Box, Typography } from '@mui/material';
 import { KeyboardArrowRight } from '@mui/icons-material';
 import ProfileAvatar from './ProfileAvatar';
+import QuestionHoverPreview, { ANCESTOR_PREVIEW_DELAY_MS, useDelayedQuestionPreview } from '../question/QuestionHoverPreview';
 import { Question, ParentContentInfo } from '../../types/question';
 import { Answer } from '../../types/answer';
 import { t } from '../../utils/translations';
@@ -26,6 +27,10 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
   const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { name: themeName } = useAppSelector(state => state.theme);
+  const preview = useDelayedQuestionPreview({
+    respectHomeLock: true,
+    delayMs: ANCESTOR_PREVIEW_DELAY_MS,
+  });
 
   if (!parentId) return null;
 
@@ -96,8 +101,21 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
     };
   };
 
+  const hoverProps = isAnswer
+    ? (parentAnswer
+        ? preview.bindAnswer(parentAnswer)
+        : parentContentInfo?.questionId
+          ? preview.bindAnswerById(parentContentInfo.id, parentContentInfo.questionId)
+          : {})
+    : (parentQuestion
+        ? preview.bind(parentQuestion)
+        : preview.bindQuestionId(parentContentInfo?.id || parentId));
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content', maxWidth: '100%' }}>
+    <Box
+      {...hoverProps}
+      sx={{ display: 'flex', flexDirection: 'column', width: 'fit-content', maxWidth: '100%' }}
+    >
       {parentContentInfo ? (
         // Use backend parentContentInfo
         <Chip
@@ -147,9 +165,9 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                   </Typography>
                 </>
               )}
-              {parentContentInfo.type === 'question' && parentContentInfo.title ? (
+              {parentContentInfo.type === 'question' && parentContentInfo.summary ? (
                 <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '300px' })}>
-                  {parentContentInfo.title}
+                  {parentContentInfo.summary}
                 </Typography>
               ) : parentContentInfo.type === 'answer' ? (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden', maxWidth: '300px', minWidth: 0 }}>
@@ -163,13 +181,13 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                   >
                     {t('answer', currentLanguage)}
                   </Typography>
-                  {parentContentInfo.questionTitle && (
+                  {parentContentInfo.questionSummary && (
                     <>
                       <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, flexShrink: 0 })}>
                         •
                       </Typography>
                       <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 })}>
-                        {parentContentInfo.questionTitle}
+                        {parentContentInfo.questionSummary}
                       </Typography>
                     </>
                   )}
@@ -230,7 +248,7 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                 {parentQuestion.userInfo?.name || parentQuestion.author.name}
               </Typography>
               <Typography variant="caption" sx={(theme) => ({ color: theme.palette.text.secondary })}>
-                • {parentQuestion.title}
+                • {parentQuestion.summary}
               </Typography>
             </Box>
           }
@@ -284,7 +302,7 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
                     {parentAnswerQuestion.userInfo?.name || parentAnswerQuestion.author.name}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                    • {parentAnswerQuestion.title}
+                    • {parentAnswerQuestion.summary}
                   </Typography>
                 </Box>
               }
@@ -399,6 +417,14 @@ const ParentInfoChip: React.FC<ParentInfoChipProps> = ({
           icon={<KeyboardArrowRight />}
         />
       )}
+      <QuestionHoverPreview
+        placement="page"
+        question={preview.question}
+        featuredAnswer={preview.featuredAnswer}
+        anchorEl={preview.anchorEl}
+        onMouseEnter={preview.previewHandlers.onMouseEnter}
+        onMouseLeave={preview.previewHandlers.onMouseLeave}
+      />
     </Box>
   );
 };

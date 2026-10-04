@@ -1,4 +1,5 @@
 import api from './api';
+import { formatContentAge } from '../utils/contentAge';
 import {
   QuestionData,
   Question,
@@ -23,25 +24,9 @@ export interface PaginatedQuestionsResponse {
 
 // Backend'den gelen ham veriyi frontend formatına dönüştürme
 export const transformQuestionData = (questionData: QuestionData): Question => {
-  const createdAt = new Date(questionData.createdAt);
-  const now = new Date();
-  const timeDiff = now.getTime() - createdAt.getTime();
+  const timeAgo = formatContentAge(questionData.createdAt);
 
-  // Zaman hesaplama
-  let timeAgo = '';
-  const minutes = Math.floor(timeDiff / (1000 * 60));
-  const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-  const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
-
-  if (minutes < 60) {
-    timeAgo = `${minutes} dakika önce`;
-  } else if (hours < 24) {
-    timeAgo = `${hours} saat önce`;
-  } else {
-    timeAgo = `${days} gün önce`;
-  }
-
-  const content = questionData.content.toLowerCase();
+  const content = questionData.detail.toLowerCase();
 
   // Backend'den kategori gelmezse basit bir algoritma ile tahmin et
   let inferredCategory = 'Genel';
@@ -125,8 +110,8 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
 
   return {
     id: questionData._id,
-    title: questionData.title,
-    content: questionData.content,
+    summary: questionData.summary,
+    detail: questionData.detail,
     slug: questionData.slug,
     author: {
       id: finalUserInfo._id,
@@ -146,6 +131,7 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     dislikesCount: questionData.dislikes.length,
     dislikedByUsers: questionData.dislikes,
     answers: questionData.answers.length,
+    commentCount: questionData.commentCount ?? 0,
     timeAgo,
     isTrending,
     category: questionData.category || inferredCategory,
@@ -157,6 +143,19 @@ export const transformQuestionData = (questionData: QuestionData): Question => {
     ancestors: questionData.ancestors,
     parentContentInfo: questionData.parentContentInfo,
     thumbnail: questionData.thumbnail ?? null,
+    visibility: questionData.visibility,
+    format: questionData.format,
+    interest: questionData.interest,
+    focus: questionData.focus,
+    references: questionData.references as Question['references'],
+    metadata: questionData.metadata as Question['metadata'],
+    attachments: questionData.attachments as Question['attachments'],
+    featureTemplateId: questionData.featureTemplateId,
+    featureTemplateVersionId: questionData.featureTemplateVersionId,
+    featureFieldValues:
+      questionData.featureFieldValues && typeof questionData.featureFieldValues === 'object'
+        ? (questionData.featureFieldValues as Record<string, unknown>)
+        : undefined,
   };
 };
 
@@ -400,7 +399,9 @@ class QuestionService {
   async getQuestionsByUser(
     userId: string,
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    sortOrder: 'asc' | 'desc' = 'desc',
+    focus?: number
   ): Promise<PaginatedQuestionsResponse> {
     try {
       // Sorular için daha uzun timeout (30 saniye)
@@ -418,7 +419,7 @@ class QuestionService {
           };
         };
       }>(`/questions/user/${userId}`, {
-        params: { page, limit },
+        params: { page, limit, sortOrder, ...(focus != null ? { focus } : {}) },
         timeout: 30000,
       });
       if (response.data.success && response.data.data) {
@@ -467,8 +468,8 @@ class QuestionService {
     if (filters.search) {
       filtered = filtered.filter(
         (question) =>
-          question.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-          question.content.toLowerCase().includes(filters.search.toLowerCase()) ||
+          question.summary.toLowerCase().includes(filters.search.toLowerCase()) ||
+          question.detail.toLowerCase().includes(filters.search.toLowerCase()) ||
           question.tags.some((tag) => tag.toLowerCase().includes(filters.search.toLowerCase())),
       );
     }

@@ -58,16 +58,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     }
   }, [open]);
 
-  // Alanlar değiştiğinde validasyon (butonun doğru disable olması için)
-  useEffect(() => {
-    if (!open || !profileUser) return;
-    const timer = setTimeout(() => {
-      validateForm();
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [open, profileUser, currentPassword, newPassword, confirmPassword]);
-
-  const validateForm = async (): Promise<boolean> => {
+  const validateForm = React.useCallback(async (): Promise<boolean> => {
     const errors: { newPassword?: string; confirmPassword?: string; currentPassword?: string } = {};
 
     if (!profileUser?.isGoogleUser && !currentPassword.trim()) {
@@ -100,7 +91,16 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
     setPasswordErrors(errors);
     return Object.keys(errors).length === 0;
-  };
+  }, [profileUser, currentPassword, newPassword, confirmPassword, currentLanguage]);
+
+  // Alanlar değiştiğinde validasyon (butonun doğru disable olması için)
+  useEffect(() => {
+    if (!open || !profileUser) return;
+    const timer = setTimeout(() => {
+      validateForm();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [open, profileUser, currentPassword, newPassword, confirmPassword, validateForm]);
 
   const handleRequestPasswordChange = async () => {
     setPasswordErrors({});

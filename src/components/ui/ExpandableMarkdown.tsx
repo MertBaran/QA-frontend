@@ -23,6 +23,10 @@ interface ExpandableMarkdownProps {
   maxLength?: number;
   maxHeight?: number;
   className?: string;
+  onRefHover?: (refIndex: number | null) => void;
+  onRefClick?: (refIndex: number) => void;
+  /** Panel referansına hover'da vurgulanacak index - ref metnini highlight eder */
+  highlightedRefIndex?: number | null;
 }
 
 /**
@@ -33,6 +37,9 @@ const ExpandableMarkdown: React.FC<ExpandableMarkdownProps> = ({
   maxLength = DEFAULT_DISPLAY_MAX_LENGTH,
   maxHeight = DEFAULT_MAX_HEIGHT,
   className,
+  onRefHover,
+  onRefClick,
+  highlightedRefIndex,
 }) => {
   const theme = useTheme();
   const { currentLanguage } = useAppSelector((state) => state.language);
@@ -74,7 +81,7 @@ const ExpandableMarkdown: React.FC<ExpandableMarkdownProps> = ({
           maxHeight: showExpandButton ? maxHeight : 'none',
         }}
       >
-        <MarkdownRenderer content={displayContent} />
+        <MarkdownRenderer content={displayContent} onRefHover={onRefHover} onRefClick={onRefClick} highlightedRefIndex={highlightedRefIndex} />
       </Box>
       {(needsCharExpand || needsHeightExpand) ? (
         <Box sx={{ mt: 1 }}>

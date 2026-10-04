@@ -25,6 +25,25 @@ export const userRoutes = [
     component: 'Search',
     exact: true,
   },
+  {
+    path: '/bookmarks',
+    component: 'BookmarkDetail',
+    exact: true,
+  },
+];
+
+// Public shared content (no auth - incognito/gizli sekme)
+export const sharedContentRoutes = [
+  {
+    path: '/bookmarks/shared/t/:token',
+    component: 'BookmarkSharedView',
+    exact: true,
+  },
+  {
+    path: '/bookmarks/shared/:collectionId',
+    component: 'BookmarkSharedView',
+    exact: true,
+  },
 ];
 
 // Home route (protected)

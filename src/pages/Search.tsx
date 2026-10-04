@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -23,15 +23,21 @@ import {
   Select,
   MenuItem,
   FormHelperText,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Badge,
 } from '@mui/material';
 import {
   Search as SearchIcon,
   InfoOutlined as InfoIcon,
+  FilterList,
 } from '@mui/icons-material';
 import Tooltip from '@mui/material/Tooltip';
 import { styled, alpha } from '@mui/material/styles';
 import Layout from '../components/layout/Layout';
-import { searchService } from '../services/searchService';
+import { searchService, SearchUserHit } from '../services/searchService';
 import { questionService } from '../services/questionService';
 import { Question } from '../types/question';
 import { Answer } from '../types/answer';
@@ -39,11 +45,20 @@ import { t } from '../utils/translations';
 import { useAppSelector, useAppDispatch } from '../store/hooks';
 import QuestionCard from '../components/question/QuestionCard';
 import AnswerCard from '../components/answer/AnswerCard';
-import ItemsPerPageSelector from '../components/home/ItemsPerPageSelector';
+import ItemsPerPageSelector, { DateSortOrder, dateSortToApiOrder } from '../components/home/ItemsPerPageSelector';
+import ActiveFilters from '../components/home/ActiveFilters';
+import FilterModal from '../components/ui/FilterModal';
 import RelatedQuestionsPopover from '../components/question/RelatedQuestionsPopover';
 import { SearchPageSkeleton } from '../components/ui/skeleton';
+import ProfileAvatar from '../components/ui/ProfileAvatar';
 import { likeQuestion, unlikeQuestion } from '../store/questions/questionThunks';
 import { likeAnswer, unlikeAnswer } from '../store/answers/answerThunks';
+import {
+  updateFilter,
+  setActiveFilters,
+  clearFilters,
+  setFilterModalOpen,
+} from '../store/home/homeSlice';
 import papyrusVertical1 from '../asset/textures/papyrus_vertical_1.png';
 
 const PaginationContainer = styled(Box, {
@@ -92,27 +107,47 @@ const Search = () => {
   const dispatch = useAppDispatch();
   const { currentLanguage } = useAppSelector(state => state.language);
   const { user } = useAppSelector(state => state.auth);
+  const { filters, activeFilters, filterModalOpen } = useAppSelector(state => state.home);
+  const { items: bookmarks } = useAppSelector(state => state.bookmarks);
   
   const query = searchParams.get('q') || '';
   const [searchTerm, setSearchTerm] = useState(query);
   const [lastSearchTerm, setLastSearchTerm] = useState<string>('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Answer[]>([]);
+  const [users, setUsers] = useState<SearchUserHit[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'answers'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'answers' | 'users'>('questions');
   
-  // Search mode state (3 mod: phrase, all_words, any_word)
-  const [searchMode, setSearchMode] = useState<'phrase' | 'all_words' | 'any_word'>('any_word');
+  // Search mode state (3 mod: phrase, all_words, any_word) — default: all_words
+  const [searchMode, setSearchMode] = useState<'phrase' | 'all_words' | 'any_word'>('all_words');
   
   // Match type state (fuzzy/exact - smart kaldırıldı)
   const [matchType, setMatchType] = useState<'fuzzy' | 'exact'>('fuzzy');
   
-  // Typo tolerance state (sadece fuzzy modunda aktif)
-  const [typoTolerance, setTypoTolerance] = useState<'low' | 'medium' | 'high'>('medium');
+  // Typo tolerance state (sadece fuzzy modunda aktif) — default: low
+  const [typoTolerance, setTypoTolerance] = useState<'low' | 'medium' | 'high'>('low');
   
+  /** Canlı öncesi kapalı — synonym/semantic henüz hazır değil */
+  const SMART_SEARCH_ENABLED = false;
+
   // Smart search state (checkbox - açık/kapalı)
   const [smartSearch, setSmartSearch] = useState(false);
+
+  // Takip ettiklerimde ara — giriş yapmış kullanıcıda varsayılan açık
+  const [followingOnly, setFollowingOnly] = useState(Boolean(user));
+
+  useEffect(() => {
+    if (!user) {
+      setFollowingOnly(false);
+      return;
+    }
+    // URL açıkça false demediyse giriş sonrası default açık kalsın
+    if (searchParams.get('followingOnly') !== 'false') {
+      setFollowingOnly(true);
+    }
+  }, [user, searchParams]);
   
   // Smart options state (linguistic/semantic) - sadece smartSearch açıkken aktif
   const [smartLinguistic, setSmartLinguistic] = useState(false);
@@ -124,10 +159,14 @@ const Search = () => {
   // Pagination state
   const [questionsPage, setQuestionsPage] = useState(1);
   const [answersPage, setAnswersPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
   const [questionsItemsPerPage, setQuestionsItemsPerPage] = useState(10);
   const [answersItemsPerPage, setAnswersItemsPerPage] = useState(10);
+  const [usersItemsPerPage, setUsersItemsPerPage] = useState(10);
+  const [dateSort, setDateSort] = useState<DateSortOrder>('newest');
   const [questionsPagination, setQuestionsPagination] = useState<any>(null);
   const [answersPagination, setAnswersPagination] = useState<any>(null);
+  const [usersPagination, setUsersPagination] = useState<any>(null);
   
   // Related questions state
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<Record<string, number>>({});
@@ -136,6 +175,7 @@ const Search = () => {
   const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
   const [currentRelatedTargetId, setCurrentRelatedTargetId] = useState<string | null>(null);
   const [currentRelatedMode, setCurrentRelatedMode] = useState<'question' | 'answer' | null>(null);
+  const searchRequestIdRef = useRef(0);
   
   // Kelime sayısını hesapla
   const wordCount = searchTerm.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -145,15 +185,22 @@ const Search = () => {
     const urlQuery = searchParams.get('q') || '';
     
     // searchOptions'ı query parametrelerinden oku
-    const urlSearchMode = (searchParams.get('searchMode') as 'phrase' | 'all_words' | 'any_word' | null) || 'any_word';
+    const urlSearchMode = (searchParams.get('searchMode') as 'phrase' | 'all_words' | 'any_word' | null) || 'all_words';
     const urlMatchTypeRaw = searchParams.get('matchType');
     // Eski 'smart' değerini handle et - artık smartSearch checkbox'ı kullanılıyor
     const urlMatchType = (urlMatchTypeRaw === 'smart' ? 'fuzzy' : (urlMatchTypeRaw as 'fuzzy' | 'exact' | null)) || 'fuzzy';
-    const urlTypoTolerance = (searchParams.get('typoTolerance') as 'low' | 'medium' | 'high' | null) || 'medium';
-    // Eski 'smart' matchType varsa smartSearch'i otomatik aç
-    const urlSmartSearch = searchParams.get('smartSearch') === 'true' || urlMatchTypeRaw === 'smart';
-    const urlSmartLinguistic = searchParams.get('smartLinguistic') === 'true';
-    const urlSmartSemantic = searchParams.get('smartSemantic') === 'true';
+    const urlTypoTolerance = (searchParams.get('typoTolerance') as 'low' | 'medium' | 'high' | null) || 'low';
+    // Akıllı arama geçici olarak kapalı — URL'den de zorla false
+    const urlSmartSearch = false;
+    const urlSmartLinguistic = false;
+    const urlSmartSemantic = false;
+    const followingParam = searchParams.get('followingOnly');
+    // Girişli: URL'de false yoksa default true; çıkışlı: false
+    const urlFollowingOnly = Boolean(user) && followingParam !== 'false';
+    const urlCategory = searchParams.get('category') || '';
+    const urlTags = searchParams.get('tags') || '';
+    const urlSavedOnly = searchParams.get('savedOnly') === 'true' ? 'true' : 'false';
+    const urlSortBy = searchParams.get('sortBy') || 'En Yeni';
     
     // URL'den gelen değerleri state'e aktar
     setSearchTerm(urlQuery);
@@ -163,35 +210,71 @@ const Search = () => {
     setSmartSearch(urlSmartSearch);
     setSmartLinguistic(urlSmartLinguistic);
     setSmartSemantic(urlSmartSemantic);
+    setFollowingOnly(urlFollowingOnly);
+
+    dispatch(updateFilter({ field: 'search', value: urlQuery }));
+    dispatch(updateFilter({ field: 'category', value: urlCategory }));
+    dispatch(updateFilter({ field: 'tags', value: urlTags }));
+    dispatch(updateFilter({ field: 'savedOnly', value: urlSavedOnly }));
+    dispatch(updateFilter({ field: 'sortBy', value: urlSortBy }));
+    const nextActive: string[] = [];
+    if (urlCategory) nextActive.push(`category: ${urlCategory}`);
+    if (urlTags) nextActive.push(`tags: ${urlTags}`);
+    if (urlSavedOnly === 'true') nextActive.push(t('saved_only', currentLanguage));
+    dispatch(setActiveFilters(nextActive));
     
     // URL'de query varsa ve minimum 3 karakter ise arama yap
     const trimmedUrlQuery = urlQuery.trim();
     if (trimmedUrlQuery && trimmedUrlQuery.length >= 3) {
-      // Reset pagination when search term changes (or when _t parameter changes for same term)
+      // URL kaynaklı arama her zaman sayfa 1'den (stale questionsPage/answersPage kullanma)
       const timestampParam = searchParams.get('_t');
       if (lastSearchTerm !== trimmedUrlQuery || timestampParam) {
-      setQuestionsPage(1);
-      setAnswersPage(1);
         setLastSearchTerm(trimmedUrlQuery);
       }
-      // Smart search açıksa otomatik olarak sadece linguistic aktif (semantic false)
-      const finalSmartOpts = urlSmartSearch 
+      setQuestionsPage(1);
+      setAnswersPage(1);
+      setUsersPage(1);
+
+      const finalSmartOpts = urlSmartSearch
         ? { linguistic: true, semantic: false }
         : undefined;
-      
-      performSearch(trimmedUrlQuery, urlSearchMode, urlMatchType, urlTypoTolerance, urlSmartSearch, finalSmartOpts);
+
+      performSearch(
+        trimmedUrlQuery,
+        urlSearchMode,
+        urlMatchType,
+        urlTypoTolerance,
+        urlSmartSearch,
+        finalSmartOpts,
+        1,
+        questionsItemsPerPage,
+        1,
+        answersItemsPerPage,
+        true,
+        1,
+        usersItemsPerPage,
+        undefined,
+        urlFollowingOnly,
+        urlCategory,
+        urlTags,
+        urlSavedOnly === 'true'
+      );
     } else if (trimmedUrlQuery && trimmedUrlQuery.length > 0 && trimmedUrlQuery.length < 3) {
-      // 3 karakterden azsa hata göster
       setError(t('min_search_length', currentLanguage) || 'Arama için en az 3 karakter girmelisiniz.');
       setQuestions([]);
       setAnswers([]);
+      setUsers([]);
       setQuestionsPagination(null);
       setAnswersPagination(null);
+      setUsersPagination(null);
     } else {
+      setError(null);
       setQuestions([]);
       setAnswers([]);
+      setUsers([]);
       setQuestionsPagination(null);
       setAnswersPagination(null);
+      setUsersPagination(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, searchParams.get('_t')]);
@@ -199,24 +282,33 @@ const Search = () => {
 
   const performSearch = async (
     term: string,
-    mode: 'phrase' | 'all_words' | 'any_word' = 'any_word',
+    mode: 'phrase' | 'all_words' | 'any_word' = 'all_words',
     match: 'fuzzy' | 'exact' = 'fuzzy',
-    tolerance: 'low' | 'medium' | 'high' = 'medium',
+    tolerance: 'low' | 'medium' | 'high' = 'low',
     smart: boolean = false,
     smartOpts?: { linguistic?: boolean; semantic?: boolean },
     customQuestionsPage?: number,
     customQuestionsItemsPerPage?: number,
     customAnswersPage?: number,
     customAnswersItemsPerPage?: number,
-    shouldUpdateActiveTab: boolean = true // Sayfa değişikliğinde false olmalı
+    shouldUpdateActiveTab: boolean = true, // Sayfa değişikliğinde false olmalı
+    customUsersPage?: number,
+    customUsersItemsPerPage?: number,
+    customSortOrder?: 'asc' | 'desc',
+    customFollowingOnly?: boolean,
+    customCategory?: string,
+    customTags?: string,
+    customSavedOnly?: boolean
   ) => {
     const trimmedTerm = term.trim();
     // Minimum 3 karakter kontrolü
     if (!trimmedTerm || trimmedTerm.length < 3) {
       setQuestions([]);
       setAnswers([]);
+      setUsers([]);
       setQuestionsPagination(null);
       setAnswersPagination(null);
+      setUsersPagination(null);
       if (trimmedTerm.length > 0 && trimmedTerm.length < 3) {
         setError(t('min_search_length', currentLanguage) || 'Arama için en az 3 karakter girmelisiniz.');
       } else {
@@ -225,14 +317,35 @@ const Search = () => {
       return;
     }
 
+    const requestId = ++searchRequestIdRef.current;
     setLoading(true);
     setError(null);
+
+    // Canlı öncesi akıllı arama kapalı
+    if (!SMART_SEARCH_ENABLED) {
+      smart = false;
+      smartOpts = undefined;
+    }
 
     // Custom değerler varsa onları kullan, yoksa state'ten al
     const qPage = customQuestionsPage !== undefined ? customQuestionsPage : questionsPage;
     const qItemsPerPage = customQuestionsItemsPerPage !== undefined ? customQuestionsItemsPerPage : questionsItemsPerPage;
     const aPage = customAnswersPage !== undefined ? customAnswersPage : answersPage;
     const aItemsPerPage = customAnswersItemsPerPage !== undefined ? customAnswersItemsPerPage : answersItemsPerPage;
+    const uPage = customUsersPage !== undefined ? customUsersPage : usersPage;
+    const uItemsPerPage = customUsersItemsPerPage !== undefined ? customUsersItemsPerPage : usersItemsPerPage;
+    const sortOrder =
+      customSortOrder !== undefined ? customSortOrder : dateSortToApiOrder(dateSort);
+    const applyFollowingOnly =
+      Boolean(user) &&
+      (customFollowingOnly !== undefined ? customFollowingOnly : followingOnly);
+    const applyCategory =
+      customCategory !== undefined ? customCategory : searchParams.get('category') || '';
+    const applyTags = customTags !== undefined ? customTags : searchParams.get('tags') || '';
+    const applySavedOnly =
+      customSavedOnly !== undefined
+        ? customSavedOnly
+        : searchParams.get('savedOnly') === 'true';
 
     // Smart search açıksa otomatik olarak sadece linguistic aktif (semantic false)
     const finalSmartOpts = smart ? { linguistic: true, semantic: false } : undefined;
@@ -249,42 +362,136 @@ const Search = () => {
         tolerance,
         smart,
         finalSmartOpts,
-        currentLanguage
+        currentLanguage,
+        uPage,
+        uItemsPerPage,
+        sortOrder,
+        applyFollowingOnly,
+        applyCategory || undefined,
+        applyTags || undefined
       );
-      setQuestions(results.questions);
+      if (requestId !== searchRequestIdRef.current) return;
+
+      let nextQuestions = results.questions;
+      if (applySavedOnly) {
+        const savedIds = new Set(
+          bookmarks
+            .filter(b => b.target_type === 'question')
+            .map(b => b.target_id)
+        );
+        nextQuestions = nextQuestions.filter(q => savedIds.has(q.id));
+      }
+
+      setQuestions(nextQuestions);
       setAnswers(results.answers);
+      setUsers(results.users);
       setQuestionsPagination(results.questionsPagination);
       setAnswersPagination(results.answersPagination);
-      
-      // Smart modunda sadece dilsel arama kullanıldığı için semantic kontrolü yok
+      setUsersPagination(results.usersPagination);
       
       // Aktif tab'ı ayarla (sadece yeni arama yapıldığında, sayfa değişikliğinde değil)
       if (shouldUpdateActiveTab) {
-        if (results.answers.length > 0) {
-          // Cevaplar varsa ve sorular yoksa cevaplar sekmesini göster
-          if (results.questions.length === 0) {
-            setActiveTab('answers');
-          } else {
-            // Her ikisi de varsa, sorular sekmesinde başla
-            setActiveTab('questions');
-          }
-        } else if (results.questions.length > 0) {
+        if (nextQuestions.length > 0) {
+          setActiveTab('questions');
+        } else if (results.answers.length > 0) {
+          setActiveTab('answers');
+        } else if (results.users.length > 0) {
+          setActiveTab('users');
+        } else {
           setActiveTab('questions');
         }
       }
     } catch (err: any) {
+      if (requestId !== searchRequestIdRef.current) return;
       console.error('Arama hatası:', err);
-      
-      // Hata durumunda normal hata mesajını göster
-      setError(err.message || t('search_error', currentLanguage));
-      
+      setError(err.response?.data?.message || err.message || t('search_error', currentLanguage));
       setQuestions([]);
       setAnswers([]);
+      setUsers([]);
       setQuestionsPagination(null);
       setAnswersPagination(null);
+      setUsersPagination(null);
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
+  };
+
+  const syncFilterParams = (params: URLSearchParams, f: typeof filters) => {
+    if (f.category?.trim()) params.set('category', f.category.trim());
+    else params.delete('category');
+    if (f.tags?.trim()) params.set('tags', f.tags.trim());
+    else params.delete('tags');
+    if (f.savedOnly === 'true') params.set('savedOnly', 'true');
+    else params.delete('savedOnly');
+    if (f.sortBy && f.sortBy !== 'En Yeni') params.set('sortBy', f.sortBy);
+    else params.delete('sortBy');
+  };
+
+  const handleFilterChange = (field: string, value: string) => {
+    dispatch(updateFilter({ field, value }));
+  };
+
+  const handleApplyFilters = (applied: {
+    search: string;
+    category: string;
+    tags: string;
+    sortBy: string;
+    savedOnly?: string;
+  }) => {
+    const f = {
+      ...filters,
+      ...applied,
+      savedOnly: applied.savedOnly ?? filters.savedOnly,
+    };
+    Object.entries(f).forEach(([key, value]) => {
+      dispatch(updateFilter({ field: key, value: String(value ?? '') }));
+    });
+    const nextActive: string[] = [];
+    if (f.category) nextActive.push(`category: ${f.category}`);
+    if (f.tags) nextActive.push(`tags: ${f.tags}`);
+    if (f.savedOnly === 'true') nextActive.push(t('saved_only', currentLanguage));
+    dispatch(setActiveFilters(nextActive));
+
+    const params = new URLSearchParams(searchParams);
+    const q = (f.search || searchTerm).trim();
+    if (q.length >= 3) {
+      params.set('q', q);
+      setSearchTerm(q);
+    }
+    syncFilterParams(params, f);
+    params.set('_t', Date.now().toString());
+    navigate(`/search?${params.toString()}`);
+    dispatch(setFilterModalOpen(false));
+  };
+
+  const handleClearFilters = () => {
+    dispatch(clearFilters());
+    const params = new URLSearchParams(searchParams);
+    params.delete('category');
+    params.delete('tags');
+    params.delete('savedOnly');
+    params.delete('sortBy');
+    params.set('_t', Date.now().toString());
+    navigate(`/search?${params.toString()}`);
+  };
+
+  const handleRemoveFilter = (filterToRemove: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (filterToRemove.startsWith('category:')) {
+      dispatch(updateFilter({ field: 'category', value: '' }));
+      params.delete('category');
+    } else if (filterToRemove.startsWith('tags:')) {
+      dispatch(updateFilter({ field: 'tags', value: '' }));
+      params.delete('tags');
+    } else if (filterToRemove === t('saved_only', currentLanguage)) {
+      dispatch(updateFilter({ field: 'savedOnly', value: 'false' }));
+      params.delete('savedOnly');
+    }
+    dispatch(setActiveFilters(activeFilters.filter(f => f !== filterToRemove)));
+    params.set('_t', Date.now().toString());
+    navigate(`/search?${params.toString()}`);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -306,11 +513,12 @@ const Search = () => {
       }
       
       params.set('q', trimmedSearchTerm);
+      syncFilterParams(params, filters);
       // includeAnswers artık kullanılmıyor, her zaman cevapları dahil ediyoruz
       params.delete('includeAnswers'); // Eski parametreyi temizle
       
-      // searchOptions parametrelerini ayrı ayrı ekle
-      if (searchMode !== 'any_word') {
+      // searchOptions parametrelerini ayrı ayrı ekle (default: all_words / fuzzy / low)
+      if (searchMode !== 'all_words') {
         params.set('searchMode', searchMode);
       } else {
         params.delete('searchMode');
@@ -322,21 +530,26 @@ const Search = () => {
       }
       
       // Typo toleransı (sadece fuzzy modunda)
-      if (matchType === 'fuzzy' && typoTolerance !== 'medium') {
+      if (matchType === 'fuzzy' && typoTolerance !== 'low') {
         params.set('typoTolerance', typoTolerance);
       } else {
         params.delete('typoTolerance');
       }
       
-      // Akıllı arama (checkbox) - açıksa otomatik olarak sadece linguistic aktif
-      if (smartSearch) {
-        params.set('smartSearch', 'true');
-        params.set('smartLinguistic', 'true'); // Otomatik olarak linguistic aktif
-        params.delete('smartSemantic'); // Semantic her zaman false
+      // Akıllı arama geçici olarak kapalı
+      params.delete('smartSearch');
+      params.delete('smartLinguistic');
+      params.delete('smartSemantic');
+
+      // Takip ettiklerimde ara (girişli default true — false'u URL'de tut)
+      if (user) {
+        if (followingOnly) {
+          params.delete('followingOnly');
+        } else {
+          params.set('followingOnly', 'false');
+        }
       } else {
-        params.delete('smartSearch');
-        params.delete('smartLinguistic');
-        params.delete('smartSemantic');
+        params.delete('followingOnly');
       }
       
       navigate(`/search?${params.toString()}`);
@@ -377,6 +590,20 @@ const Search = () => {
     // URL'i güncelleme, sadece state'i güncelle - arama form submit'te yapılacak
   };
 
+  const handleFollowingOnlyChange = (checked: boolean) => {
+    setFollowingOnly(checked);
+    const trimmed = searchTerm.trim();
+    if (trimmed.length < 3) return;
+
+    const params = new URLSearchParams(searchParams);
+    params.set('q', trimmed);
+    if (checked) {
+      params.delete('followingOnly');
+    } else {
+      params.set('followingOnly', 'false');
+    }
+    navigate(`/search?${params.toString()}`, { replace: true });
+  };
 
   const updateURL = () => {
     const params = new URLSearchParams(searchParams);
@@ -384,8 +611,8 @@ const Search = () => {
     // includeAnswers artık kullanılmıyor, her zaman cevapları dahil ediyoruz
     params.delete('includeAnswers'); // Eski parametreyi temizle
     
-    // searchOptions parametrelerini ayrı ayrı ekle
-    if (searchMode !== 'any_word') {
+    // searchOptions parametrelerini ayrı ayrı ekle (default: all_words / fuzzy / low)
+    if (searchMode !== 'all_words') {
       params.set('searchMode', searchMode);
     } else {
       params.delete('searchMode');
@@ -397,29 +624,25 @@ const Search = () => {
     }
     
     // Typo toleransı (sadece fuzzy modunda)
-    if (matchType === 'fuzzy' && typoTolerance !== 'medium') {
+    if (matchType === 'fuzzy' && typoTolerance !== 'low') {
       params.set('typoTolerance', typoTolerance);
     } else {
       params.delete('typoTolerance');
     }
     
-    // Akıllı arama (checkbox)
-    if (smartSearch) {
-      params.set('smartSearch', 'true');
-      if (smartLinguistic) {
-        params.set('smartLinguistic', 'true');
+    // Akıllı arama geçici olarak kapalı
+    params.delete('smartSearch');
+    params.delete('smartLinguistic');
+    params.delete('smartSemantic');
+
+    if (user) {
+      if (followingOnly) {
+        params.delete('followingOnly');
       } else {
-        params.delete('smartLinguistic');
-      }
-      if (smartSemantic) {
-        params.set('smartSemantic', 'true');
-      } else {
-        params.delete('smartSemantic');
+        params.set('followingOnly', 'false');
       }
     } else {
-      params.delete('smartSearch');
-      params.delete('smartLinguistic');
-      params.delete('smartSemantic');
+      params.delete('followingOnly');
     }
     
     navigate(`/search?${params.toString()}`, { replace: true });
@@ -558,95 +781,99 @@ const Search = () => {
   };
 
   // Pagination handlers
-  const handleQuestionsPageChange = (event: React.ChangeEvent<unknown>, page: number) => {
-    setQuestionsPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    // Sayfa değiştiğinde arama yap (yeni sayfa numarasını direkt kullan)
-    // Aktif tab'ı değiştirme (shouldUpdateActiveTab: false)
+  const runPagedSearch = (
+    qPage: number,
+    qLimit: number,
+    aPage: number,
+    aLimit: number,
+    uPage: number,
+    uLimit: number
+  ) => {
     const trimmedSearchTerm = searchTerm.trim();
-    if (trimmedSearchTerm && trimmedSearchTerm.length >= 3) {
-      performSearch(
-        trimmedSearchTerm, 
-        searchMode, 
-        matchType, 
-        typoTolerance,
-        smartSearch,
-        smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
-        page, // Yeni sayfa numarası
-        questionsItemsPerPage,
-        answersPage,
-        answersItemsPerPage,
-        false // Aktif tab'ı değiştirme
-      );
-    }
+    if (!trimmedSearchTerm || trimmedSearchTerm.length < 3) return;
+    performSearch(
+      trimmedSearchTerm,
+      searchMode,
+      matchType,
+      typoTolerance,
+      smartSearch,
+      smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
+      qPage,
+      qLimit,
+      aPage,
+      aLimit,
+      false,
+      uPage,
+      uLimit,
+      undefined,
+      followingOnly
+    );
   };
 
-  const handleAnswersPageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+  const handleDateSortChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const next = event.target.value as DateSortOrder;
+    setDateSort(next);
+    setQuestionsPage(1);
+    setAnswersPage(1);
+    setUsersPage(1);
+    const trimmedSearchTerm = searchTerm.trim();
+    if (!trimmedSearchTerm || trimmedSearchTerm.length < 3) return;
+    performSearch(
+      trimmedSearchTerm,
+      searchMode,
+      matchType,
+      typoTolerance,
+      smartSearch,
+      smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
+      1,
+      questionsItemsPerPage,
+      1,
+      answersItemsPerPage,
+      false,
+      1,
+      usersItemsPerPage,
+      dateSortToApiOrder(next),
+      followingOnly
+    );
+  };
+
+  const handleQuestionsPageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    setQuestionsPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    runPagedSearch(page, questionsItemsPerPage, answersPage, answersItemsPerPage, usersPage, usersItemsPerPage);
+  };
+
+  const handleAnswersPageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
     setAnswersPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    // Sayfa değiştiğinde arama yap (yeni sayfa numarasını direkt kullan)
-    // Aktif tab'ı değiştirme (shouldUpdateActiveTab: false)
-    if (searchTerm.trim()) {
-      performSearch(
-        searchTerm, 
-        searchMode, 
-        matchType, 
-        typoTolerance,
-        smartSearch,
-        smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
-        questionsPage,
-        questionsItemsPerPage,
-        page, // Yeni sayfa numarası
-        answersItemsPerPage,
-        false // Aktif tab'ı değiştirme
-      );
-    }
+    runPagedSearch(questionsPage, questionsItemsPerPage, page, answersItemsPerPage, usersPage, usersItemsPerPage);
+  };
+
+  const handleUsersPageChange = (_event: React.ChangeEvent<unknown>, page: number) => {
+    setUsersPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    runPagedSearch(questionsPage, questionsItemsPerPage, answersPage, answersItemsPerPage, page, usersItemsPerPage);
   };
 
   const handleQuestionsItemsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newItemsPerPage = parseInt(event.target.value);
     setQuestionsItemsPerPage(newItemsPerPage);
-    setQuestionsPage(1); // Reset to first page
-    // Items per page değiştiğinde arama yap (yeni değerleri direkt kullan)
-    // Aktif tab'ı değiştirme (shouldUpdateActiveTab: false)
-    if (searchTerm.trim()) {
-      performSearch(
-        searchTerm, 
-        searchMode, 
-        matchType, 
-        typoTolerance,
-        smartSearch,
-        smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
-        1, // Reset to page 1
-        newItemsPerPage, // Yeni items per page
-        answersPage,
-        answersItemsPerPage,
-        false // Aktif tab'ı değiştirme
-      );
-    }
+    setQuestionsPage(1);
+    runPagedSearch(1, newItemsPerPage, answersPage, answersItemsPerPage, usersPage, usersItemsPerPage);
   };
 
   const handleAnswersItemsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newItemsPerPage = parseInt(event.target.value);
     setAnswersItemsPerPage(newItemsPerPage);
-    setAnswersPage(1); // Reset to first page
-    // Items per page değiştiğinde arama yap (yeni değerleri direkt kullan)
-    // Aktif tab'ı değiştirme (shouldUpdateActiveTab: false)
-    if (searchTerm.trim()) {
-      performSearch(
-        searchTerm, 
-        searchMode, 
-        matchType, 
-        typoTolerance,
-        smartSearch,
-        smartSearch ? { linguistic: smartLinguistic, semantic: smartSemantic } : undefined,
-        questionsPage,
-        questionsItemsPerPage,
-        1, // Reset to page 1
-        newItemsPerPage, // Yeni items per page
-        false // Aktif tab'ı değiştirme
-      );
-    }
+    setAnswersPage(1);
+    runPagedSearch(questionsPage, questionsItemsPerPage, 1, newItemsPerPage, usersPage, usersItemsPerPage);
+  };
+
+  const handleUsersItemsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const newItemsPerPage = parseInt(event.target.value);
+    setUsersItemsPerPage(newItemsPerPage);
+    setUsersPage(1);
+    runPagedSearch(questionsPage, questionsItemsPerPage, answersPage, answersItemsPerPage, 1, newItemsPerPage);
   };
 
 
@@ -688,14 +915,29 @@ const Search = () => {
 
   return (
     <Layout>
+      <FilterModal
+        open={filterModalOpen}
+        onClose={() => dispatch(setFilterModalOpen(false))}
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        onApplyFilters={handleApplyFilters}
+        onClearFilters={handleClearFilters}
+        activeFilters={activeFilters}
+        onRemoveFilter={handleRemoveFilter}
+      />
       <Container maxWidth="lg" sx={{ py: 4 }}>
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" gutterBottom>
             {t('search', currentLanguage)}
           </Typography>
+
+          <ActiveFilters
+            filters={activeFilters}
+            onRemoveFilter={handleRemoveFilter}
+          />
           
           <form onSubmit={handleSearch}>
-            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, mb: 2, alignItems: 'center' }}>
               <TextField
                 fullWidth
                 placeholder={t('search_placeholder', currentLanguage) || 'Sorularda ve cevaplarda ara...'}
@@ -721,6 +963,45 @@ const Search = () => {
                   ),
                 }}
               />
+              <Tooltip title={t('filter', currentLanguage)}>
+                <IconButton
+                  type="button"
+                  aria-label={t('filter', currentLanguage)}
+                  onClick={() => dispatch(setFilterModalOpen(true))}
+                  sx={(theme) => ({
+                    flexShrink: 0,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 1,
+                    border: '1px solid',
+                    borderColor:
+                      filterModalOpen || activeFilters.length > 0
+                        ? 'primary.main'
+                        : 'divider',
+                    color:
+                      filterModalOpen || activeFilters.length > 0
+                        ? 'primary.main'
+                        : 'text.secondary',
+                    backgroundColor: filterModalOpen
+                      ? alpha(theme.palette.primary.main, 0.08)
+                      : 'transparent',
+                    '&:hover': {
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
+                      backgroundColor: alpha(theme.palette.primary.main, 0.08),
+                    },
+                  })}
+                >
+                  <Badge
+                    color="primary"
+                    variant="dot"
+                    invisible={activeFilters.length === 0}
+                    overlap="circular"
+                  >
+                    <FilterList />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
             </Box>
             
             {/* Arama Modu, Eşleşme Tipi ve Akıllı Arama - 3 Bölüm */}
@@ -820,20 +1101,58 @@ const Search = () => {
                     )}
                   </FormControl>
 
-                  {/* 3. Akıllı Arama - Sağ */}
+                  {/* 3. Akıllı Arama / Takip filtresi - Sağ */}
                   <FormControl component="fieldset" sx={{ flex: 1 }}>
                     <FormLabel component="legend" sx={{ mb: 1 }}>
                       {t('smart_search', currentLanguage) || 'Akıllı Arama'}
                     </FormLabel>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={smartSearch}
-                          onChange={(e) => handleSmartSearchChange(e.target.checked)}
-                        />
+                    <Tooltip
+                      title={
+                        SMART_SEARCH_ENABLED
+                          ? ''
+                          : t('smart_search_disabled_tooltip', currentLanguage)
                       }
-                      label={t('smart_search', currentLanguage) || 'Akıllı Arama'}
-                    />
+                    >
+                      <span>
+                        <FormControlLabel
+                          disabled={!SMART_SEARCH_ENABLED}
+                          control={
+                            <Checkbox
+                              checked={SMART_SEARCH_ENABLED ? smartSearch : false}
+                              onChange={(e) => handleSmartSearchChange(e.target.checked)}
+                              disabled={!SMART_SEARCH_ENABLED}
+                            />
+                          }
+                          label={t('smart_search', currentLanguage) || 'Akıllı Arama'}
+                          sx={{
+                            opacity: SMART_SEARCH_ENABLED ? 1 : 0.55,
+                            ...(!SMART_SEARCH_ENABLED && {
+                              '& .MuiFormControlLabel-label': {
+                                color: 'text.disabled',
+                              },
+                            }),
+                          }}
+                        />
+                      </span>
+                    </Tooltip>
+                    {user && (
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={followingOnly}
+                            onChange={(e) => handleFollowingOnlyChange(e.target.checked)}
+                          />
+                        }
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <span>{t('search_following_only', currentLanguage)}</span>
+                            <Tooltip title={t('search_following_only_tooltip', currentLanguage)} arrow>
+                              <InfoIcon sx={{ fontSize: 14, color: 'text.secondary', cursor: 'help' }} />
+                            </Tooltip>
+                          </Box>
+                        }
+                      />
+                    )}
                   </FormControl>
                 </Box>
               </Box>
@@ -853,7 +1172,12 @@ const Search = () => {
           <SearchPageSkeleton />
         ) : (
           <>
-            {questions.length === 0 && answers.length === 0 && searchTerm.trim() && !loading && (
+            {questions.length === 0 &&
+              answers.length === 0 &&
+              users.length === 0 &&
+              searchTerm.trim().length >= 3 &&
+              !loading &&
+              !error && (
               <Alert 
                 severity="info" 
                 sx={{ 
@@ -893,7 +1217,7 @@ const Search = () => {
               </Alert>
             )}
 
-            {(questions.length > 0 || answers.length > 0) && (
+            {(questions.length > 0 || answers.length > 0 || users.length > 0) && (
               <Box sx={{ mb: 3 }}>
                 <Tabs
                   value={activeTab}
@@ -905,13 +1229,16 @@ const Search = () => {
                     value="questions"
                     disabled={questions.length === 0}
                   />
-                  {answers.length > 0 && (
-                    <Tab
-                      label={`${t('answers', currentLanguage)} (${answersPagination?.total || answers.length})`}
-                      value="answers"
-                      disabled={answers.length === 0}
-                    />
-                  )}
+                  <Tab
+                    label={`${t('answers', currentLanguage)} (${answersPagination?.total || answers.length})`}
+                    value="answers"
+                    disabled={answers.length === 0}
+                  />
+                  <Tab
+                    label={`${t('users', currentLanguage)} (${usersPagination?.total || users.length})`}
+                    value="users"
+                    disabled={users.length === 0}
+                  />
                 </Tabs>
               </Box>
             )}
@@ -923,6 +1250,8 @@ const Search = () => {
                   totalQuestions={questionsPagination?.total || questions.length}
                   onItemsPerPageChange={handleQuestionsItemsPerPageChange}
                   currentLanguage={currentLanguage}
+                  dateSort={dateSort}
+                  onDateSortChange={handleDateSortChange}
                 />
                 <Box>
                   {questions.map((question: Question, index: number) => (
@@ -981,12 +1310,15 @@ const Search = () => {
                   totalQuestions={answersPagination?.total || answers.length}
                   onItemsPerPageChange={handleAnswersItemsPerPageChange}
                   currentLanguage={currentLanguage}
+                  dateSort={dateSort}
+                  onDateSortChange={handleDateSortChange}
                 />
                 <Box>
                   {answers.map((answer: Answer, index: number) => (
                     <Fade in timeout={800 + index * 200} key={answer.id}>
                       <AnswerCard
                         answer={answer}
+                        showHoverPreview
                         isAlternateTexture={index % 2 === 1}
                         relatedQuestionsCount={relatedQuestionsCount[answer.id] || 0}
                         onShowRelatedQuestions={(e: React.MouseEvent<Element>, answerId: string) => {
@@ -1036,7 +1368,132 @@ const Search = () => {
               </>
             )}
 
-            {activeTab === 'questions' && questions.length === 0 && searchTerm.trim() && !loading && (
+            {activeTab === 'users' && users.length > 0 && (
+              <>
+                <ItemsPerPageSelector
+                  itemsPerPage={usersItemsPerPage}
+                  totalQuestions={usersPagination?.total || users.length}
+                  onItemsPerPageChange={handleUsersItemsPerPageChange}
+                  currentLanguage={currentLanguage}
+                  dateSort={dateSort}
+                  onDateSortChange={handleDateSortChange}
+                />
+                <List disablePadding>
+                  {users.map((searchUser, index) => (
+                    <Fade in timeout={400 + index * 80} key={searchUser.id}>
+                      <ListItem
+                        sx={{
+                          cursor: 'pointer',
+                          border: (theme) => `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                          borderRadius: 2,
+                          mb: 1.5,
+                          px: 2,
+                          py: 1.5,
+                          transition: 'background-color 0.2s ease, border-color 0.2s ease',
+                          '&:hover': {
+                            backgroundColor: (theme) => alpha(theme.palette.primary.main, 0.06),
+                            borderColor: (theme) => theme.palette.primary.main,
+                          },
+                        }}
+                        onClick={() => navigate(`/profile/${searchUser.id}`)}
+                      >
+                        <ListItemAvatar>
+                          <ProfileAvatar
+                            src={searchUser.profile_image}
+                            ownerId={searchUser.id}
+                            fallbackName={searchUser.name}
+                            alt={searchUser.name}
+                            sx={{ width: 48, height: 48 }}
+                          />
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={searchUser.name}
+                          secondary={
+                            <Box
+                              component="span"
+                              sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 1.5,
+                                mt: 0.5,
+                                color: 'text.secondary',
+                                fontSize: '0.875rem',
+                              }}
+                            >
+                              <Box component="span">
+                                {t('search_user_questions_count', currentLanguage).replace(
+                                  '{count}',
+                                  String(searchUser.questionsCount ?? 0)
+                                )}
+                              </Box>
+                              <Box component="span">
+                                {t('search_user_answers_count', currentLanguage).replace(
+                                  '{count}',
+                                  String(searchUser.answersCount ?? 0)
+                                )}
+                              </Box>
+                              {searchUser.createdAt && (
+                                <Box component="span">
+                                  {t('search_user_joined', currentLanguage).replace(
+                                    '{date}',
+                                    new Date(searchUser.createdAt).toLocaleDateString()
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          }
+                          primaryTypographyProps={{ fontWeight: 600 }}
+                          secondaryTypographyProps={{ component: 'div' }}
+                        />
+                      </ListItem>
+                    </Fade>
+                  ))}
+                </List>
+                {usersPagination && usersPagination.totalPages > 1 && (
+                  <PaginationContainer isPapirus={isPapirus}>
+                    <Pagination
+                      count={usersPagination.totalPages}
+                      page={usersPage}
+                      onChange={handleUsersPageChange}
+                      color="primary"
+                      size="large"
+                      showFirstButton
+                      showLastButton
+                      sx={(theme: any) => ({
+                        '& .MuiPaginationItem-root': {
+                          color: theme.palette.text.secondary,
+                          border: `1px solid ${theme.palette.primary.main}50`,
+                          backgroundColor: theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.05)'
+                            : 'rgba(0,0,0,0.03)',
+                          '&:hover': {
+                            backgroundColor: `${theme.palette.primary.main}22`,
+                            borderColor: theme.palette.primary.main,
+                          },
+                          '&.Mui-selected': {
+                            backgroundColor: theme.palette.primary.main,
+                            color: theme.palette.primary.contrastText,
+                            borderColor: theme.palette.primary.main,
+                            '&:hover': {
+                              backgroundColor: theme.palette.primary.dark,
+                            },
+                          },
+                        },
+                        '& .MuiPaginationItem-icon': {
+                          color: theme.palette.text.secondary,
+                        },
+                      })}
+                    />
+                  </PaginationContainer>
+                )}
+              </>
+            )}
+
+            {activeTab === 'questions' &&
+              questions.length === 0 &&
+              searchTerm.trim().length >= 3 &&
+              !loading &&
+              !error && (
               <Alert 
                 severity="info"
                 sx={{
@@ -1075,7 +1532,21 @@ const Search = () => {
               </Alert>
             )}
 
-            {activeTab === 'answers' && answers.length === 0 && searchTerm.trim() && !loading && (
+            {activeTab === 'users' &&
+              users.length === 0 &&
+              searchTerm.trim().length >= 3 &&
+              !loading &&
+              !error && (
+              <Alert severity="info" sx={{ mb: 3 }}>
+                {t('no_results', currentLanguage)}
+              </Alert>
+            )}
+
+            {activeTab === 'answers' &&
+              answers.length === 0 &&
+              searchTerm.trim().length >= 3 &&
+              !loading &&
+              !error && (
               <Alert 
                 severity="info"
                 sx={{

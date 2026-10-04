@@ -8,11 +8,13 @@ import {
   Avatar,
   useTheme,
   Dialog,
+  Tooltip,
 } from '@mui/material';
 import {
   ThumbUp,
   ThumbDown,
   Comment,
+  ChatBubbleOutline,
   AccountTree,
   Quiz,
 } from '@mui/icons-material';
@@ -22,9 +24,11 @@ import ParentInfoChip from '../ui/ParentInfoChip';
 import AncestorsDrawer from './AncestorsDrawer';
 import MarkdownRenderer from '../ui/MarkdownRenderer';
 import { t } from '../../utils/translations';
+import ContentTime from '../ui/ContentTime';
+import DeferredImage from '../ui/DeferredImage';
+import QuestionHoverPreview, { useDelayedQuestionPreview } from './QuestionHoverPreview';
 import { useAppSelector } from '../../store/hooks';
 import { questionService } from '../../services/questionService';
-import RelatedQuestionsPopover from './RelatedQuestionsPopover';
 import papyrusVertical1 from '../../asset/textures/papyrus_vertical_1.png';
 import papyrusHorizontal2 from '../../asset/textures/papyrus_horizontal_2.png';
 
@@ -114,6 +118,8 @@ interface QuestionCardProps {
   children?: React.ReactNode; // Allow children for answer writing section
 }
 
+const CARD_DETAIL_LIMIT = 280;
+
 const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   question,
   parentQuestions = {},
@@ -133,10 +139,8 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const isMagnefite = themeName === 'magnefite';
   const [ancestorsDrawerOpen, setAncestorsDrawerOpen] = useState(false);
   const [thumbnailPreviewOpen, setThumbnailPreviewOpen] = useState(false);
+  const hoverPreview = useDelayedQuestionPreview({ respectHomeLock: true });
   const [thumbnailUrlState, setThumbnailUrlState] = useState<string | null>(null);
-  const [relatedQuestionsAnchor, setRelatedQuestionsAnchor] = useState<HTMLElement | null>(null);
-  const [relatedQuestions, setRelatedQuestions] = useState<Question[]>([]);
-  const [loadingRelatedQuestions, setLoadingRelatedQuestions] = useState(false);
   const [relatedQuestionsCount, setRelatedQuestionsCount] = useState<number>(0);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
@@ -178,6 +182,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     } else {
       setProfileImageUrl(profileImage || null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- profile image resolution depends on question identity fields only
   }, [question?.userInfo?.profile_image, question?.author.avatar, question?.userInfo?._id, question?.author.id]);
 
   // Thumbnail URL'ini oluştur (key varsa ama URL yoksa)
@@ -225,30 +230,14 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
     loadRelatedCount();
   }, [question]);
 
-  const handleShowRelatedQuestions = async (event: React.MouseEvent<HTMLElement>) => {
+  const openQuestionDetail = (
+    event: React.MouseEvent,
+    open: 'likes' | 'dislikes' | 'answers' | 'comments' | 'related'
+  ) => {
     if (!question) return;
     event.stopPropagation();
-    setRelatedQuestionsAnchor(event.currentTarget);
-    setLoadingRelatedQuestions(true);
-    
-    try {
-      const questions = await questionService.getQuestionsByParent(question.id);
-      setRelatedQuestions(questions);
-    } catch (error) {
-      console.error('İlişkili sorular yüklenirken hata:', error);
-      setRelatedQuestions([]);
-    } finally {
-      setLoadingRelatedQuestions(false);
-    }
-  };
-
-  const handleCloseRelatedQuestionsPopover = () => {
-    setRelatedQuestionsAnchor(null);
-  };
-
-  const handleRelatedQuestionClick = (questionId: string) => {
-    navigate(`/questions/${questionId}`);
-    setRelatedQuestionsAnchor(null);
+    const from = location.pathname + location.search;
+    navigate(`/questions/${question.id}`, { state: { from, open } });
   };
 
   // If no question provided, render children (for answer writing section)
@@ -277,7 +266,13 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
   const parentAQ = parentId && !hasBackendParentInfo ? parentAnswerQuestions[parentId] : undefined;
 
   return (
-    <StyledPaper ref={ref} isPapirus={isPapirus} isMagnefite={isMagnefite} isAlternateTexture={isAlternateTexture} isAnswerWriting={isAnswerWriting}>
+    <StyledPaper
+      ref={ref}
+      isPapirus={isPapirus}
+      isMagnefite={isMagnefite}
+      isAlternateTexture={isAlternateTexture}
+      isAnswerWriting={isAnswerWriting}
+    >
 
       {/* Parent Question/Answer Info with Ancestors Button */}
       {parentId && (
@@ -343,6 +338,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             state: { from } 
           });
         }}
+        {...(question && question.detail.length > CARD_DETAIL_LIMIT ? hoverPreview.bind(question) : {})}
       >
         <Box sx={{ flex: 1, paddingX: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -382,9 +378,7 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
               •
             </Typography>
-            <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-              {question.timeAgo}
-            </Typography>
+            <ContentTime value={question.createdAt} currentLanguage={currentLanguage} />
             <Typography variant="body2" sx={{ color: theme.palette.text.disabled }}>
               •
             </Typography>
@@ -429,16 +423,16 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                   wordBreak: 'break-word',
                 }}
               >
-                {question.title}
+                {question.summary}
               </Typography>
 
               <Box sx={{ overflow: 'hidden', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                <MarkdownRenderer content={`${question.content.slice(0, 280)}${question.content.length > 280 ? '...' : ''}`} />
+                <MarkdownRenderer content={`${question.detail.slice(0, CARD_DETAIL_LIMIT)}${question.detail.length > CARD_DETAIL_LIMIT ? '...' : ''}`} />
               </Box>
             </Box>
 
             {/* Thumbnail Container - Dikey olarak ortalanmış */}
-            {hasThumbnail && thumbnailUrl && (
+            {hasThumbnail && (
               <Box
                 sx={{
                   display: 'flex',
@@ -469,34 +463,22 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
                     setThumbnailPreviewOpen(true);
                   }}
                 >
-                  <img
-                    src={thumbnailUrl || ''}
-                    alt={question.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={async (e) => {
-                      const img = e.currentTarget;
-                      const currentSrc = img.src;
-                      
-                      // Eğer thumbnail key varsa ama URL yüklenemiyorsa, yeniden URL oluşturmayı dene
-                      if (question?.thumbnail?.key) {
-                        try {
-                          const { contentAssetService } = await import('../../services/contentAssetService');
-                          const newUrl = await contentAssetService.resolveAssetUrl({
-                            key: question.thumbnail.key,
-                            type: 'question-thumbnail',
-                            entityId: question.id,
-                          });
-                          if (newUrl && newUrl !== currentSrc) {
-                            img.src = newUrl;
-                            return; // Yeniden yükleme başarılı
-                          }
-                        } catch (error) {
-                          // Silent fail - thumbnail yüklenemiyorsa gizlenir
-                        }
+                  <DeferredImage
+                    src={thumbnailUrl || undefined}
+                    alt={question.summary}
+                    onError={async () => {
+                      if (!question?.thumbnail?.key) return;
+                      try {
+                        const { contentAssetService } = await import('../../services/contentAssetService');
+                        const newUrl = await contentAssetService.resolveAssetUrl({
+                          key: question.thumbnail.key,
+                          type: 'question-thumbnail',
+                          entityId: question.id,
+                        });
+                        if (newUrl && newUrl !== thumbnailUrl) setThumbnailUrlState(newUrl);
+                      } catch {
+                        // Yer tutucu ikon kalır.
                       }
-                      
-                      // Başarısız olursa gizle
-                      img.style.display = 'none';
                     }}
                   />
                 </Box>
@@ -542,41 +524,66 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
             gap: 3,
             mt: 2,
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                {question.likesCount}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                {question.dislikesCount}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Comment sx={{ fontSize: 18, color: theme.palette.text.secondary, transform: 'rotate(180deg)' }} />
-              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
-                {question.answers}
-              </Typography>
-            </Box>
-            {user && relatedQuestionsCount > 0 && (
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 0.5,
-                cursor: 'pointer',
-              }}
-              onClick={handleShowRelatedQuestions}
-              title={t('related_questions', currentLanguage)}
-            >
-              <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
-              <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+            <Tooltip title={t('likes', currentLanguage)}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                onClick={(event) => openQuestionDetail(event, 'likes')}
+              >
+                <ThumbUp sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                  {question.likesCount}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title={t('dislikes', currentLanguage)}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                onClick={(event) => openQuestionDetail(event, 'dislikes')}
+              >
+                <ThumbDown sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                  {question.dislikesCount}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title={t('answers', currentLanguage)}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                onClick={(event) => openQuestionDetail(event, 'answers')}
+              >
+                <Comment sx={{ fontSize: 18, color: theme.palette.text.secondary, transform: 'rotate(180deg)' }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                  {question.answers}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title={t('comments', currentLanguage)}>
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                onClick={(event) => openQuestionDetail(event, 'comments')}
+              >
+                <ChatBubbleOutline sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                  {question.commentCount ?? 0}
+                </Typography>
+              </Box>
+            </Tooltip>
+            <Tooltip title={t('related_questions', currentLanguage)}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  cursor: 'pointer',
+                }}
+                onClick={(event) => openQuestionDetail(event, 'related')}
+              >
+                <Quiz sx={{ fontSize: 18, color: theme.palette.text.secondary }} />
+                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
                   {relatedQuestionsCount}
-              </Typography>
-            </Box>
-            )}
+                </Typography>
+              </Box>
+            </Tooltip>
           </Box>
         </Box>
       </Box>
@@ -595,55 +602,42 @@ const QuestionCard = forwardRef<HTMLDivElement, QuestionCardProps>(({
         contentType="question"
       />
 
-      {/* Related Questions Popover */}
-      <RelatedQuestionsPopover
-        anchorEl={relatedQuestionsAnchor}
-        onClose={handleCloseRelatedQuestionsPopover}
-        questions={relatedQuestions}
-        loading={loadingRelatedQuestions}
-        onQuestionClick={handleRelatedQuestionClick}
-      />
-
       <Dialog
         open={thumbnailPreviewOpen}
         onClose={() => setThumbnailPreviewOpen(false)}
         maxWidth="md"
       >
         {(thumbnailUrl || question?.thumbnail?.key) && (
-          <Box sx={{ p: 0, m: 0 }}>
-            <img
-              src={thumbnailUrl || ''}
-              alt={question.title}
-              style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
-              onError={async (e) => {
-                const img = e.currentTarget;
-                const currentSrc = img.src;
-                
-                // Eğer thumbnail key varsa, yeniden URL oluşturmayı dene
-                if (question?.thumbnail?.key) {
-                  try {
-                    const { contentAssetService } = await import('../../services/contentAssetService');
-                    const newUrl = await contentAssetService.resolveAssetUrl({
-                      key: question.thumbnail.key,
-                      type: 'question-thumbnail',
-                      entityId: question.id,
-                    });
-                    if (newUrl && newUrl !== currentSrc) {
-                      setThumbnailUrlState(newUrl);
-                      img.src = newUrl;
-                      return;
-                    }
-                  } catch (error) {
-                    // Silent fail
-                  }
+          <Box sx={{ p: 0, m: 0, minHeight: 240 }}>
+            <DeferredImage
+              src={thumbnailUrl || undefined}
+              alt={question.summary}
+              objectFit="contain"
+              onError={async () => {
+                if (!question?.thumbnail?.key) return;
+                try {
+                  const { contentAssetService } = await import('../../services/contentAssetService');
+                  const newUrl = await contentAssetService.resolveAssetUrl({
+                    key: question.thumbnail.key,
+                    type: 'question-thumbnail',
+                    entityId: question.id,
+                  });
+                  if (newUrl && newUrl !== thumbnailUrl) setThumbnailUrlState(newUrl);
+                } catch {
+                  // Yer tutucu ikon kalır.
                 }
-                
-                img.style.display = 'none';
               }}
             />
           </Box>
         )}
       </Dialog>
+      <QuestionHoverPreview
+        placement="below"
+        question={hoverPreview.question}
+        anchorEl={hoverPreview.anchorEl}
+        onMouseEnter={hoverPreview.previewHandlers.onMouseEnter}
+        onMouseLeave={hoverPreview.previewHandlers.onMouseLeave}
+      />
     </StyledPaper>
   );
 });
