@@ -6,6 +6,7 @@ import { showErrorToast } from '../../utils/notificationUtils';
 import { t } from '../../utils/translations';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { addBookmarkThunk, removeBookmarkThunk } from '../../store/bookmarks/bookmarkThunks';
+import { useBookmarkAdd } from '../../contexts/BookmarkAddContext';
 
 interface Props {
   targetType: AddBookmarkRequest['targetType'];
@@ -20,9 +21,11 @@ interface Props {
 export default function BookmarkButton({ targetType, targetId, targetData, onChange, isBookmarked: initialBookmarked, bookmarkId: initialBookmarkId }: Props) {
   const theme = useTheme();
   const dispatch = useAppDispatch();
+  const bookmarkAddCtx = useBookmarkAdd();
   const { isAuthenticated } = useAppSelector(state => state.auth);
   const { currentLanguage } = useAppSelector(state => state.language);
   const { items: bookmarks } = useAppSelector(state => state.bookmarks);
+  const { bookmarkCollectionIds } = useAppSelector(state => state.bookmarkCollections);
   const { name: themeName } = useAppSelector(state => state.theme);
   const [loading, setLoading] = useState(false);
   
@@ -43,6 +46,8 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
   );
   const bookmarked = initialBookmarked !== undefined ? initialBookmarked : !!bookmark;
   const bookmarkIdValue = initialBookmarkId !== undefined ? initialBookmarkId : (bookmark?._id || null);
+  const inAnyCollection = bookmarkIdValue ? (bookmarkCollectionIds[bookmarkIdValue]?.length ?? 0) > 0 : false;
+  const showFilled = bookmarked && inAnyCollection;
 
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,39 +55,39 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
     try {
       setLoading(true);
       const limit = (s: string, max: number) => (s.length > max ? s.slice(0, max) : s);
-      const isValidObjectId = (s?: string) => !!s && /^[0-9a-fA-F]{24}$/.test(s);
+      // Accept MongoDB ObjectId (24 hex) or UUID format for authorId
+      const isValidId = (s?: string) => !!s && (s.length >= 10 && s.length <= 36);
+
+      const sanitized = {
+        ...targetData,
+        title: limit(targetData.title, 200),
+        content: limit(targetData.content, 2000),
+        author: targetData.author ? limit(targetData.author, 100) : undefined,
+        authorId: isValidId(targetData.authorId) ? targetData.authorId : undefined,
+        url: targetData.url ? limit(targetData.url, 500) : undefined,
+      } as AddBookmarkRequest['targetData'];
+      const payload: AddBookmarkRequest = { targetType, targetId, targetData: sanitized };
+
+      if (bookmarkAddCtx) {
+        bookmarkAddCtx.openAddModal(payload, bookmarked ? bookmarkIdValue : undefined);
+        setLoading(false);
+        return;
+      }
 
       if (!bookmarked) {
-        const sanitized = {
-          ...targetData,
-          title: limit(targetData.title, 200),
-          content: limit(targetData.content, 2000),
-          author: targetData.author ? limit(targetData.author, 100) : undefined,
-          authorId: isValidObjectId(targetData.authorId) ? targetData.authorId : undefined,
-          url: targetData.url ? limit(targetData.url, 500) : undefined,
-        } as AddBookmarkRequest['targetData'];
-
-        const result = await dispatch(addBookmarkThunk({
-          targetType,
-          targetId,
-          targetData: sanitized,
-        }));
-        
+        const result = await dispatch(addBookmarkThunk(payload));
         if (addBookmarkThunk.fulfilled.match(result)) {
           onChange?.(result.payload);
         }
       } else if (bookmarkIdValue) {
         const result = await dispatch(removeBookmarkThunk(bookmarkIdValue));
-        
         if (removeBookmarkThunk.fulfilled.match(result) && result.payload) {
           onChange?.();
         }
       } else {
-        // Bookmark id bilinmiyorsa, Redux'tan bul
         const found = bookmarks.find(b => b.target_id === targetId && b.target_type === targetType);
         if (found) {
           const result = await dispatch(removeBookmarkThunk(found._id));
-          
           if (removeBookmarkThunk.fulfilled.match(result) && result.payload) {
             onChange?.();
           }
@@ -109,7 +114,7 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
             padding: 0,
             minWidth: '40px',
             minHeight: '40px',
-            color: bookmarked ? bookmarkColor : theme.palette.text.secondary,
+            color: showFilled ? bookmarkColor : theme.palette.text.secondary,
             border: theme.palette.mode === 'light' ? `1px solid ${theme.palette.divider}` : 'none',
             backgroundColor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'transparent',
             '&:hover': {
@@ -124,7 +129,7 @@ export default function BookmarkButton({ targetType, targetId, targetData, onCha
             },
           }}
         >
-          {bookmarked ? (
+          {showFilled ? (
             <BookmarkIcon />
           ) : (
             <BookmarkBorder />

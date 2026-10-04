@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import ContentTime from '../../components/ui/ContentTime';
 import {
   getAllQuestions,
   likeQuestion,
@@ -40,6 +41,7 @@ const Questions = () => {
     state => state.questions
   );
   const { user } = useAppSelector(state => state.auth);
+  const { currentLanguage } = useAppSelector(state => state.language);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);
@@ -66,8 +68,8 @@ const Questions = () => {
     } else {
       const filtered = questions.filter(
         (question: Question) =>
-          question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          question.content.toLowerCase().includes(searchTerm.toLowerCase())
+          question.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          question.detail.toLowerCase().includes(searchTerm.toLowerCase())
       );
       setFilteredQuestions(filtered);
     }
@@ -100,14 +102,6 @@ const Questions = () => {
 
   const handleDismissError = () => {
     dispatch(clearError());
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('tr-TR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
   };
 
   const truncateText = (text: string, maxLength = 150) => {
@@ -268,7 +262,7 @@ const Questions = () => {
                           }}
                           onClick={() => navigate(`/questions/${question.id}`)}
                         >
-                          {question.title}
+                          {question.summary}
                         </Typography>
 
                         {/* Question Content */}
@@ -277,7 +271,7 @@ const Questions = () => {
                           color="text.secondary"
                           sx={{ mb: 2 }}
                         >
-                          {truncateText(question.content)}
+                          {truncateText(question.detail)}
                         </Typography>
 
                         {/* User Info */}
@@ -288,9 +282,11 @@ const Questions = () => {
                           <Typography variant="caption" color="text.secondary">
                             •
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {formatDate(question.createdAt)}
-                          </Typography>
+                          <ContentTime
+                            value={question.createdAt}
+                            currentLanguage={currentLanguage}
+                            variant="caption"
+                          />
                         </Box>
 
                         {/* Question Meta */}

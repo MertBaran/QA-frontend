@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { t } from '../../utils/translations';
 import { useAppSelector } from '../../store/hooks';
 import { Question } from '../../types/question';
+import QuestionHoverPreview, { ANCESTOR_PREVIEW_DELAY_MS, useDelayedQuestionPreview } from './QuestionHoverPreview';
 
 const StyledPopover = styled(Popover)(({ theme }) => ({
   '& .MuiPopover-paper': {
@@ -62,7 +63,15 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
   const theme = useTheme();
   const navigate = useNavigate();
   const { currentLanguage } = useAppSelector(state => state.language);
+  const preview = useDelayedQuestionPreview({
+    respectHomeLock: true,
+    delayMs: ANCESTOR_PREVIEW_DELAY_MS,
+  });
   const open = Boolean(anchorEl);
+
+  React.useEffect(() => {
+    if (!open) preview.dismiss();
+  }, [open, preview.dismiss]);
 
 
   const handleAvatarClick = (e: React.MouseEvent, userId: string) => {
@@ -110,6 +119,7 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
   };
 
   return (
+    <>
     <StyledPopover
       open={open}
       anchorEl={anchorEl}
@@ -141,6 +151,7 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
             {questions.map((question) => (
               <QuestionItem
                 key={question.id}
+                {...preview.bind(question)}
                 onClick={(e) => handleQuestionItemClick(e, question.id)}
                 onMouseDown={(e) => {
                   if (e.button === 1) {
@@ -191,11 +202,11 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
                         {question.userInfo?.name || question.author.name}
                       </Typography>
                       <Typography variant="body2" sx={{ color: theme.palette.text.primary, fontSize: '0.9rem' }}>
-                        {question.title}
+                        {question.summary}
                       </Typography>
                     </Box>
                   }
-                  secondary={question.content.substring(0, 60) + '...'}
+                  secondary={question.detail.substring(0, 60) + '...'}
                   secondaryTypographyProps={{ 
                     color: theme.palette.text.secondary,
                     sx: { fontSize: '0.75rem', mt: 0.5 }
@@ -207,6 +218,14 @@ const RelatedQuestionsPopover: React.FC<RelatedQuestionsPopoverProps> = ({
         )}
       </Box>
     </StyledPopover>
+    <QuestionHoverPreview
+      placement="page"
+      question={preview.question}
+      anchorEl={preview.anchorEl}
+      onMouseEnter={preview.previewHandlers.onMouseEnter}
+      onMouseLeave={preview.previewHandlers.onMouseLeave}
+    />
+    </>
   );
 };
 

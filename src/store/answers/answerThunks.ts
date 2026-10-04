@@ -18,13 +18,13 @@ export const getAnswersByQuestion = createAsyncThunk<
       hasPrev: boolean;
     };
   },
-  { questionId: string; page?: number; limit?: number }
+  { questionId: string; page?: number; limit?: number; sortOrder?: 'asc' | 'desc' }
 >(
   'answers/getAnswersByQuestion',
-  async ({ questionId, page = 1, limit = 5 }, { rejectWithValue }) => {
+  async ({ questionId, page = 1, limit = 5, sortOrder = 'desc' }, { rejectWithValue }) => {
     try {
-      logger.user.action('fetch_answers', { questionId, page, limit });
-      const result = await answerService.getAnswersByQuestion(questionId, page, limit);
+      logger.user.action('fetch_answers', { questionId, page, limit, sortOrder });
+      const result = await answerService.getAnswersByQuestion(questionId, page, limit, sortOrder);
       return result;
     } catch (error) {
       const errorInfo = await handleError(error, {

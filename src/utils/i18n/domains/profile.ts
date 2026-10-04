@@ -20,9 +20,9 @@ export const profile = {
     de: 'Noch keine Aktivitäten',
   },
   member_since: {
-    tr: 'Üyelik Tarihi',
-    en: 'Member Since',
-    de: 'Mitglied seit',
+    tr: '{date} tarihinde katıldı',
+    en: 'Joined on {date}',
+    de: 'Beigetreten am {date}',
   },
   location: {
     tr: 'Konum',

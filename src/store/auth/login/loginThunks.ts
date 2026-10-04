@@ -53,11 +53,18 @@ export const loginUser = createAsyncThunk<
       credentials: { email: credentials.email },
     });
 
-    // Return more specific error message
+    // API returns { error, message } - extract user-friendly message
+    const apiMessage =
+      error.response?.data?.error ||
+      error.response?.data?.message;
     const errorMessage =
-      error.response?.data?.message ||
-      error.message ||
-      'Login failed. Please check your credentials.';
+      apiMessage ||
+      (error.response?.status === 401
+        ? 'Invalid credentials'
+        : error.message?.includes('404')
+          ? 'Invalid credentials'
+          : error.message ||
+            'Login failed. Please check your credentials.');
 
     return rejectWithValue(errorMessage);
   }

@@ -9,15 +9,15 @@ export interface QuestionFilters {
 }
 
 export interface NewQuestion {
-  title: string;
-  content: string;
+  summary: string;
+  detail: string;
   category: string;
   tags: string;
 }
 
 export interface ValidationErrors {
-  title?: string;
-  content?: string;
+  summary?: string;
+  detail?: string;
   category?: string;
   tags?: string;
 }
@@ -44,6 +44,7 @@ export interface HomeState {
   // Pagination
   currentPage: number;
   itemsPerPage: number;
+  dateSort: 'newest' | 'oldest';
   totalQuestions: number;
   totalPages: number;
 }

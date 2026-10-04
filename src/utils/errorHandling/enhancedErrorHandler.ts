@@ -127,8 +127,9 @@ export class EnhancedErrorHandler {
         'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.',
     };
 
-    // Try to get message from server response
-    const serverMessage = error.response?.data?.message;
+    // Try to get message from server response (API uses error veya message)
+    const serverMessage =
+      error.response?.data?.error || error.response?.data?.message;
     if (serverMessage) {
       return serverMessage;
     }

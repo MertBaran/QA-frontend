@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ChangeEvent, FocusEvent, FormEvent } from 'react';
 import {
   Box,
@@ -21,7 +21,7 @@ import {
   Email,
   Lock,
 } from '@mui/icons-material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { registerUser } from '../../store/auth/register/registerThunks';
 import { clearError } from '../../store/auth/authSlice';
@@ -51,6 +51,19 @@ const Register = () => {
 
   const { validateForm, handleBlur, handleChange, isFormValid, getFieldError, validateField, touched } =
     useFormValidation(registerSchema);
+
+  const location = useLocation();
+  // Sadece Login'den Register'a geçince hata temizle (Register'da alınan hata görünsün)
+  useEffect(() => {
+    const curr = location.pathname;
+    if (curr === '/login' || curr === '/register') {
+      const last = sessionStorage.getItem('lastAuthPath') || '';
+      if ((last === '/login' || last === '/register') && last !== curr) {
+        dispatch(clearError());
+      }
+      sessionStorage.setItem('lastAuthPath', curr);
+    }
+  }, [location.pathname, dispatch]);
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

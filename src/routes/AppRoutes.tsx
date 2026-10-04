@@ -9,7 +9,7 @@ import PublicRoute from './PublicRoute';
 import AdminLayout from '../components/layout/AdminLayout';
 
 // Route configuration
-import { publicRoutes, protectedRoutes, adminProtectedRoutes, catchAllRoute } from './config';
+import { publicRoutes, openRoutes, protectedRoutes, adminProtectedRoutes, catchAllRoute } from './config';
 
 // Lazy load page components
 const Login = lazy(() => import('../pages/auth/Login'));
@@ -26,6 +26,8 @@ const ForgotPassword = lazy(() => import('../pages/auth/ForgotPassword'));
 const Inquire = lazy(() => import('../pages/Inquire'));
 const Query = lazy(() => import('../pages/Query'));
 const Search = lazy(() => import('../pages/Search'));
+const BookmarkDetail = lazy(() => import('../pages/bookmark/BookmarkDetail'));
+const BookmarkSharedView = lazy(() => import('../pages/bookmark/BookmarkSharedView'));
 
 // Admin page components
 const AdminDashboard = lazy(() => import('../pages/admin/AdminDashboard'));
@@ -52,6 +54,8 @@ const Pages = {
     Inquire,
     Query,
     Search,
+    BookmarkDetail,
+    BookmarkSharedView,
     // Admin pages
   AdminDashboard,
   AdminUsers,
@@ -83,7 +87,7 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      {/* Public Routes */}
+      {/* Public Routes (login/register - redirect if already logged in) */}
       {publicRoutes.map(({ path, component: ComponentName }) => (
         <Route
           key={path}
@@ -91,6 +95,15 @@ const AppRoutes = () => {
           element={
             <PublicRoute>{renderPageComponent(ComponentName as keyof typeof Pages)}</PublicRoute>
           }
+        />
+      ))}
+
+      {/* Open Routes (no auth - shared links, etc.) */}
+      {openRoutes.map(({ path, component: ComponentName }) => (
+        <Route
+          key={path}
+          path={path}
+          element={renderPageComponent(ComponentName as keyof typeof Pages)}
         />
       ))}
 

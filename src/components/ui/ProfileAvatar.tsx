@@ -12,13 +12,21 @@ interface ProfileAvatarProps extends Omit<AvatarProps, 'src'> {
  * Avatar component that resolves profile image URLs from storage keys.
  * Use when profile_image/avatar might be a storage key instead of HTTP URL.
  */
+const avatarUrlCache = new Map<string, string>();
+
+function initialAvatarUrl(src?: string | null): string | null {
+  if (!src || src === 'default.jpg') return null;
+  if (src.startsWith('http')) return src;
+  return avatarUrlCache.get(`${src}`) ?? null;
+}
+
 const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   src,
   ownerId,
   fallbackName,
   ...avatarProps
 }) => {
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(() => initialAvatarUrl(src));
 
   useEffect(() => {
     if (!src || src === 'default.jpg') {
@@ -29,8 +37,12 @@ const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
       setResolvedUrl(src);
       return;
     }
-    setResolvedUrl(null); // Reset before resolving key
-    // Storage key - resolve to URL
+    const cached = avatarUrlCache.get(src);
+    if (cached) {
+      setResolvedUrl(cached);
+      return;
+    }
+    let cancelled = false;
     const resolve = async () => {
       try {
         const url = await contentAssetService.resolveAssetUrl({
@@ -40,12 +52,16 @@ const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
           visibility: 'public',
           presignedUrl: false,
         });
-        setResolvedUrl(url);
+        avatarUrlCache.set(src, url);
+        if (!cancelled) setResolvedUrl(url);
       } catch {
-        setResolvedUrl(null);
+        if (!cancelled) setResolvedUrl(null);
       }
     };
     resolve();
+    return () => {
+      cancelled = true;
+    };
   }, [src, ownerId]);
 
   const displaySrc = resolvedUrl ?? (src?.startsWith('http') ? src : null);
