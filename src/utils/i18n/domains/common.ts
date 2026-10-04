@@ -34,6 +34,11 @@ export const common = {
     en: 'New message',
     de: 'Neue Nachricht',
   },
+  send_message: {
+    tr: 'Mesaj gönder',
+    en: 'Send message',
+    de: 'Nachricht senden',
+  },
   format_bold: { tr: 'Kalın', en: 'Bold', de: 'Fett' },
   format_italic: { tr: 'İtalik', en: 'Italic', de: 'Kursiv' },
   format_strikethrough: { tr: 'Üstü çizili', en: 'Strikethrough', de: 'Durchgestrichen' },
@@ -50,6 +55,11 @@ export const common = {
   voice_only: { tr: 'Sadece ses kayıtları', en: 'Voice only', de: 'Nur Sprachnachrichten' },
   starred_only: { tr: 'Sadece yıldızlılar', en: 'Starred only', de: 'Nur mit Stern' },
   following_this_user: { tr: 'Takip ediliyor', en: 'Following', de: 'Folgt' },
+  user_not_followed: {
+    tr: 'Bu kullanıcı takip edilmiyor',
+    en: 'This user is not followed',
+    de: 'Dieser Benutzer wird nicht gefolgt',
+  },
   resize_panel: { tr: 'Yüksekliği değiştirmek için yukarı/aşağı sürükleyin', en: 'Drag up or down to resize height', de: 'Nach oben oder unten ziehen zum Ändern der Höhe' },
   scroll_to_bottom: { tr: 'En alta in', en: 'Scroll to bottom', de: 'Nach unten scrollen' },
   no_voice_messages: { tr: 'Ses kaydı bulunamadı', en: 'No voice messages found', de: 'Keine Sprachnachrichten gefunden' },
@@ -219,6 +229,11 @@ export const common = {
     tr: 'Beğeni',
     en: 'Likes',
     de: 'Likes',
+  },
+  dislikes: {
+    tr: 'Beğenmeme',
+    en: 'Dislikes',
+    de: 'Abgelehnt',
   },
   views: {
     tr: 'Görüntülenme',
@@ -614,5 +629,45 @@ export const common = {
     tr: 'Plan',
     en: 'Plan',
     de: 'Plan',
+  },
+  close: {
+    tr: 'Kapat',
+    en: 'Close',
+    de: 'Schließen',
+  },
+  report: {
+    tr: 'Bildir',
+    en: 'Report',
+    de: 'Melden',
+  },
+  report_title: {
+    tr: 'İçeriği bildir',
+    en: 'Report content',
+    de: 'Inhalt melden',
+  },
+  report_placeholder_body: {
+    tr: 'Ayrıntılı bildirme formu daha sonra eklenecek. Gönderdiğiniz bildirim şimdilik incelenmek üzere alınır.',
+    en: 'A detailed report form will be added later. For now, your report is received for review.',
+    de: 'Ein ausführliches Meldeformular folgt später. Ihre Meldung wird vorerst zur Prüfung entgegengenommen.',
+  },
+  report_reason: {
+    tr: 'Bildirme nedeni',
+    en: 'Reason',
+    de: 'Grund',
+  },
+  report_reason_placeholder: {
+    tr: 'Kısaca neden bildiriyorsunuz?',
+    en: 'Briefly, why are you reporting this?',
+    de: 'Warum melden Sie das?',
+  },
+  report_submit: {
+    tr: 'Bildirimi gönder',
+    en: 'Submit report',
+    de: 'Meldung senden',
+  },
+  report_sent: {
+    tr: 'Bildiriminiz incelenmek üzere gönderildi.',
+    en: 'Your report was sent for review.',
+    de: 'Ihre Meldung wurde zur Prüfung gesendet.',
   },
 } as const;

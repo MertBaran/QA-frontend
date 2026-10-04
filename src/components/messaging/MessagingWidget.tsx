@@ -35,11 +35,11 @@ import {
   blockUser,
   unblockUser,
 } from '../../store/messaging/messagingThunks';
-import { setActiveConversation, updateMessageReaction, updateMessageStar } from '../../store/messaging/messagingSlice';
+import { clearMessageCompose, markConversationRead, setActiveConversation, updateMessageReaction, updateMessageStar } from '../../store/messaging/messagingSlice';
 import { messageService, type MessageItem } from '../../services/messageService';
 import { useMessagingWebSocket } from '../../hooks/useMessagingWebSocket';
 import ProfileAvatar from '../ui/ProfileAvatar';
-import MessageContent, { stripInlineFormat } from './MessageContent';
+import MessageContent, { PlatformLinkPreview, stripInlineFormat } from './MessageContent';
 import VoiceMessagePlayer from './VoiceMessagePlayer';
 import { getScrollbarSx } from '../../theme/scrollbarStyles';
 import {
@@ -87,6 +87,7 @@ const MessagingWidget: React.FC = () => {
     loadingMessages,
     loadingMoreMessages,
     connectionStatus,
+    pendingCompose,
   } = useAppSelector((s) => s.messaging);
 
   const [open, setOpen] = useState(false);
@@ -104,6 +105,7 @@ const MessagingWidget: React.FC = () => {
   const [pendingVoiceContent, setPendingVoiceContent] = useState<string | null>(null);
   const [pendingVoiceDurationSeconds, setPendingVoiceDurationSeconds] = useState<number>(0);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; senderName: string } | null>(null);
+  const [attachedMention, setAttachedMention] = useState<{ questionId: string; answerId?: string; commentId?: string } | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [messageMenuAnchor, setMessageMenuAnchor] = useState<{ el: HTMLElement; message: typeof activeMessages[0] } | null>(null);
   const [reactionPickerAnchor, setReactionPickerAnchor] = useState<{ el: HTMLElement; message: typeof activeMessages[0] } | null>(null);
@@ -149,6 +151,7 @@ const MessagingWidget: React.FC = () => {
   const cancelRecordingRef = useRef(false);
   const recordingSecondsRef = useRef(0);
   const messageInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const applyingComposeRef = useRef(false);
   const { send: wsSend } = useMessagingWebSocket(isAuthenticated, !open);
 
   const handleFormatClick = (wrap: { before: string; after: string }) => {
@@ -383,6 +386,7 @@ const MessagingWidget: React.FC = () => {
   };
 
   const handleNewMessage = () => {
+    setAttachedMention(null);
     setChatOpen('new');
     setNewMessageRecipient(null);
     setUserSearchQuery('');
@@ -390,12 +394,18 @@ const MessagingWidget: React.FC = () => {
     setPendingVoiceDurationSeconds(0);
   };
 
+  const clearConversationUnread = (id: string) => {
+    dispatch(markConversationRead(id));
+    dispatch(markAsRead(id));
+  };
+
   const handleSelectConversation = (id: string) => {
+    if (!applyingComposeRef.current) setAttachedMention(null);
     setChatOpen(id);
     setPendingVoiceContent(null);
     setPendingVoiceDurationSeconds(0);
     dispatch(setActiveConversation(id));
-    dispatch(markAsRead(id));
+    clearConversationUnread(id);
   };
 
   const jumpToMessage = (conversationId: string, messageId: string) => {
@@ -440,9 +450,43 @@ const MessagingWidget: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!pendingCompose) return;
+    const request = pendingCompose;
+    dispatch(clearMessageCompose());
+    applyingComposeRef.current = true;
+    setOpen(true);
+    setAttachedMention(
+      request.questionId
+        ? { questionId: request.questionId, answerId: request.answerId, commentId: request.commentId }
+        : null
+    );
+    setMessageInput('');
+    const existing = conversations.find(conversation => conversation.otherUser.id === request.recipient.id);
+    if (existing) {
+      handleSelectConversation(existing.id);
+    } else {
+      void handleSelectUserForNewMessage({
+        id: request.recipient.id,
+        name: request.recipient.name,
+        profile_image: request.recipient.profile_image ?? '',
+      });
+    }
+    applyingComposeRef.current = false;
+  }, [pendingCompose]);
+
   const handleSendMessage = async (contentToSend?: string) => {
     const textPart = (contentToSend ?? messageInput).trim();
     const voicePart = pendingVoiceContent;
+    const mentionUrl = attachedMention
+      ? `${window.location.origin}/questions/${attachedMention.questionId}${
+          attachedMention.commentId
+            ? `#comment-${attachedMention.commentId}`
+            : attachedMention.answerId
+              ? `#answer-${attachedMention.answerId}`
+              : ''
+        }`
+      : '';
     let content = '';
     if (voicePart && textPart) {
       content = `${voicePart}\n\n${textPart}`;
@@ -451,7 +495,11 @@ const MessagingWidget: React.FC = () => {
     } else {
       content = textPart;
     }
+    if (mentionUrl) {
+      content = content ? `${mentionUrl}\n${content}` : mentionUrl;
+    }
     if (!content || !chatOpen || chatOpen === 'new') return;
+    setAttachedMention(null);
     if (replyingTo) {
       const preview = replyingTo.content.replace(/\n/g, ' ').slice(0, 100);
       content = `[reply:${replyingTo.id}]\n${replyingTo.senderName}: ${preview}\n\n${content}`;
@@ -683,16 +731,24 @@ const MessagingWidget: React.FC = () => {
     : null;
   const activeMessages = chatOpen ? messagesByConversation[chatOpen] ?? [] : [];
 
+  const watchedUserId = chatOpen === 'new'
+    ? newMessageRecipient?.id
+    : activeConversation?.otherUser.id;
+
   useEffect(() => {
-    if (!chatOpen || chatOpen === 'new' || !activeConversation?.otherUser.id) {
+    if (!watchedUserId) {
       setOtherUserIsFollowing(null);
       return;
     }
+    let cancelled = false;
     setOtherUserIsFollowing(null);
-    userService.getUserById(activeConversation.otherUser.id).then((u) => {
-      setOtherUserIsFollowing(u?.isFollowing ?? false);
+    userService.getUserById(watchedUserId).then((u) => {
+      if (!cancelled) setOtherUserIsFollowing(u?.isFollowing ?? false);
     });
-  }, [chatOpen, activeConversation?.otherUser?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [watchedUserId]);
 
   type VoiceMsgWithConv = MessageItem & { _conv: typeof conversations[0] };
   type TextMsgWithConv = MessageItem & { _conv: typeof conversations[0] };
@@ -1487,6 +1543,20 @@ const MessagingWidget: React.FC = () => {
                       </Collapse>
                     )}
                   </Box>
+                  {otherUserIsFollowing === false && (
+                    <Box
+                      sx={{
+                        px: 2,
+                        py: 0.75,
+                        bgcolor: theme.palette.mode === 'dark' ? 'rgba(255, 193, 7, 0.14)' : 'rgba(255, 193, 7, 0.28)',
+                        borderBottom: `1px solid ${theme.palette.divider}`,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                        {t('user_not_followed', currentLanguage)}
+                      </Typography>
+                    </Box>
+                  )}
 
                   {chatOpen === 'new' ? (
                     <Box sx={{ p: 2 }}>
@@ -1532,6 +1602,9 @@ const MessagingWidget: React.FC = () => {
                       <Box
                         ref={messagesScrollRef}
                         onScroll={handleMessagesScroll}
+                        onClick={() => {
+                          if (chatOpen && chatOpen !== 'new') clearConversationUnread(chatOpen);
+                        }}
                         sx={{
                           flex: 1,
                           minHeight: 0,
@@ -1569,6 +1642,9 @@ const MessagingWidget: React.FC = () => {
                             <Box
                               key={m.id}
                               data-message-id={m.id}
+                              onClick={() => {
+                                if (chatOpen && chatOpen !== 'new') clearConversationUnread(chatOpen);
+                              }}
                               sx={{
                                 alignSelf: isOwn ? 'flex-end' : 'flex-start',
                                 maxWidth: '75%',
@@ -1869,6 +1945,39 @@ const MessagingWidget: React.FC = () => {
                             </Tooltip>
                           </Box>
                         )}
+                        {attachedMention && (
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 0.5,
+                              mb: 0.5,
+                              p: 0.75,
+                              borderRadius: 1,
+                              bgcolor: 'action.hover',
+                              border: `1px solid ${theme.palette.divider}`,
+                            }}
+                          >
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <PlatformLinkPreview
+                                questionId={attachedMention.questionId}
+                                answerId={attachedMention.answerId}
+                                commentId={attachedMention.commentId}
+                                isOwn={false}
+                                currentLanguage={currentLanguage}
+                                compact
+                              />
+                            </Box>
+                            <IconButton
+                              size="small"
+                              onClick={() => setAttachedMention(null)}
+                              sx={{ color: 'text.secondary', p: 0.25 }}
+                              aria-label={t('cancel', currentLanguage)}
+                            >
+                              <Close sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </Box>
+                        )}
                         {pendingVoiceContent && !isRecording && (
                           <Box
                             sx={{
@@ -1964,7 +2073,7 @@ const MessagingWidget: React.FC = () => {
                               size="small"
                               color="primary"
                               onClick={() => handleSendMessage()}
-                              disabled={!messageInput.trim() && !pendingVoiceContent}
+                              disabled={!messageInput.trim() && !pendingVoiceContent && !attachedMention}
                               sx={{ p: 0.75 }}
                             >
                               <Send sx={{ fontSize: 20 }} />

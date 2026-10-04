@@ -5,17 +5,20 @@ import { stripRefLinksForDisplay } from '../../utils/refLinkDisplay';
 import { t } from '../../utils/translations';
 import { questionService } from '../../services/questionService';
 import { answerService } from '../../services/answerService';
+import { commentService } from '../../services/commentService';
 import type { Question } from '../../types/question';
 import type { Answer } from '../../types/answer';
+import type { CommentItem } from '../../types/comment';
 
 const PREVIEW_LENGTH = 80;
-const URL_REGEX = /(https?:\/\/[^\s<>"']+)|(\/questions\/[a-zA-Z0-9_-]+)(#answer-[a-zA-Z0-9_-]+)?/g;
+const URL_REGEX = /(https?:\/\/[^\s<>"']+)|(\/questions\/[a-zA-Z0-9_-]+)(#(?:answer|comment)-[a-zA-Z0-9_-]+)?/g;
 
 interface ParsedSegment {
   type: 'text' | 'url';
   value: string;
   questionId?: string;
   answerId?: string;
+  commentId?: string;
   isPlatform?: boolean;
 }
 
@@ -78,6 +81,7 @@ function parseMessageContent(text: string): ParsedSegment[] {
     const fullMatch = match[0];
     let questionId: string | undefined;
     let answerId: string | undefined;
+    let commentId: string | undefined;
     let isPlatform = false;
 
     if (match[1]) {
@@ -87,10 +91,12 @@ function parseMessageContent(text: string): ParsedSegment[] {
         const path = parsed.pathname;
         const hash = parsed.hash || '';
         const qMatch = path.match(/\/questions\/([a-zA-Z0-9_-]+)/);
+        const cMatch = hash.match(/#comment-([a-zA-Z0-9_-]+)/);
         const aMatch = hash.match(/#answer-([a-zA-Z0-9_-]+)/);
         if (qMatch && (parsed.origin === origin || parsed.hostname === new URL(origin).hostname)) {
           questionId = qMatch[1];
-          answerId = aMatch?.[1];
+          commentId = cMatch?.[1];
+          answerId = commentId ? undefined : aMatch?.[1];
           isPlatform = true;
         }
       } catch {
@@ -98,7 +104,9 @@ function parseMessageContent(text: string): ParsedSegment[] {
       }
     } else if (match[2]) {
       questionId = match[2].replace(/^\/questions\//, '').trim();
-      answerId = match[3]?.replace(/^#answer-/, '').trim();
+      const hash = match[3] ?? '';
+      commentId = hash.startsWith('#comment-') ? hash.slice('#comment-'.length) : undefined;
+      answerId = hash.startsWith('#answer-') ? hash.slice('#answer-'.length) : undefined;
       isPlatform = !!questionId;
     }
 
@@ -107,6 +115,7 @@ function parseMessageContent(text: string): ParsedSegment[] {
       value: fullMatch,
       questionId,
       answerId,
+      commentId,
       isPlatform: isPlatform && !!questionId,
     });
     lastIndex = match.index + fullMatch.length;
@@ -160,26 +169,31 @@ interface MessageContentProps {
 const REPLY_REGEX = /^\[reply:([^\]]+)\]\n([^\n]+)\n\n/;
 
 /** Metinde platform soru/cevap linki var mı; varsa questionId ve isteğe bağlı answerId döndür. */
-function extractPlatformLinkFromText(text: string): { questionId: string; answerId?: string } | null {
+function extractPlatformLinkFromText(text: string): { questionId: string; answerId?: string; commentId?: string } | null {
   if (!text || typeof text !== 'string') return null;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  // Tam URL veya /questions/xxx#answer-yyy
   const urlMatch = text.match(/(https?:\/\/[^\s<>"']+)/);
   if (urlMatch) {
     try {
       const parsed = new URL(urlMatch[1], origin);
       const q = parsed.pathname.match(/\/questions\/([a-zA-Z0-9_-]+)/);
+      const c = parsed.hash.match(/#comment-([a-zA-Z0-9_-]+)/);
       const a = parsed.hash.match(/#answer-([a-zA-Z0-9_-]+)/);
       if (q && (parsed.origin === origin || parsed.hostname === new URL(origin).hostname)) {
-        return { questionId: q[1], answerId: a?.[1] };
+        return { questionId: q[1], commentId: c?.[1], answerId: c ? undefined : a?.[1] };
       }
     } catch {
       // ignore
     }
   }
-  const pathMatch = text.match(/\/questions\/([a-zA-Z0-9_-]+)(#answer-([a-zA-Z0-9_-]+))?/);
-  if (pathMatch) return { questionId: pathMatch[1], answerId: pathMatch[3] };
-  return null;
+  const pathMatch = text.match(/\/questions\/([a-zA-Z0-9_-]+)(#(?:answer|comment)-([a-zA-Z0-9_-]+))?/);
+  if (!pathMatch) return null;
+  const hash = pathMatch[2] ?? '';
+  return {
+    questionId: pathMatch[1],
+    commentId: hash.startsWith('#comment-') ? pathMatch[3] : undefined,
+    answerId: hash.startsWith('#answer-') ? pathMatch[3] : undefined,
+  };
 }
 
 /** Yanıt önizlemesi için ham metni temizle: **kalın**, [voice], [reply:...], ref linkleri vb. */
@@ -243,6 +257,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
               <PlatformLinkPreview
                 questionId={replyPreviewPlatformLink.questionId}
                 answerId={replyPreviewPlatformLink.answerId}
+                commentId={replyPreviewPlatformLink.commentId}
                 isOwn={isOwn}
                 currentLanguage={currentLanguage}
                 compact
@@ -257,7 +272,12 @@ const MessageContent: React.FC<MessageContentProps> = ({
       )}
       {segments.map((seg, idx) => {
         if (seg.type === 'text') {
-          const inlineSegments = parseInlineFormat(seg.value);
+          const previous = segments[idx - 1];
+          const value = previous?.type === 'url' && previous.isPlatform
+            ? seg.value.replace(/^\n+/, '')
+            : seg.value;
+          if (!value) return null;
+          const inlineSegments = parseInlineFormat(value);
           const renderWithHighlight = (val: string) =>
             highlightTerm ? highlightText(val, highlightTerm) : val;
           return (
@@ -283,6 +303,7 @@ const MessageContent: React.FC<MessageContentProps> = ({
               key={idx}
               questionId={seg.questionId}
               answerId={seg.answerId}
+              commentId={seg.commentId}
               isOwn={isOwn}
               currentLanguage={currentLanguage}
             />
@@ -313,28 +334,44 @@ const MessageContent: React.FC<MessageContentProps> = ({
 interface PlatformLinkPreviewProps {
   questionId: string;
   answerId?: string;
+  commentId?: string;
   isOwn: boolean;
   currentLanguage: string;
   /** Yanıt önizlemesi gibi dar alanlarda daha küçük gösterim */
   compact?: boolean;
 }
 
-const PlatformLinkPreview: React.FC<PlatformLinkPreviewProps> = ({
+export const PlatformLinkPreview: React.FC<PlatformLinkPreviewProps> = ({
   questionId,
   answerId,
+  commentId,
   isOwn,
   currentLanguage,
   compact = false,
 }) => {
   const [question, setQuestion] = useState<Question | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [comment, setComment] = useState<CommentItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      setLoading(true);
+      setError(false);
+      setComment(null);
+      setQuestion(null);
+      setAnswer(null);
       try {
+        if (commentId) {
+          const list = await commentService.listForQuestion(questionId);
+          if (cancelled) return;
+          const found = list.find(item => item.id === commentId) ?? null;
+          setComment(found);
+          if (!found) setError(true);
+          return;
+        }
         const q = await questionService.getQuestionById(questionId);
         if (cancelled) return;
         if (q) {
@@ -354,13 +391,11 @@ const PlatformLinkPreview: React.FC<PlatformLinkPreviewProps> = ({
     };
     load();
     return () => { cancelled = true; };
-  }, [questionId, answerId]);
+  }, [questionId, answerId, commentId]);
 
   const handleClick = () => {
-    const path = answerId
-      ? `/questions/${questionId}#answer-${answerId}`
-      : `/questions/${questionId}`;
-    window.open(`${window.location.origin}${path}`, '_blank', 'noopener,noreferrer');
+    const hash = commentId ? `#comment-${commentId}` : answerId ? `#answer-${answerId}` : '';
+    window.open(`${window.location.origin}/questions/${questionId}${hash}`, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -382,10 +417,9 @@ const PlatformLinkPreview: React.FC<PlatformLinkPreviewProps> = ({
     );
   }
 
-  if (error || (!question && !answer)) {
-    const fallbackUrl = answerId
-      ? `${window.location.origin}/questions/${questionId}#answer-${answerId}`
-      : `${window.location.origin}/questions/${questionId}`;
+  if (error || (!question && !answer && !comment)) {
+    const hash = commentId ? `#comment-${commentId}` : answerId ? `#answer-${answerId}` : '';
+    const fallbackUrl = `${window.location.origin}/questions/${questionId}${hash}`;
     return (
       <Link
         href={fallbackUrl}
@@ -406,19 +440,29 @@ const PlatformLinkPreview: React.FC<PlatformLinkPreviewProps> = ({
 
   const displayQuestion = question;
   const displayAnswer = answer;
-  const avatarSrc = displayAnswer
+  const avatarSrc = comment
+    ? comment.authorAvatar
+    : displayAnswer
     ? (displayAnswer.userInfo?.profile_image || displayAnswer.author?.avatar)
     : (displayQuestion?.userInfo?.profile_image || displayQuestion?.author?.avatar);
-  const ownerId = displayAnswer
+  const ownerId = comment
+    ? comment.userId
+    : displayAnswer
     ? (displayAnswer.userInfo?._id ?? displayAnswer.author?.id)
     : (displayQuestion?.userInfo?._id ?? displayQuestion?.author?.id);
-  const authorName = displayAnswer
+  const authorName = comment
+    ? comment.authorName
+    : displayAnswer
     ? (displayAnswer.author?.name ?? displayAnswer.userInfo?.name ?? '—')
     : (displayQuestion?.author?.name ?? displayQuestion?.userInfo?.name ?? '—');
-  const title = displayAnswer
+  const title = comment
+    ? comment.authorName
+    : displayAnswer
     ? (displayAnswer.questionSummary ?? displayQuestion?.summary ?? '—')
     : (displayQuestion?.summary ?? '—');
-  const contentDisplay = displayAnswer
+  const contentDisplay = comment
+    ? (comment.deleted ? t('comment_deleted', currentLanguage) : comment.body)
+    : displayAnswer
     ? stripRefLinksForDisplay(displayAnswer.content)
     : stripRefLinksForDisplay(displayQuestion?.detail);
   const contentPreview = contentDisplay?.slice(0, PREVIEW_LENGTH) ?? '';

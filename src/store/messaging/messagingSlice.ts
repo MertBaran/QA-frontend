@@ -21,6 +21,14 @@ interface PaginationInfo {
   total: number;
 }
 
+export interface MessageComposeRequest {
+  id: number;
+  recipient: { id: string; name: string; profile_image?: string };
+  questionId?: string;
+  answerId?: string;
+  commentId?: string;
+}
+
 interface MessagingState {
   conversations: ConversationListItem[];
   messagesByConversation: Record<string, MessageItem[]>;
@@ -31,6 +39,7 @@ interface MessagingState {
   loadingMessages: boolean;
   loadingMoreMessages: boolean;
   error: string | null;
+  pendingCompose: MessageComposeRequest | null;
 }
 
 const initialState: MessagingState = {
@@ -43,6 +52,7 @@ const initialState: MessagingState = {
   loadingMessages: false,
   loadingMoreMessages: false,
   error: null,
+  pendingCompose: null,
 };
 
 /** Yeni mesajla konuşmayı üste taşı (liste sırası sunucuyla uyumlu kalsın). */
@@ -72,6 +82,12 @@ const messagingSlice = createSlice({
   reducers: {
     setActiveConversation: (state, action: PayloadAction<string | null>) => {
       state.activeConversationId = action.payload;
+    },
+    requestMessageCompose: (state, action: PayloadAction<Omit<MessageComposeRequest, 'id'>>) => {
+      state.pendingCompose = { ...action.payload, id: Date.now() };
+    },
+    clearMessageCompose: (state) => {
+      state.pendingCompose = null;
     },
     setConnectionStatus: (state, action: PayloadAction<ConnectionStatus>) => {
       state.connectionStatus = action.payload;
@@ -136,6 +152,10 @@ const messagingSlice = createSlice({
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.loading = false;
         state.conversations = action.payload;
+        if (state.activeConversationId) {
+          const openConversation = state.conversations.find(conversation => conversation.id === state.activeConversationId);
+          if (openConversation) openConversation.unreadCount = 0;
+        }
       })
       .addCase(fetchConversations.rejected, (state, action) => {
         state.loading = false;
@@ -206,6 +226,8 @@ const messagingSlice = createSlice({
 
 export const {
   setActiveConversation,
+  requestMessageCompose,
+  clearMessageCompose,
   setConnectionStatus,
   addMessage,
   clearError,
