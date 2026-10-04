@@ -31,9 +31,9 @@ import themePapirusIcon from '../../asset/icons/home/themes/theme_papirus.png';
 import themeMagnefiteIcon from '../../asset/icons/home/themes/theme_magnefite.png';
 
 const themes = [
-  { id: 'molume' as const, nameKey: 'molume', icon: themeMolumeIcon },
-  { id: 'papirus' as const, nameKey: 'papirus', icon: themePapirusIcon },
   { id: 'magnefite' as const, nameKey: 'magnefite', icon: themeMagnefiteIcon },
+  { id: 'papirus' as const, nameKey: 'papirus', icon: themePapirusIcon },
+  { id: 'molume' as const, nameKey: 'molume', icon: themeMolumeIcon },
 ];
 
 const languages = [
